@@ -1,0 +1,62 @@
+.photo-gallery { margin-top:14px; border:1px solid var(--border,#e8ecf2); border-radius:14px; overflow:hidden; background:#f5f7fa; }
+.photo-carousel { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; scrollbar-width:none; overscroll-behavior-x:contain; aspect-ratio:var(--photo-ratio); max-height:min(76svh,680px); }
+.photo-carousel::-webkit-scrollbar { display:none; }
+.photo-preview { position:relative; min-width:100%; height:100%; flex:0 0 100%; padding:0; background:transparent; scroll-snap-align:start; cursor:zoom-in; }
+.photo-preview img { width:100%; height:100%; object-fit:contain; display:block; }
+.photo-expand { position:absolute; bottom:10px; right:10px; display:grid; place-items:center; width:30px; height:30px; border-radius:9px; background:#17203399; color:#fff; }
+.gallery-controls { display:flex; gap:12px; align-items:center; justify-content:center; background:#fff; padding:3px 8px; font-size:11px; color:#697589; }
+.photo-viewer.modal { width:100vw; max-width:none; height:100dvh; max-height:none; margin:0; border:0; border-radius:0; background:#0a0c11; color:#fff; padding:0; overflow:hidden; }
+.photo-viewer::backdrop { background:#05070ae8; }
+.photo-viewer>header { border-color:#ffffff14; height:calc(60px + env(safe-area-inset-top)); padding:env(safe-area-inset-top) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left)); }
+.photo-viewer .icon-button { color:#fff; background:#ffffff0e; }
+.photo-stage { position:relative; display:flex; align-items:center; justify-content:center; height:calc(100% - 124px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overflow:hidden; touch-action:none; user-select:none; padding:12px; }
+.photo-stage img { max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain; flex-shrink:0; will-change:transform; }
+.photo-loader { position:absolute; width:28px; height:28px; }
+.photo-controls { height:calc(64px + env(safe-area-inset-bottom)); padding-bottom:env(safe-area-inset-bottom); display:flex; gap:12px; align-items:center; justify-content:center; font-size:12px; }
+.photo-control-divider { width:1px; height:22px; background:#ffffff26; }
+.profile-view-switch { display:flex; width:max-content; margin:0 0 12px auto; border:1px solid #e4e9f0; border-radius:12px; padding:4px; background:#fff; }
+.profile-view-switch button { display:flex; align-items:center; gap:7px; border-radius:8px; padding:9px 12px; font-size:12px; color:#65718a; }
+.profile-view-switch button[aria-pressed=true] { background:#edf4ff; color:#2460d5; }
+.profile-grid-header .profile-hero { display:none; }
+.profile-grid-header .profile-header-top { padding-top:16px; }
+.profile-grid-header .profile-avatar { margin-top:0; }
+.profile-grid-header .profile-header-body { padding-top:20px; }
+.profile-tab-indicator { width:calc(100% / 3); }
+.profile-social-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.profile-tile { position:relative; aspect-ratio:4/5; border-radius:9px; overflow:hidden; background:#edf1f7; color:#223148; display:block; }
+.profile-tile>img { width:100%; height:100%; object-fit:cover; display:block; }
+.grid-reel-cover {position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;pointer-events:none;}
+.grid-reel-cover.ready {opacity:1;}
+.grid-text-preview,.grid-video-fallback { padding:16px; display:flex; flex-direction:column; height:100%; justify-content:center; gap:12px; background:linear-gradient(145deg,#f3f7ff,#e7edf8); }
+.grid-text-preview p,.grid-video-fallback p { font-size:12px; line-height:1.6; overflow:hidden; display:-webkit-box; -webkit-line-clamp:7; -webkit-box-orient:vertical; overflow-wrap:anywhere; }
+.grid-video-fallback { background:#14223a; color:#e7eefb; }
+.grid-video-fallback>span { font-size:11px; }
+.grid-media-badge { position:absolute; top:8px; right:8px; color:#fff; filter:drop-shadow(0 1px 3px #0009); }
+.text-tile .grid-media-badge { color:#647997; filter:none; }
+.grid-duration,.grid-attribution { position:absolute; bottom:8px; right:8px; background:#0008; color:#fff; padding:3px 6px; border-radius:5px; font-size:10px; }
+.grid-attribution { left:8px; right:auto; display:flex; align-items:center; gap:4px; max-width:85%; overflow:hidden; }
+.grid-engagement { position:absolute; inset:0; display:flex; justify-content:center; align-items:center; gap:16px; background:#0c182766; color:#fff; opacity:0; transition:opacity 160ms; }
+.grid-engagement>span { display:flex; align-items:center; gap:6px; font-size:12px; }
+.profile-tile:hover .grid-engagement,.profile-tile:focus-visible .grid-engagement { opacity:1; }
+.composer-create-reel { display:inline-flex; align-items:center; gap:7px; font-size:12px; color:#55708f; padding:6px; }
+@media(max-width:600px) { .profile-social-grid {gap:3px;} .profile-tile {border-radius:4px;} .grid-text-preview,.grid-video-fallback {padding:9px;gap:6px;} .grid-text-preview p,.grid-video-fallback p {font-size:10px;-webkit-line-clamp:5;} .grid-engagement {display:none;} .profile-view-switch button {padding:8px 10px;} .photo-controls {gap:8px;} }
+@media(prefers-reduced-motion:reduce) { .grid-engagement {transition:none;} .photo-viewer {animation:none!important;} }
+.reel-video {object-fit:contain; background:#000;}
+@media(max-width:899px) {
+  /* Navigation owns the bottom safe area; these controls are inside the usable video stage. */
+  .reels-page {--playback-dock-h:64px;}
+  .reels-page,.reels-page.comments-open {top:var(--app-top,0px);}
+  .reel-actions {bottom:calc(var(--playback-dock-h) + 12px); max-height:calc(100% - 80px - env(safe-area-inset-top));}
+  .reel-info {bottom:var(--playback-dock-h);}
+  .reel-caption.expanded {max-height:min(30dvh,180px);}
+  .reel-comments footer {padding-bottom:max(16px,env(safe-area-inset-bottom));}
+}
+@media(max-width:899px) and (max-height:500px) {
+  .reels-mobile-nav,.reels-page {--mobile-nav-h:calc(46px + env(safe-area-inset-bottom));}
+  .reel-actions {gap:2px; bottom:var(--playback-dock-h);}
+  .reel-action-icon {width:30px;height:30px;}
+  .reel-action>span:not(.reel-action-icon) {font-size:9px;line-height:12px;}
+  .reel-info {padding-top:4px;}
+  .reel-caption-text {-webkit-line-clamp:1;}
+  .reels-topbar {padding-bottom:6px;}
+}

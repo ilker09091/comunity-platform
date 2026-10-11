@@ -1,0 +1,179 @@
+import assert from "node:assert/strict";
+import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+import { join, resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import ts from "typescript";
+import { JSDOM } from "jsdom";
+import React, { act } from "react";
+import { createRoot } from "react-dom/client";
+import { compileVideoFixtures } from "./transpile-video-fixtures.mjs";
+
+const rootPath = fileURLToPath(new URL("../", import.meta.url));
+const temp = await mkdtemp(join(rootPath, ".upgrade-tests-"));
+const dom = new JSDOM("<div id='root'></div>", { url: "http://localhost/reels", pretendToBeVisual: true });
+Object.assign(globalThis, { window: dom.window, document: dom.window.document, MutationObserver: dom.window.MutationObserver, Element: dom.window.Element, IS_REACT_ACT_ENVIRONMENT: true });
+window.matchMedia = (media) => ({ matches: false, media, addEventListener() {}, removeEventListener() {} });
+dom.window.HTMLMediaElement.prototype.load = function () {};
+dom.window.HTMLMediaElement.prototype.pause = function () {};
+dom.window.HTMLMediaElement.prototype.play = function () { return Promise.resolve(); };
+dom.window.HTMLCanvasElement.prototype.getContext = () => null;
+const author = { id: "creator", username: "creator", displayName: "Creator" };
+const post = (id) => ({ id, kind: "ORIGINAL", author, media: [{ id: "media-" + id, type: "VIDEO", status: "READY", url: "https://example.invalid/" + id + ".mp4" }], createdAt: new Date().toISOString(), content: "Caption", likeCount: 0, commentCount: 2, repostCount: 0, quoteCount: 0 });
+globalThis.reelsFixture = { data: { pages: [{ items: [post("first"), post("second"), post("third")] }] }, hasNextPage: false, isPending: false, isFetchingNextPage: false, refetch: async () => {}, fetchNextPage: async () => {} };
+const host = document.getElementById("root"), root = createRoot(host);
+let checks = 0;
+const pass = (name) => { checks++; console.log("PASS " + name); };
+try {
+  await writeFile(join(temp, "shims.mjs"), `
+    export const useFeatures = () => ({ config: undefined, on: () => true, readOnly: false, canWrite: () => true });
+    import React from "react";
+    export function Link({children,href,...props}) { return React.createElement("a",{...props,href},children); }
+    export const useRouter = () => ({push(){},back(){},replace(){}});
+    export const useQueryClient = () => ({getQueryData(){},invalidateQueries(){return Promise.resolve();}});
+    export const useSearchParams = () => new URLSearchParams(globalThis.reelStartId ? "start="+globalThis.reelStartId+(globalThis.reelMediaId ? "&media="+globalThis.reelMediaId : "") : "");
+    export const useInfiniteQuery = () => globalThis.reelsFixture;
+    export const useQuery = ({queryKey}) => queryKey[0] === "profile" ? globalThis.reelProfileQuery ?? {isPending:false,data:{isFollowing:false,isFollowRequested:false,isBlocking:false}} : globalThis.reelStartQuery ?? {isPending:true};
+    export const api = async () => {};
+    export const sharePath = async () => {};
+    export const usePostEngagement = () => ({act(){},pending:false,repostable:true});
+    export const useSession = () => ({user:{id:"me",username:"me",displayName:"Me"}});
+    export const useToast = () => () => {};
+    export const Avatar = () => React.createElement("span",null,"Avatar");
+    export const Dropdown = ({children,summary}) => React.createElement("details",null,React.createElement("summary",null,summary),children);
+    export const relativeTime = () => "now";
+    export const FollowButton = ({variant}) => React.createElement("button",{"aria-label":"Follow creator","data-variant":variant},"Follow");
+    export const CommentList = () => React.createElement("p",null,"Comments fixture");
+    export const CommentInput = () => React.createElement("textarea",{"aria-label":"Comment fixture"});
+    export const ReportDialog = () => null;
+    export const Brand = () => React.createElement("a",{href:"/"},"circle.");
+    export const MobileNav = () => React.createElement("nav",{className:"reels-mobile-nav"},"Mobile navigation");
+    export const PostComposer = () => null;
+    export const RichText = ({text}) => React.createElement("p",null,text);
+  `);
+  await compileVideoFixtures(rootPath, temp);
+  for (const name of ["components/reels", "lib/profile-editor", "lib/image-crop"]) {
+    let source = await readFile(join(rootPath, "src", name + (name.startsWith("lib") ? ".ts" : ".tsx")), "utf8");
+    if (name.endsWith("/reels")) {
+      source = source.replace('import Link from "next/link";', 'import { Link } from "./shims.mjs";')
+        .replace('import FollowButton from "./follow-button";', 'import { FollowButton } from "./shims.mjs";')
+        .replace('import CommentList, { CommentInput } from "./comments";', 'import { CommentList, CommentInput } from "./shims.mjs";')
+        .replace('import ReportDialog from "./report-dialog";', 'import { ReportDialog } from "./shims.mjs";');
+      source = source.replace('from "@/lib/reel-watch-transport"','from "./reel-watch-transport.mjs"').replace('import PostComposer from "./post-composer";', 'import { PostComposer } from "./shims.mjs";').replace('from "@/lib/video-playback-coordinator"', 'from "./video-playback-coordinator.mjs"');
+      for (const dependency of ["next/navigation", "@tanstack/react-query", "@/lib/api/client", "@/lib/use-post-engagement", "./providers", "./ui", "./main-layout", "./post-card", "@/lib/platform-config"]) source = source.replace(`from "${dependency}"`, 'from "./shims.mjs"');
+      source = source.replace('from "./reel-player"', 'from "./reel-player.mjs"').replace('from "@/lib/reel-watch-transport"', 'from "./reel-watch-transport.mjs"');
+    }
+    const output = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText.replace('"./media-video"', '"./media-video.mjs"');
+    await writeFile(join(temp, name.split("/")[1] + ".mjs"), output);
+  }
+  const { default: Reels } = await import(pathToFileURL(join(temp, "reels.mjs")));
+  const render = async () => act(async () => root.render(React.createElement(Reels)));
+  const selectedVideo = () => host.querySelector('section[aria-hidden="false"] video');
+  const currentName = () => selectedVideo()?.getAttribute("src");
+  await render();
+  assert.match(currentName(), /first\.mp4/);
+  assert.equal(host.querySelectorAll(".reels-sidebar nav > a").length, 7);
+  assert.ok(host.querySelector('.reels-sidebar [aria-label="Create Reel"]'));
+  assert.ok(host.querySelector('.reels-sidebar a[href="/saved"]'));
+  assert.ok(host.querySelector('a[href="/profile/creator"]'));
+  assert.ok(host.querySelectorAll("video").length <= 3);
+  const soundVideo = selectedVideo();
+  await act(async () => host.querySelector('[aria-label="Unmute"]').click());
+  assert.equal(soundVideo.muted,false);
+  assert.equal(selectedVideo(),soundVideo);
+  pass("desktop navigation and creator links render; at most three video elements mount");
+  const video = selectedVideo();
+  video.currentTime = 17;
+  await act(async () => host.querySelector('[aria-label="Comments, 2"]').click());
+  assert.ok(host.querySelector(".reel-comments"));
+  assert.equal(selectedVideo(), video);
+  assert.equal(video.currentTime, 17);
+  assert.equal(host.querySelector('[aria-label="Next reel"]').disabled, false, "desktop navigation stays usable with comments open");
+  host.querySelector(".reel-comments").dispatchEvent(new window.WheelEvent("wheel", { deltaY: 100, bubbles: true }));
+  assert.match(currentName(), /first\.mp4/);
+  await act(async () => host.querySelector('[aria-label="Close comments"]').click());
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 200)));
+  assert.equal(host.querySelector(".reel-comments"), null);
+  assert.equal(selectedVideo(), video);
+  pass("comments open/close preserve the same player; comment wheel events do not navigate");
+  const stage = host.querySelector(".reel-viewport");
+  const seekControl = host.querySelector('section[aria-hidden="false"] .video-seek');
+  await act(async () => seekControl.dispatchEvent(new window.WheelEvent("wheel", { deltaY: 100, bubbles: true, cancelable: true })));
+  const scrubTouch = (type, y) => { const event = new window.Event(type, { bubbles: true }); Object.defineProperty(event,"touches",{value:[{clientY:y}]}); seekControl.dispatchEvent(event); };
+  await act(async () => { scrubTouch("touchstart",600); scrubTouch("touchmove",100); scrubTouch("touchend",100); });
+  assert.match(currentName(), /first\.mp4/);
+  pass("wheel and touch scrubbing on the seek control never navigate the carousel");
+  await act(async () => stage.dispatchEvent(new window.WheelEvent("wheel", { deltaY: 70, bubbles: true, cancelable: true })));
+  assert.match(currentName(), /second\.mp4/);
+  for (let i = 0; i < 6; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    await act(async () => stage.dispatchEvent(new window.WheelEvent("wheel", { deltaY: 70, bubbles: true, cancelable: true })));
+  }
+  assert.match(currentName(), /second\.mp4/, "one uninterrupted wheel gesture advances once, including after the animation lock");
+  pass("a continuous wheel gesture advances exactly one reel");
+  const secondVideo = selectedVideo();
+  globalThis.reelsFixture = { ...globalThis.reelsFixture, data: { pages: [{ items: [post("inserted"), post("first"), post("second"), post("third")] }] } };
+  await render();
+  assert.match(currentName(), /second\.mp4/); assert.equal(selectedVideo(), secondVideo);
+  pass("a feed refresh inserting an earlier post preserves the selected reel ID and DOM player");
+  await act(async () => window.dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true })));
+  assert.match(currentName(), /first\.mp4/);
+  await new Promise((resolve) => setTimeout(resolve, 450));
+  // Dispatch a swipe from the accessible play surface, not a passive background.
+  const surface = host.querySelector('section[aria-hidden="false"] .reel-play-surface');
+  const touch = (type, y) => { const event = new window.Event(type, { bubbles: true }); Object.defineProperty(event, "touches", { value: [{ clientY: y }] }); surface.dispatchEvent(event); };
+  await act(async () => { touch("touchstart", 600); touch("touchmove", 200); touch("touchend", 200); });
+  assert.match(currentName(), /second\.mp4/);
+  pass("keyboard navigation and a swipe on the play surface select the expected reels");
+  globalThis.reelsFixture = { ...globalThis.reelsFixture, data: { pages: [{ items: [] }] } };
+  await render();
+  assert.match(host.textContent, /No unseen reels are available/);
+  pass("an empty feed renders its empty state even when the optional start query is disabled");
+  globalThis.reelsFixture = { ...globalThis.reelsFixture, data: { pages: [{items:[post("other")]}] } };
+  globalThis.reelStartId = "requested"; globalThis.reelStartQuery = {isPending:true};
+  await render();
+  assert.equal(selectedVideo(),null);
+  globalThis.reelStartQuery = {isPending:false,data:post("requested")};
+  await render();
+  assert.match(currentName(),/requested\.mp4/);
+  pass("an explicit start reel wins even when its post request settles after the feed");
+  const requested = post("requested");
+  requested.media.push({...requested.media[0],id:"second-media",url:"https://example.invalid/exact-video.mp4"});
+  globalThis.reelMediaId = "second-media"; globalThis.reelStartQuery = {isPending:false,data:requested};
+  await render(); assert.match(currentName(),/exact-video\.mp4/);
+  await act(async () => root.render(null));
+  await render(); assert.match(currentName(),/exact-video\.mp4/,"a freshly mounted direct URL preserves the requested media");
+  globalThis.reelMediaId = "deleted-media";
+  await render(); assert.equal(selectedVideo(),null); assert.match(host.textContent,/Reel unavailable/);
+  globalThis.reelStartQuery = {isPending:false,isError:true};
+  await render(); assert.equal(selectedVideo(),null); assert.match(host.textContent,/private, deleted or restricted/);
+  pass("direct links select exact media outside the feed and show an unavailable state for missing/restricted targets");
+  globalThis.reelMediaId = undefined; globalThis.reelStartQuery = {isPending:false,data:requested};
+  globalThis.reelProfileQuery = {isPending:false,data:{isBlocking:true}};
+  await render(); assert.equal(host.querySelector('[aria-label="Follow creator"]'),null);
+  globalThis.reelProfileQuery = {isPending:false,data:{isBlocking:false}};
+  await render(); assert.ok(host.querySelector('[data-variant="badge"]'));
+  pass("blocked creator relationships hide the follow action; available creators use the compact badge");
+
+  const { profileFields, profilePatch, validateProfile } = await import(pathToFileURL(join(temp, "profile-editor.mjs")));
+  const original = profileFields({ displayName: "Me", username: "user_name", bio: "Keep this", website: null, location: "Tbilisi" });
+  assert.deepEqual(profilePatch({ ...original, bio: " " }, original, false, false), { bio: null });
+  assert.deepEqual(profilePatch({ ...original, displayName: "New Name" }, original, true, false), { displayName: "New Name", isPrivate: true });
+  assert.equal(validateProfile(original).username, undefined);
+  assert.ok(validateProfile({ ...original, website: "javascript:alert(1)" }).website);
+  assert.ok(validateProfile({ ...original, username: "x" }).username);
+  pass("profile updates preserve untouched fields, clear nullable fields, and validate names/website protocols");
+  const { cropOutputSize } = await import(pathToFileURL(join(temp, "image-crop.mjs")));
+  assert.deepEqual(cropOutputSize({ x: 0, y: 0, width: 2000, height: 2000 }, "avatar"), { width: 1024, height: 1024 });
+  assert.deepEqual(cropOutputSize({ x: 0, y: 0, width: 2400, height: 800 }, "cover"), { width: 1800, height: 600 });
+  assert.deepEqual(cropOutputSize({ x: 0, y: 0, width: 600, height: 200 }, "cover"), { width: 600, height: 200 });
+  assert.throws(() => cropOutputSize({ x: NaN, y: 0, width: 0, height: 0 }, "avatar"));
+  pass("crop export dimensions preserve 1:1/3:1 ratios, bound resolution, and reject invalid areas");
+  await act(async () => root.unmount());
+  assert.equal(document.documentElement.style.overflow, "");
+  pass("leaving Reels restores document scrolling");
+  console.log(`\n${checks} upgrade checks passed. APIs and native video decoding were mocked; no real account data was changed.`);
+} finally {
+  dom.window.close();
+  assert.ok(resolve(temp).startsWith(resolve(rootPath) + sep) && temp.includes(".upgrade-tests-"));
+  await rm(temp, { recursive: true, force: true });
+}

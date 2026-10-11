@@ -1,0 +1,26 @@
+node_modules/
+.next/
+dist/
+build/
+.env
+.env.*
+!.env.example
+*.log
+coverage/
+.DS_Store
+
+
+
+# Dependencies and builds
+**/node_modules/
+**/.next/
+**/dist/
+**/build/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Runtime logs
+*.log
