@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Circle Video Importer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { color-scheme: light; --blue:#2563eb; --ink:#172033; --muted:#6b7588; --line:#e6eaf1; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#f7f9fc; color:var(--ink); font-family:Poppins,system-ui,sans-serif; font-size:14px; }
+    button,input,select { font:inherit; }
+    button { cursor:pointer; }
+    button:disabled { cursor:default; opacity:.5; }
+    button,a,input,select,summary { -webkit-tap-highlight-color:transparent; }
+    :focus-visible { outline:3px solid #93bbff; outline-offset:3px; }
+    [hidden] { display:none !important; }
+    .top { background:#fff; border-bottom:1px solid var(--line); }
+    .top-inner { max-width:1120px; margin:auto; padding:23px 24px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
+    .brand { color:var(--blue); font-size:21px; font-weight:700; letter-spacing:-.8px; }
+    .pill { padding:6px 11px; border-radius:30px; color:var(--muted); border:1px solid var(--line); font-size:11px; }
+    main { max-width:1120px; margin:auto; padding:42px 24px 40px; }
+    .eyebrow { font-size:11px; text-transform:uppercase; letter-spacing:1.8px; color:var(--blue); font-weight:600; }
+    h1 { margin:8px 0 10px; font-size:clamp(26px,4vw,36px); font-weight:600; letter-spacing:-1.2px; }
+    h2 { margin:0; font-size:17px; font-weight:600; letter-spacing:-.3px; }
+    p { line-height:1.7; }
+    .subtitle { color:var(--muted); margin:0 0 26px; max-width:650px; }
+    .card { background:#fff; border:1px solid var(--line); border-radius:18px; box-shadow:0 5px 24px #132a4a04; }
+    .search { padding:23px; margin-bottom:16px; }
+    .search-options { display:grid; grid-template-columns:1fr 160px; gap:16px; margin-bottom:18px; }
+    #username-field { flex:1; min-width:0; }
+    #username-field input { width:100%; }
+    .search-row { align-items:end; }
+    #fetch-button { flex-shrink:0; }
+    .label { display:block; font-size:12px; font-weight:500; margin-bottom:9px; }
+    .search-row { display:flex; gap:12px; }
+    .search-row input { flex:1; min-width:0; }
+    input:not([type=checkbox]),select { width:100%; height:46px; padding:0 14px; border:1px solid #dce2ec; border-radius:10px; background:#fff; color:var(--ink); }
+    input::placeholder { color:#929bad; }
+    .button { display:inline-flex; gap:8px; align-items:center; justify-content:center; min-height:46px; padding:0 19px; border:0; border-radius:10px; font-weight:500; font-size:13px; background:var(--blue); color:#fff; white-space:nowrap; transition:background 180ms,box-shadow 180ms,transform 180ms; }
+    .button:hover:not(:disabled) { background:#1d4ed8; box-shadow:0 4px 12px #2563eb22; }
+    .button:active:not(:disabled) { transform:translateY(1px); }
+    .secondary { color:var(--ink); background:#fff; border:1px solid #dce2ec; }
+    .secondary:hover:not(:disabled) { background:#f2f6fc; box-shadow:none; }
+    .small { min-height:36px; padding:0 12px; font-size:12px; }
+    .hint { color:var(--muted); font-size:11px; margin:10px 0 0; }
+    .personal-setup { margin-top:18px; padding:16px; border:1px solid #dbe7ff; border-radius:12px; background:#f5f8ff; }
+    .personal-setup p { margin:0 0 12px; font-size:12px; }
+    .personal-actions { display:flex; flex-wrap:wrap; gap:10px; }
+    .personal-actions a { text-decoration:none; }
+    #feedback { margin:16px 0; padding:12px 16px; border-radius:10px; background:#edf4ff; color:#254d88; line-height:1.6; }
+    #feedback[data-kind=error] { background:#fff0f0; color:#a02f3e; }
+    #feedback[data-kind=success] { background:#ebf8f0; color:#24764b; }
+    .section-head { display:flex; align-items:center; justify-content:space-between; margin:28px 0 16px; gap:16px; }
+    #library-count { display:block; color:var(--muted); font-size:12px; margin-top:4px; }
+    .empty { padding:60px 20px; text-align:center; }
+    .empty-icon { display:grid; place-items:center; width:64px; height:64px; margin:0 auto 18px; border-radius:18px; color:var(--blue); background:#eff5ff; }
+    .empty h2 { font-size:16px; }
+    .empty p { margin:9px auto 0; color:var(--muted); max-width:380px; font-size:12px; }
+    .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:19px; }
+    .video-card { overflow:hidden; transition:box-shadow 180ms,transform 180ms; }
+    .video-card:hover { box-shadow:0 9px 28px #15294b0b; transform:translateY(-2px); }
+    .video-card.is-selected { border-color:#8cb5ff; box-shadow:0 0 0 2px #2563eb14; }
+    .thumbnail { position:relative; aspect-ratio:4/3; background:#eef2f8; overflow:hidden; display:grid; place-items:center; color:var(--muted); }
+    .thumbnail img { width:100%; height:100%; object-fit:cover; position:absolute; inset:0; }
+    .duration { position:absolute; bottom:10px; right:10px; padding:3px 7px; border-radius:6px; background:#172033cf; color:#fff; font-size:10px; font-variant-numeric:tabular-nums; }
+    .check-label { position:absolute; top:10px; left:10px; padding:7px; background:#fffffff0; border-radius:8px; display:flex; }
+    input[type=checkbox] { width:18px; height:18px; margin:0; accent-color:var(--blue); cursor:pointer; }
+    input[type=checkbox]:disabled { cursor:default; }
+    .video-body { padding:16px; }
+    .creator { margin:0 0 7px; color:var(--blue); font-size:11px; font-weight:500; overflow-wrap:anywhere; }
+    .description { margin:0 0 12px; font-size:12px; line-height:1.65; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height:40px; overflow-wrap:anywhere; }
+    .video-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .video-state { color:var(--muted); font-size:10px; max-width:65%; overflow-wrap:anywhere; }
+    .video-state[data-state=imported],.video-state[data-state=duplicate] { color:#24764b; }
+    .video-state[data-state=error] { color:#a02f3e; }
+    .load-row { text-align:center; margin:22px 0; }
+    .selection-bar { position:sticky; bottom:12px; z-index:2; display:flex; align-items:center; justify-content:space-between; gap:18px; padding:16px 20px; margin-top:22px; box-shadow:0 6px 28px #132a4a0c; background:#fffffff5; backdrop-filter:blur(14px); }
+    .selection-bar strong { display:block; font-size:13px; font-weight:500; }
+    .selection-bar small { display:block; color:var(--muted); font-size:10px; margin-top:3px; }
+    .progress-card { margin-top:22px; padding:22px; }
+    #progress-text { color:var(--muted); font-size:12px; line-height:1.7; }
+    progress { width:100%; height:8px; display:block; border:none; border-radius:8px; background:#edf1f7; accent-color:var(--blue); overflow:hidden; }
+    progress::-webkit-progress-bar { background:#edf1f7; }
+    progress::-webkit-progress-value { background:var(--blue); border-radius:8px; }
+    progress::-moz-progress-bar { background:var(--blue); border-radius:8px; }
+    #import-log { list-style:none; padding:0; margin:16px 0 0; max-height:220px; overflow:auto; }
+    #import-log li { padding:10px 0; border-top:1px solid var(--line); font-size:11px; line-height:1.6; overflow-wrap:anywhere; }
+    #import-log li[data-kind=error] { color:#a02f3e; }
+    dialog { padding:0; width:min(620px,calc(100% - 24px)); max-height:calc(100dvh - 32px); border:none; border-radius:18px; box-shadow:0 24px 100px #0004; color:var(--ink); }
+    dialog::backdrop { background:#16213b80; backdrop-filter:blur(4px); }
+    .preview-head { display:flex; gap:15px; align-items:center; justify-content:space-between; padding:16px 20px; }
+    .close { width:36px; height:36px; border:0; border-radius:50%; background:#f2f5fa; color:var(--ink); font-size:23px; }
+    #preview-content { background:#000; display:flex; justify-content:center; }
+    #preview-content video,#preview-content iframe { display:block; width:100%; height:min(65dvh,620px); border:0; object-fit:contain; }
+    #preview-caption { padding:0 20px 16px; color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+    .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
+    .work-panel { padding:24px; margin-top:22px; }
+    .work-panel h2 { margin:0 0 8px; }
+    .work-panel p { color:var(--muted); font-size:12px; line-height:1.8; }
+    .form-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:18px 0; }
+    .form-grid label { min-width:0; }
+    .form-grid input,.form-grid select { width:100%; }
+    .work-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+    .work-status { padding:12px 15px; background:#f4f7fc; border-radius:10px; margin:15px 0; font-size:12px; line-height:1.8; overflow-wrap:anywhere; }
+    .work-status[data-kind="error"] { color:#b42318; background:#fff3f1; }
+    .queue-card { border:1px solid var(--line); border-radius:12px; padding:16px; margin-top:12px; }
+    .queue-card summary { cursor:pointer; font-size:12px; line-height:1.8; }
+    .queue-card ol { font-size:12px; padding-left:22px; max-height:230px; overflow:auto; }
+    .queue-card li { margin:8px 0; overflow-wrap:anywhere; }
+    .queue-card progress { margin:12px 0; }
+    .danger-button { background:#fff3f1; color:#b42318; border:1px solid #ffd3ce; }
+    .check-field { display:flex; align-items:center; gap:9px; font-size:12px; }
+    .check-field input { width:auto; }
+    details.work-panel>summary { cursor:pointer; font-weight:600; }
+    @media(max-width:680px) { .form-grid { grid-template-columns:1fr 1fr; } .work-panel { padding:18px; } }
+    @media(max-width:420px) { .form-grid { grid-template-columns:1fr; } }
+    @media(max-width:800px) { .grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media(max-width:520px) { main { padding:28px 16px; } .top-inner { padding:18px 16px; } .search { padding:18px; } .search-options { grid-template-columns:1fr; gap:12px; } .search-row { flex-direction:column; align-items:stretch; } .grid { grid-template-columns:1fr; } .selection-bar { padding:14px; gap:8px; } .selection-bar .button { padding:0 12px; font-size:12px; } }
+    @media(prefers-reduced-motion:reduce) { * { transition:none !important; } }
+  </style>
+</head>
+<body>
+  <header class="top"><div class="top-inner"><span class="brand">Circle</span><span class="pill">Video importer</span></div></header>
+  <main>
+    <div class="eyebrow">Your content, connected</div>
+    <h1>Circle Video Importer</h1>
+    <p class="subtitle">Keşfetini Circle’a bağla. Videoları seçerek aktar veya adet ve aralık belirleyip arka planda otomatik yayınla.</p>
+
+    <form id="search-form" class="card search">
+      <div class="search-options">
+        <div><label class="label" for="source-mode">Video kaynağı</label><select id="source-mode" name="mode"><option value="personal_auto" selected>Benim Keşfetim (arka plan hesabı)</option><option value="personal">Açık TikTok sekmem (yer imi)</option><option value="profile">Kullanıcı profili</option><option value="explore">Keşfet (genel)</option></select></div>
+        <div><label class="label" for="video-limit">Video sayısı</label><input id="video-limit" name="limit" type="number" min="1" max="100" step="1" value="20" required inputmode="numeric" aria-describedby="username-help"></div>
+      </div>
+      <div class="search-row"><div id="username-field"><label class="label" for="username">TikTok kullanıcı adı veya bağlantısı</label><input id="username" name="account" list="recent-profiles" placeholder="@kullanici veya https://www.tiktok.com/@kullanici" required maxlength="500" autocomplete="off" spellcheck="false" aria-describedby="username-help"><datalist id="recent-profiles"></datalist></div><button id="fetch-button" class="button" type="submit">Fetch Videos <span aria-hidden="true">→</span></button></div>
+      <p id="username-help" class="hint">Herkese açık profil veya video bağlantısını girin. Seçilen videolar açık Circle hesabınıza aktarılır.</p>
+      <div id="personal-setup" class="personal-setup" hidden>
+        <p><strong>Açık TikTok hesabındaki akışı al:</strong> Aşağıdaki “Circle Keşfetimi Al” bağlantısını tarayıcının yer imleri çubuğuna sürükle. Kendi hesabınla TikTok’un <strong>Sizin İçin</strong> sekmesindeyken bu yer imine tıkla. Videolar toplandıktan sonra bu araca dönülür.</p>
+        <div class="personal-actions"><a id="personal-bookmark" class="button small" draggable="true" href="#">Circle Keşfetimi Al</a><button id="copy-personal-bookmark" class="button secondary small" type="button">Yer imi bağlantısını kopyala</button><a class="button secondary small" href="https://www.tiktok.com/foryou" target="_blank" rel="noopener noreferrer">TikTok Sizin İçin’i aç ↗</a></div>
+        <p class="hint" style="margin:12px 0 0">Yer imi video sayısını sorar (1–100). Açık sekmedeki videoları okur; şifre ve çerez bilgilerini almaz. Toplanan videolar otomatik paylaşılmaz, önce burada seçilir.</p>
+      </div>
+    </form>
+
+
+    <div id="feedback" role="status" aria-live="polite" hidden></div>
+    <section class="card work-panel" aria-labelledby="automation-title">
+      <div class="eyebrow">Arka planda çalışır</div><h2 id="automation-title">Keşfet otomasyonu</h2>
+      <p>Bu sayfayı kapatabilirsin; servis açık kaldığı sürece toplama ve yayınlama devam eder. Bilgisayar kapalıyken çalışmaz. TikTok penceresinde aynı hesabına bir kez giriş yapıp pencereyi kapat.</p>
+      <div class="work-actions"><button id="tiktok-login" type="button" class="button secondary small">TikTok hesabını bağla ↗</button><button id="circle-connect" type="button" class="button secondary small">Circle oturumunu bağla</button><a class="button secondary small" href="http://localhost:3000/login" target="_blank" rel="noopener noreferrer" id="circle-login-link">Circle’a giriş yap ↗</a></div>
+      <label class="check-field" style="margin-top:16px"><input id="startup-enabled" type="checkbox">Windows oturum açıldığında servisi sessizce başlat</label><p id="startup-status" class="hint">Başlangıç ayarı yükleniyor…</p>
+      <div id="worker-status" class="work-status" role="status" aria-live="polite">Servis ve hesap bilgileri yükleniyor…</div>
+      <form id="automation-form">
+        <div class="form-grid">
+          <label><span class="label">Ne zaman çeksin?</span><select id="auto-when"><option value="instant">Şimdi direkt çek</option><option value="daily">Her gün belli saatte çek</option></select></label>
+          <label id="auto-time-field" hidden><span class="label">Saat kaçta çeksin?</span><input id="auto-time" type="time" value="09:00"></label>
+          <label><span class="label">Videolar nereden alınsın?</span><select id="auto-mode"><option value="personal_auto">Benim Keşfetim</option><option value="explore">Genel Keşfet</option><option value="profile">TikTok profili</option></select></label>
+          <label id="auto-account-field" hidden><span class="label">TikTok kullanıcı adı</span><input id="auto-account" placeholder="@kullanici" maxlength="500" autocomplete="off"></label>
+          <label><span class="label">Kaç video alsın?</span><input id="auto-count" type="number" min="1" max="500" step="1" value="200" required></label>
+        </div>
+        <p class="hint"><strong>Nasıl çalışır:</strong> <em>Şimdi direkt çek</em> seçersen "Başlat"a basınca hemen video çekimi başlar; belirlediğin sayıya ulaşınca otomatik durur. <em>Her gün belli saatte</em> seçersen her gün yazdığın saatte otomatik çeker. TikTok tarayıcısının açılması ve videoların indirilip Circle'a yüklenmesi birkaç dakika sürebilir. Aynı video tekrar yayınlanmaz.</p>
+        <div class="work-actions"><button id="auto-start" class="button" type="submit">Başlat</button><button id="auto-stop" class="button danger-button" type="button">Durdur</button></div>
+      </form>
+      <div id="schedule-status" class="work-status" role="status" aria-live="polite">Otomasyon henüz başlatılmadı.</div>
+    </section>
+    <section class="card work-panel" aria-labelledby="queue-title"><h2 id="queue-title">Arka plan kuyruğu</h2><p>Yenileme ve servis yeniden başlatmaları kuyruğu silmez. Duraklat/iptal, devam eden videodan sonraki işleri durdurur. Oturum sona ererse giriş yapıp yeniden bağlayabilirsin.</p><div class="work-actions"><button type="button" id="stop-all" class="button secondary small">Tüm işleri duraklat</button><button type="button" id="cancel-all" class="button danger-button small">Tüm bekleyen işleri iptal et</button></div><div id="background-queues" aria-live="polite"><p>Henüz kuyruk yok.</p></div></section>
+    <details class="card work-panel" id="database-panel"><summary>Bağlantı ve PostgreSQL ayarları</summary>
+      <p>Circle’ın mevcut NestJS bağlantısını yönetir. MP4 dosyaları mevcut medya storage’ında tutulur. Bağlantıyı uygulamak Circle backend’ini yeniden başlatır; farklı veritabanına geçmek mevcut verileri taşımaz. Otomasyonu durdurup açık kuyrukları bitir/iptal et.</p>
+      <form id="database-form"><div class="form-grid">
+        <label><span class="label">PostgreSQL host</span><input id="db-host" autocomplete="off" required maxlength="253"></label>
+        <label><span class="label">Port</span><input id="db-port" type="number" min="1" max="65535" value="5432" required></label>
+        <label><span class="label">Veritabanı adı</span><input id="db-name" autocomplete="off" required maxlength="253"></label>
+        <label><span class="label">Kullanıcı</span><input id="db-user" autocomplete="off" required maxlength="253"></label>
+        <label><span class="label">Yeni parola</span><input id="db-password" type="password" autocomplete="new-password" maxlength="2048" placeholder="Boş bırakırsan mevcut parola korunur"></label>
+        <label class="check-field"><input id="db-ssl" type="checkbox">TLS / SSL (sertifika doğrulanır)</label>
+      </div><label class="check-field"><input id="db-clear-password" type="checkbox">Mevcut veritabanı parolasını kaldır</label>
+      <div class="work-actions" style="margin-top:18px"><button id="db-test" type="submit" class="button secondary">Bağlantıyı test et</button><button id="db-apply" type="button" class="button">Test et, kaydet ve Circle’ı yeniden başlat</button></div></form>
+      <div id="database-status" class="work-status" role="status" aria-live="polite">Ayarlar yükleniyor…</div>
+      <p id="storage-summary" class="hint"></p>
+    </details>
+    <section aria-labelledby="library-title">
+      <div class="section-head"><div><h2 id="library-title">Video library</h2><span id="library-count">Your videos will appear here</span></div><button id="select-all" type="button" class="button secondary small" disabled>Select All</button></div>
+      <div id="empty" class="card empty"><div class="empty-icon" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="m10 9 5 3-5 3V9Z"/></svg></div><h2 id="empty-title">Videolarınızı getirin</h2><p id="empty-text">@kullanıcı adı veya tam profil/video bağlantısıyla başlayın.</p></div>
+      <div id="video-grid" class="grid" aria-busy="false"></div>
+      <div class="load-row"><button id="load-more" type="button" class="button secondary" hidden>Load More</button></div>
+      <div class="card selection-bar"><div><strong id="selection-count" aria-live="polite">0 videos selected</strong><small>Already imported videos are excluded.</small></div><button id="import-button" type="button" class="button" disabled>Import Selected <span aria-hidden="true">↑</span></button></div>
+    </section>
+
+    <section id="progress-section" class="card progress-card" aria-labelledby="progress-title" hidden><h2 id="progress-title">Import progress</h2><p id="progress-text" role="status" aria-live="polite"></p><progress id="import-progress" max="1" value="0" aria-label="Import progress"></progress><ul id="import-log" aria-label="Import results"></ul></section>
+
+
+  </main>
+  <dialog id="preview-dialog" aria-labelledby="preview-title"><div class="preview-head"><h2 id="preview-title">Video preview</h2><button id="close-preview" type="button" class="close" aria-label="Close preview">×</button></div><div id="preview-content"></div><p id="preview-caption"></p></dialog>
+  <noscript><p style="padding:24px">Enable JavaScript to use the video importer.</p></noscript>
+  <!-- Public TikTok extraction/downloads run in tools/tiktok_importer.py (yt-dlp).
+  Start with start-importer.cmd; the helper serves this single HTML over HTTP.
+  API_CONFIG can target another compatible helper. CIRCLE_WEB_URL configures the
+  existing Circle frontend gateway, default http://localhost:3000. Existing Circle
+  session cookies supply the destination author; no manual credentials required.
+  Media/post rows are created via existing authenticated Circle APIs. MP4 files
+  live in its configured storage. Local imports.sqlite3 contains metadata, the
+  durable queue/schedule and DPAPI-encrypted background Circle credentials.
+  No TikTok OAuth/API key required. Private/restricted pages and extraction errors
+  are reported honestly. Only import content you have permission to publish. -->
+  <script>
+    'use strict';
+    const $ = id => document.getElementById(id);
+    const videos = new Map(), selected = new Set(), confirmed = new Map();
+    let account = '', cursor = null, activeConfig = null, activeMode = 'profile', activeLimit = 20, fetching = false, importing = false;
+    // Run start-importer.cmd to serve the tool and its real download adapters.
+    // Configure a compatible helper here; Circle destination is CIRCLE_WEB_URL.
+    const API_CONFIG = Object.freeze({
+      base: window.location.protocol === 'file:' ? 'http://localhost:4317/api/backend/importer' : `${window.location.origin}/api/backend/importer`,
+      videosPath: 'videos',
+      personalPath: 'personal-feed',
+      importPath: 'imports',
+      jobPath: 'imports/{jobId}'
+    });
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const errorText = {};
+    function failure(message, code = '', status = 0) { return Object.assign(new Error(message), {code,status}); }
+    function feedback(message, kind = 'info') { $('feedback').textContent = message; $('feedback').dataset.kind = kind; $('feedback').hidden = false; }
+    function el(tag, className, text) { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; }
+    function safeUrl(value) {
+      try { const url = new URL(value); if (url.username || url.password) return null; if (url.protocol === 'https:' || url.protocol === 'http:' && ['localhost','127.0.0.1','[::1]'].includes(url.hostname)) return url.href; } catch {}
+      return null;
+    }
+    function readConfig() {
+      const base = safeUrl(API_CONFIG.base);
+      if (!base) throw failure('Backend bağlantısı henüz yapılandırılmamış.','CONFIGURATION');
+      const url = new URL(base);
+      if (url.search || url.hash) throw failure('The backend base URL must not contain a query or fragment.','CONFIGURATION');
+      const config = {...API_CONFIG,base:base.replace(/\/$/,'')};
+      for (const key of ['videosPath','personalPath','importPath','jobPath']) if (!/^\/?[a-zA-Z0-9/_{}-]+$/.test(config[key])) throw failure('API paths must be relative paths, without another host or query.','CONFIGURATION');
+      if (!config.jobPath.includes('{jobId}')) throw failure('The status path must contain {jobId}.','CONFIGURATION');
+      return Object.freeze(config);
+    }
+    function apiUrl(config, path) { return `${config.base}/${path.replace(/^\//,'')}`; }
+    async function request(config, path, options = {}) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 180000);
+      const headers = {Accept:'application/json','X-Social-Client':'web',...options.headers};
+      try {
+        const response = await fetch(apiUrl(config,path), {...options, headers, signal:controller.signal, credentials:'include', redirect:'error'});
+        let data; try { data = await response.json(); } catch { throw failure(response.status === 404 ? 'Yerel araç uç noktası bulunamadı. Aracı start-importer.cmd ile başlatın.' : 'Yerel araç geçerli bir yanıt döndürmedi.','INVALID_RESPONSE',response.status); }
+        const code = data?.code || data?.error?.code;
+        if (!response.ok || code && code !== 'ok') {
+          const message = data?.message || data?.error?.message || (response.status === 401 ? 'Circle hesabınıza localhost:3000 üzerinden giriş yapın; token gerekmiyor.' : response.status === 429 ? 'Çok fazla istek gönderildi. Biraz bekleyip tekrar deneyin.' : `İstek başarısız (${response.status}).`);
+          throw failure(String(message),code || 'API_ERROR',response.status);
+        }
+        return data;
+      } catch (error) {
+        if (error.name === 'AbortError') throw failure('Request timed out. An import may still finish on the server; retry safely using the same video ID.','TIMEOUT');
+        if (error instanceof TypeError) throw failure('Yerel indirme servisi çalışmıyor. Proje klasöründeki start-importer.cmd dosyasını açın ve aracı http://localhost:4317 adresinde kullanın.','NETWORK');
+        throw error;
+      } finally { clearTimeout(timeout); }
+    }
+    // These three adapters are implemented by the bundled local helper.
+    const adapters = {
+      list: (config, account, next, mode, limit) => request(config, `${config.videosPath}?${new URLSearchParams({account,mode,limit:String(limit),...(next ? {cursor:next} : {})})}`),
+      personal: (config, data) => request(config,config.personalPath,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}),
+      import: (config, account, videoId, mode) => request(config, config.importPath, {method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':`tiktok:${videoId}`},body:JSON.stringify({account,videoId,mode})}),
+      status: (config, jobId) => request(config, config.jobPath.replace('{jobId}',encodeURIComponent(jobId)))
+    };
+    function normalizePage(data) {
+      if (!data || !Array.isArray(data.videos) || data.videos.length > 500 || data.nextCursor != null && typeof data.nextCursor !== 'string') throw failure('Backend geçerli bir video listesi döndürmedi.','INVALID_RESPONSE');
+      return {nextCursor:data.nextCursor || null,notice:typeof data.notice === 'string' ? data.notice : '',items:data.videos.map(item => {
+        if (!item || typeof item.id !== 'string' || !/^\d{1,30}$/.test(item.id)) throw failure('The backend must return each TikTok video ID as a numeric string, never a JavaScript number.','INVALID_RESPONSE');
+        const duration = item.durationSeconds;
+        return {id:item.id,creator:typeof item.creator === 'string' ? item.creator : '',description:typeof item.description === 'string' ? item.description : '',thumbnail:safeUrl(item.thumbnailUrl),preview:safeUrl(item.previewUrl),duration:typeof duration === 'number' && Number.isFinite(duration) && duration >= 0 ? duration : null,imported:item.imported === true,canImport:item.canImport === true,reason:typeof item.importUnavailableReason === 'string' ? item.importUnavailableReason : 'Video dosyası alınamıyor'};
+      })};
+    }
+    function scope(config, account) { return `${config.base}|${account}`; }
+    function isImported(video) { return video.imported || confirmed.get(scope(activeConfig,account))?.has(video.id); }
+    function canSelect(video) { return video.canImport && !isImported(video); }
+    function time(value) { return value === null ? 'Unknown duration' : `${Math.floor(value/60)}:${String(Math.floor(value%60)).padStart(2,'0')}`; }
+    // Self-contained bookmarklet: runs in the user's actual TikTok tab. It only
+    // reads rendered feed metadata; it never reads cookies/storage or signs in.
+    async function collectPersonalFeed(returnUrl, requested) {
+      if (!['www.tiktok.com','tiktok.com'].includes(location.hostname) || !['/','/foryou','/foryou/'].includes(location.pathname)) {alert('Kendi hesabınla TikTok Sizin İçin sayfasını açıp bu yer imine orada tıkla.');return;}
+      const signedOut = () => [...document.querySelectorAll('[data-e2e="top-login-button"], [data-e2e="nav-login"]')].some(node => node.getBoundingClientRect().width && node.getBoundingClientRect().height);
+      if (signedOut()) {alert('Önce bu TikTok sekmesinde kendi hesabına giriş yap. Sonra yer imine yeniden tıkla.');return;}
+      const value = prompt('Açık TikTok hesabının Sizin İçin akışından kaç video alınsın? (1–100)',String(requested));
+      if (value === null) return;
+      const limit = Number(value);
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) {alert('Video sayısı 1–100 arasında tam sayı olmalı.');return;}
+      const target = new URL(returnUrl);
+      if (!['localhost','127.0.0.1'].includes(target.hostname) || !['http:','https:'].includes(target.protocol)) {alert('Circle yerel araç adresi geçersiz.');return;}
+      if (document.getElementById('circle-personal-feed-overlay')) {alert('Bir video toplama işlemi zaten çalışıyor.');return;}
+      const box = document.createElement('div');box.id = 'circle-personal-feed-overlay';
+      Object.assign(box.style,{position:'fixed',top:'16px',right:'16px',zIndex:'2147483647',padding:'18px',borderRadius:'14px',background:'#fff',color:'#172033',font:'14px system-ui,sans-serif',boxShadow:'0 8px 40px #0004',maxWidth:'320px'});
+      const status = document.createElement('p');status.style.margin = '0 0 12px';box.append(status);
+      let stop = false, cancel = false;
+      for (const [text,action] of [['Toplananlarla bitir',() => {stop = true;}],['İptal',() => {cancel = true;stop = true;}]]) {
+        const button = document.createElement('button');button.textContent = text;
+        Object.assign(button.style,{padding:'9px',margin:'0 6px 0 0',border:'1px solid #dce2ec',borderRadius:'8px',background:'#f5f8ff',color:'#172033',cursor:'pointer'});
+        button.onclick = action;box.append(button);
+      }
+      document.body.append(box);
+      const collected = new Map();
+      function readCard(card) {
+        if (!card.querySelector('video')) return;
+        let item;
+        let fiber = card[Object.keys(card).find(key => key.startsWith('__reactFiber'))];
+        for (let i = 0; fiber && i < 10; i++,fiber = fiber.return) {
+          const candidate = fiber.memoizedProps?.item;
+          if (candidate?.video && candidate?.author) {item = candidate;break;}
+        }
+        if (item?.isAd || item?.imagePost || item?.privateItem || item?.isProhibited || item?.liveRoom) return;
+        const wrapper = card.querySelector('[id^="xgwrapper-"]');
+        let id = wrapper?.id.match(/-(\d{1,30})$/)?.[1];
+        let creator = '';
+        for (const anchor of card.querySelectorAll('a[href]')) {
+          try {
+            const url = new URL(anchor.href,location.origin);
+            if (!['tiktok.com','www.tiktok.com'].includes(url.hostname)) continue;
+            const match = url.pathname.match(/^\/@([a-zA-Z0-9_.-]{1,128})(?:\/video\/(\d{1,30}))?\/?$/);
+            if (match) {creator ||= match[1];id ||= match[2];}
+          } catch {}
+        }
+        if (!id && typeof item?.id === 'string' && /^\d{1,30}$/.test(item.id)) id = item.id;
+        if (!creator && typeof item?.author?.uniqueId === 'string') creator = item.author.uniqueId;
+        if (!id || !/^[a-zA-Z0-9_.-]{1,128}$/.test(creator) || collected.has(id)) return;
+        const player = card.querySelector('video');
+        const duration = Number.isFinite(player.duration) && player.duration > 0 ? player.duration : item?.video?.duration;
+        let thumbnail = player.poster || item?.video?.cover || item?.video?.originCover || null;
+        try {const url = new URL(thumbnail);if (url.protocol !== 'https:' || url.username || url.password || thumbnail.length > 2000) thumbnail = null;} catch {thumbnail = null;}
+        const caption = card.querySelector('[data-e2e="video-desc"], [data-e2e="browse-video-desc"]')?.textContent || item?.desc || '';
+        collected.set(id,{id,sourceUrl:`https://www.tiktok.com/@${creator}/video/${id}`,description:String(caption).trim().slice(0,500),thumbnailUrl:thumbnail,durationSeconds:typeof duration === 'number' && Number.isFinite(duration) ? duration : null});
+      }
+      try {
+        const deadline = Date.now() + 5*60*1000;
+        do {
+          if (signedOut()) {alert('TikTok oturumu kapalı. Kendi hesabına giriş yapıp yer imini yeniden çalıştır.');return;}
+          const cards = [...document.querySelectorAll('[data-e2e="feed-video"], [data-e2e="recommend-list-item-container"], article')];
+          for (const card of cards) {readCard(card);if (collected.size >= limit) break;}
+          status.textContent = `Circle · ${collected.size}/${limit} video alındı. Açık hesabındaki akış kaydırılıyor…`;
+          if (collected.size >= limit || stop) break;
+          const next = document.querySelector('[data-e2e="feed-navigation-next"]');
+          if (next && !next.disabled) next.click();
+          else if (cards.length) cards[cards.length - 1].scrollIntoView({block:'start',behavior:'instant'});
+          await new Promise(resolve => setTimeout(resolve,1500));
+        } while (!stop && Date.now() < deadline);
+        if (cancel) return;
+        if (!collected.size) {alert('Açık TikTok akışında okunabilir video bulunamadı. Sizin İçin sayfasını yenileyip yeniden deneyin.');return;}
+        const payload = {version:1,source:'https://www.tiktok.com/foryou',limit,videos:[...collected.values()].slice(0,limit)};
+        // A normal navigation with a URL fragment avoids cross-origin requests.
+        // The fragment is removed before staging and is never sent in HTTP logs.
+        target.hash = 'personal=' + encodeURIComponent(JSON.stringify(payload));
+        location.assign(target.href);
+      } catch (error) {alert('Videolar toplanamadı: ' + error.message);} finally {box.remove();}
+    }
+    function updatePersonalBookmark() {
+      const value = Number($('video-limit').value), limit = Number.isInteger(value) && value >= 1 && value <= 100 ? value : 20;
+      const destination = window.location.protocol === 'file:' ? 'http://localhost:4317/' : `${window.location.origin}/`;
+      $('personal-bookmark').href = 'javascript:' + encodeURIComponent(`void (${collectPersonalFeed.toString()})(${JSON.stringify(destination)},${limit})`);
+    }
+    async function receivePersonalFeed() {
+      if (!window.location.hash.startsWith('#personal=')) return;
+      const fragment = window.location.hash.slice('#personal='.length);
+      history.replaceState(null,'',window.location.pathname + window.location.search);
+      try {
+        if (fragment.length > 900000) throw failure('Kişisel akış verisi çok büyük. Daha az video seçin.','VALIDATION');
+        const data = JSON.parse(decodeURIComponent(fragment));
+        if (data?.version !== 1 || data.source !== 'https://www.tiktok.com/foryou' || !Number.isInteger(data.limit) || data.limit < 1 || data.limit > 100 || !Array.isArray(data.videos) || !data.videos.length || data.videos.length > data.limit) throw failure('Kişisel akış verisi geçersiz. Yer imini yeniden çalıştırın.','VALIDATION');
+        const payload = {version:1,source:data.source,limit:data.limit,videos:data.videos.map(item => ({id:item?.id,sourceUrl:item?.sourceUrl,description:item?.description,thumbnailUrl:item?.thumbnailUrl,durationSeconds:item?.durationSeconds}))};
+        fetching = true;updateControls();feedback('Açık TikTok hesabındaki videolar yükleniyor…');
+        const config = readConfig(), response = await adapters.personal(config,payload);
+        if (!/^[0-9a-f]{32}$/.test(response?.account)) throw failure('Kişisel akış kaydı doğrulanamadı.','INVALID_RESPONSE');
+        const page = normalizePage(response);
+        activeConfig = config;activeMode = 'personal';activeLimit = data.limit;account = response.account;cursor = null;
+        videos.clear();selected.clear();$('video-grid').replaceChildren();
+        for (const video of page.items) {videos.set(video.id,video);$('video-grid').append(card(video));}
+        $('source-mode').value = 'personal';$('video-limit').value = String(data.limit);updateSourceFields();$('empty').hidden = !!videos.size;
+        feedback(`${videos.size} video açık TikTok hesabının Sizin İçin akışından alındı. Aktarmak istediklerini seç.${page.notice ? ` ${page.notice}` : ''}`,'success');
+      } catch (error) {feedback(error.message,'error');} finally {fetching = false;updateControls();}
+    }
+    function updateSourceFields() {
+      const mode = $('source-mode').value;
+      $('username-field').hidden = mode !== 'profile';
+      $('username').required = mode === 'profile';
+      $('personal-setup').hidden = mode !== 'personal';
+      $('username-help').textContent = mode === 'personal_auto' ? 'Önce TikTok hesabını bağla düğmesiyle açılan pencerede kendi hesabına giriş yapıp pencereyi kapat. Bundan sonra Sizin İçin akışın arka planda okunur.' : mode === 'personal' ? 'TikTok’ta şu an giriş yaptığın hesabın Sizin İçin akışını, aşağıdaki yer imiyle doğrudan açık sekmeden al.' : mode === 'explore' ? 'Genel, oturumsuz Keşfet sayfasından 1–100 video alınır.' : 'Herkese açık TikTok kullanıcı adını girin veya önceki aramalardan seçin. Her listelemede seçtiğiniz sayıda video alınır (1–100).';
+      updatePersonalBookmark();
+    }
+    function recentProfiles(add) {
+      let values = [];
+      try {
+        const stored = JSON.parse(localStorage.getItem('circle-importer-profiles') || '[]');
+        if (Array.isArray(stored)) values = stored.filter(value => typeof value === 'string' && value.length <= 500).slice(0,10);
+        if (add) {values = [add,...values.filter(value => value !== add)].slice(0,10);localStorage.setItem('circle-importer-profiles',JSON.stringify(values));}
+      } catch {}
+      $('recent-profiles').replaceChildren(...values.map(value => {const option = el('option');option.value = value;return option;}));
+    }
+    function updateControls() {
+      const busy = fetching || importing;
+      $('fetch-button').disabled = busy; $('username').disabled = busy; $('source-mode').disabled = busy; $('video-limit').disabled = busy;
+      $('fetch-button').textContent = fetching ? 'Videolar alınıyor…' : $('source-mode').value === 'personal' ? 'TikTok Hesabımı Aç ↗' : ['explore','personal_auto'].includes($('source-mode').value) ? 'Keşfetten Getir →' : 'Fetch Videos →';
+      $('copy-personal-bookmark').disabled = busy;
+      $('load-more').hidden = !cursor; $('load-more').disabled = busy;
+      $('load-more').textContent = fetching ? 'Loading…' : 'Load More';
+      $('import-button').disabled = busy || !selected.size;
+      $('import-button').textContent = importing ? 'Importing…' : 'Import Selected ↑';
+      $('selection-count').textContent = `${selected.size} video${selected.size === 1 ? '' : 's'} selected`;
+      const available = [...videos.values()].filter(canSelect);
+      $('select-all').disabled = busy || !available.length;
+      $('select-all').textContent = available.length && available.every(video => selected.has(video.id)) ? 'Deselect All' : 'Select All';
+      $('library-count').textContent = videos.size ? `${videos.size} video${videos.size === 1 ? '' : 's'} loaded · ${['personal','personal_auto'].includes(activeMode) ? 'Benim TikTok Keşfetim' : activeMode === 'explore' ? 'TikTok Keşfet (genel)' : account}` : 'Your videos will appear here';
+      $('video-grid').setAttribute('aria-busy',String(fetching));
+      for (const video of videos.values()) if (video.checkbox) {video.checkbox.disabled = busy || !canSelect(video);video.checkbox.checked = selected.has(video.id);video.card.classList.toggle('is-selected',selected.has(video.id));}
+    }
+    function card(video) {
+      const article = el('article','card video-card'), thumb = el('div','thumbnail');
+      thumb.append(el('span','', 'Thumbnail unavailable'));
+      if (video.thumbnail) { const image = el('img'); image.alt = ''; image.loading = 'lazy'; image.referrerPolicy = 'no-referrer'; image.src = video.thumbnail; image.addEventListener('error',() => image.remove(),{once:true}); thumb.append(image); }
+      const label = el('label','check-label'), checkbox = el('input'); checkbox.type = 'checkbox'; checkbox.setAttribute('aria-label',`Select video ${video.id}`); label.append(checkbox); thumb.append(label,el('span','duration',time(video.duration)));
+      const body = el('div','video-body'), description = el('p','description',video.description || 'No description'); description.title = video.description;
+      const footer = el('div','video-footer'), status = el('span','video-state'), preview = el('button','button secondary small','Preview'); preview.type = 'button'; preview.setAttribute('aria-label',`Preview video ${video.id}`); preview.addEventListener('click',() => showPreview(video));
+      footer.append(status,preview); if (video.creator) body.append(el('p','creator',`@${video.creator}`));body.append(description,footer); article.append(thumb,body);
+      Object.assign(video,{card:article,checkbox,status});
+      checkbox.addEventListener('change',() => {if (checkbox.checked && canSelect(video)) selected.add(video.id);else selected.delete(video.id);updateControls();});
+      setVideoStatus(video,isImported(video) ? 'duplicate' : '',isImported(video) ? 'Already imported' : video.canImport ? 'Ready to import' : 'Preview only');
+      if (!video.canImport) status.title = video.reason;
+      return article;
+    }
+    function setVideoStatus(video, state, text) { video.status.dataset.state = state; video.status.textContent = text; }
+    async function fetchVideos(more = false) {
+      if (fetching || importing) return;
+      try {
+        const config = more ? activeConfig : readConfig();
+        const mode = more ? activeMode : $('source-mode').value;
+        const limit = more ? activeLimit : Number($('video-limit').value);
+        const username = more ? account : mode !== 'profile' ? '' : $('username').value.trim();
+        if (!['profile','explore','personal','personal_auto'].includes(mode)) throw failure('Geçerli bir video kaynağı seçin.','VALIDATION');
+        if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw failure('Video sayısı 1–100 arasında tam sayı olmalı.','VALIDATION');
+        if (mode === 'profile' && (!username || username.length > 500)) throw failure('TikTok @kullanıcı adı veya profil/video bağlantısını girin.','VALIDATION');
+        if (window.location.protocol === 'file:') throw failure('start-importer.cmd dosyasını açın. Araç http://localhost:4317 adresinde çalışır.','LOCAL_SERVER_REQUIRED');
+        if (mode === 'personal') {updatePersonalBookmark();window.open('https://www.tiktok.com/foryou','_blank','noopener,noreferrer');feedback('TikTok Sizin İçin sekmesinde kendi hesabına giriş yap ve kaydettiğin Circle Keşfetimi Al yer imine tıkla. Kişisel akışın toplandıktan sonra bu araca dönülür.');return;}
+        const requestedCursor = more ? cursor : null;
+        fetching = true;
+        if (!more) { videos.clear();selected.clear();cursor = null;activeConfig = config;account = username;activeMode = mode;activeLimit = limit;$('video-grid').replaceChildren();$('empty').hidden = false;$('empty-title').textContent = mode === 'explore' ? 'TikTok Keşfet yükleniyor…' : 'TikTok sayfası okunuyor…';$('empty-text').textContent = `${limit} video için sayfa okunuyor. Bu işlem biraz sürebilir.`; }
+        updateControls();
+        const page = normalizePage(await adapters.list(config,username,requestedCursor,mode,limit));
+        if (page.nextCursor && page.nextCursor === requestedCursor) throw failure('The backend returned the same pagination cursor. Fix the adapter before loading more.','INVALID_RESPONSE');
+        for (const video of page.items) if (!videos.has(video.id)) {videos.set(video.id,video);$('video-grid').append(card(video));}
+        if (mode === 'profile' && page.items.length) recentProfiles(username);
+        cursor = page.nextCursor;$('empty').hidden = videos.size > 0;
+        $('empty-title').textContent = 'No available videos';$('empty-text').textContent = 'Bu sayfada erişilebilir video bulunamadı.';
+        feedback(videos.size ? `${videos.size} video yüklendi. Aktarılacak videoları seçin.${page.notice ? ` ${page.notice}` : ''}` : 'Sayfada erişilebilir video bulunamadı.');
+      } catch (error) {
+        feedback(error.message,'error');
+        if (!videos.size) {$('empty').hidden = false;$('empty-title').textContent = 'Videos are not available yet';$('empty-text').textContent = 'Yukarıdaki hatayı kontrol edip yeniden deneyin.';}
+      } finally {fetching = false;updateControls();}
+    }
+    function showPreview(video) {
+      const content = $('preview-content'); content.replaceChildren();
+      if (video.preview) {
+        const player = el('video');player.controls = true;player.playsInline = true;player.preload = 'metadata';player.src = video.preview; if (video.thumbnail) player.poster = video.thumbnail;
+        player.addEventListener('error',() => {$('preview-caption').textContent = 'The preview could not load. Its URL may have expired; fetch the videos again.';});content.append(player);
+      } else {
+        // Official TikTok player for the actual ID returned by page extraction.
+        const player = el('iframe'); player.title = `TikTok video ${video.id}`;player.src = `https://www.tiktok.com/player/v1/${video.id}?controls=1&autoplay=0`;player.allow = 'fullscreen';player.referrerPolicy = 'no-referrer'; content.append(player);
+      }
+      $('preview-caption').textContent = video.description || 'No description';$('preview-dialog').showModal();
+    }
+    function updateProgress(counts, current = '', percent = 0) {
+      $('import-progress').max = counts.total;
+      $('import-progress').value = counts.done + Math.max(0,Math.min(99,percent || 0))/100;
+      $('progress-text').textContent = `${counts.done}/${counts.total} processed · ${counts.imported} imported · ${counts.duplicates} already imported · ${counts.errors} errors${current ? ` · ${current}` : ''}`;
+    }
+    function log(message, kind, postId) {
+      const row = el('li','',message); row.dataset.kind = kind;
+      if (postId && uuid.test(postId)) row.append(el('span','',` Circle post: ${postId}`));
+      $('import-log').prepend(row);
+      if ($('import-log').children.length > 200) $('import-log').lastElementChild.remove();
+    }
+    async function completeImport(config, username, video, counts) {
+      let result = await adapters.import(config,username,video.id,activeMode);
+      const jobId = result?.jobId;
+      const deadline = Date.now() + 15*60*1000;
+      while (['queued','processing'].includes(result?.status)) {
+        if (result.videoId !== video.id || typeof jobId !== 'string' || !/^[a-zA-Z0-9_-]{1,200}$/.test(jobId) || result.jobId !== undefined && result.jobId !== jobId) throw failure('Invalid import job response. Expected matching videoId and a stable jobId.','INVALID_RESPONSE');
+        const percent = typeof result.progress === 'number' && Number.isFinite(result.progress) ? Math.max(0,Math.min(100,result.progress)) : 0;
+        updateProgress(counts,`${result.stage || 'Aktarılıyor'} · ${video.id}${percent ? ` (${Math.floor(percent)}%)` : ''}${result.downloadedBytes ? ` · ${(result.downloadedBytes / 1048576).toFixed(1)} MB` : ''}`,percent);
+        if (Date.now() >= deadline) throw failure('Import is still running on the backend. Retry later with the same video ID to check its result.','TIMEOUT');
+        await new Promise(resolve => setTimeout(resolve,1200));
+        result = await adapters.status(config,jobId);
+      }
+      if (result?.videoId !== video.id) throw failure('Import response did not match the requested video ID.','INVALID_RESPONSE');
+      if (result.status === 'failed') throw failure(errorText[result.code] || result.message || 'The backend import failed.',result.code || 'IMPORT_FAILED');
+      if (!['imported','duplicate'].includes(result.status) || !uuid.test(result.postId)) throw failure('The backend must confirm imported/duplicate with the persisted Circle post UUID.','INVALID_RESPONSE');
+      return result;
+    }
+    async function importSelected() {
+      if (fetching || importing || !activeConfig) return;
+      const queue = [...selected].map(id => videos.get(id)).filter(video => video && canSelect(video));
+      if (!queue.length) return;
+      importing = true;updateControls();
+      try {
+        const result = await workPost('batches',{account,mode:activeMode,videoIds:queue.map(video=>video.id)});
+        for (const video of queue) {selected.delete(video.id);video.canImport=false;setVideoStatus(video,'queued','Arka plan kuyruğunda');}
+        feedback(`${result.count} video arka plan kuyruğuna alındı. Sayfayı kapatabilirsin; servis çalıştığı sürece aktarım devam eder.`,'success');
+        await refreshWorker();
+      } catch(error) {
+        feedback(error.message,'error');
+      } finally {importing = false;updateControls();}
+    }
+    const workPost = (path,data) => request(readConfig(),path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    const workDate = value => value ? new Date(value*1000).toLocaleString('tr-TR',{timeZone:'Asia/Tbilisi'}) : '—';
+    const statusNames = {queued:'Sırada',processing:'Çalışıyor',paused:'Duraklatıldı',cancelled:'İptal edildi',completed:'Tamamlandı',failed:'Başarısız',imported:'Yayınlandı',duplicate:'Zaten aktarılmış'};
+    let workerRefreshing=false, loadedPreferences=false, lastQueues='', workerTimer;
+    function workMessage(id,message,error=false) {$(id).textContent=message;$(id).dataset.kind=error?'error':'info';}
+    function renderQueues(batches) {
+      const serialized=JSON.stringify(batches);if(serialized===lastQueues) return;lastQueues=serialized;
+      const container=$('background-queues');
+      const openDetails=new Set([...container.querySelectorAll('details[open]')].map(detail=>detail.dataset.batch));
+      container.replaceChildren();
+      if(!batches.length) {container.append(el('p','', 'Henüz kuyruk yok. Video seçerek aktar veya otomasyonu başlat.'));return;}
+      for(const batch of batches) {
+        const item=el('article','queue-card');
+        item.append(el('strong','',`${statusNames[batch.status]||batch.status} · ${batch.counts.imported}/${batch.total} yayınlandı`));
+        item.append(el('p','',`${workDate(batch.created)} · ${batch.counts.duplicate} tekrar atlandı · ${batch.counts.failed} hata · ${batch.counts.queued} sırada`));
+        const meter=el('progress');meter.max=100;meter.value=Math.max(0,Math.min(100,batch.progress));meter.setAttribute('aria-label','Kuyruk ilerlemesi');item.append(meter);
+        if(batch.message)item.append(el('p','',batch.message));
+        const actions=el('div','work-actions');
+        const add=(action,label)=>{const button=el('button','button secondary small',label);button.type='button';button.dataset.batch=batch.id;button.dataset.action=action;actions.append(button);};
+        if(['queued','processing'].includes(batch.status)) add('pause','Duraklat');
+        if(batch.status==='paused') add('resume','Devam et');
+        if(['queued','processing','paused'].includes(batch.status)) add('cancel','İptal et');
+        if(batch.counts.failed && ['completed','failed','paused'].includes(batch.status)) add('retry','Başarısızları tekrar dene');
+        item.append(actions);
+        const detail=el('details'), summary=el('summary','',`${batch.total} videonun durumunu göster`), list=el('ol');
+        detail.dataset.batch=batch.id;detail.open=openDetails.has(batch.id);
+        for(const video of batch.items) list.append(el('li','',`${video.video} · ${statusNames[video.status]||video.status} · ${video.stage || ''}${video.message ? ` · ${video.message}` : ''}`));
+        detail.append(summary,list);item.append(detail);container.append(item);
+      }
+      const current=batches[0];$('progress-section').hidden=false;
+      const done=current.total-current.counts.queued-current.counts.processing;
+      updateProgress({total:current.total,done,imported:current.counts.imported,duplicates:current.counts.duplicate,errors:current.counts.failed},statusNames[current.status]||current.status);
+      $('import-progress').max=100;$('import-progress').value=current.progress;
+      for(const batch of [...batches].reverse()) for(const item of batch.items) {
+        const video=videos.get(item.video);if(!video)continue;
+        if(['imported','duplicate'].includes(item.status)) {video.imported=true;video.canImport=false;selected.delete(video.id);setVideoStatus(video,item.status,statusNames[item.status]);}
+        else if(['failed','cancelled'].includes(item.status) && !video.imported) {video.canImport=true;setVideoStatus(video,'error',statusNames[item.status]);if(video.status)video.status.title=item.message;}
+        else if(['queued','processing'].includes(item.status)) {video.canImport=false;selected.delete(video.id);setVideoStatus(video,item.status,item.stage||statusNames[item.status]);}
+      }
+      updateControls();
+    }
+    async function refreshWorker() {
+      if(workerRefreshing || location.protocol==='file:')return;workerRefreshing=true;
+      try {
+        const state=await request(readConfig(),'automation/state');
+        workMessage('worker-status',state.workerError || `${state.workerAlive?'Arka plan servisi çalışıyor':'Arka plan servisi durmuş'} · Circle: @${state.user.username||state.user.id} · ${state.connected?'Arka plan oturumu bağlı':'Circle oturumunu bağlayabilirsin'} · ${state.browser.loginWindowOpen?'TikTok giriş penceresi açık; girişten sonra kapat':state.browser.profileExists?'TikTok otomasyon profili kayıtlı; giriş durumu toplama sırasında doğrulanır':'TikTok hesabını bir kez bağla'}`,!!state.workerError);
+        $('tiktok-login').disabled=state.browser.loginWindowOpen;
+        const schedule=state.schedule;
+        $('auto-stop').disabled=!schedule?.enabled;
+        workMessage('schedule-status',schedule?`${schedule.enabled?'✓ Otomasyon çalışıyor':'⏸ Otomasyon durdu'} · ${schedule.config.runs||0} kez çalıştı · Son çalışma: ${workDate(schedule.last_run)} · Sıradaki: ${schedule.enabled?workDate(schedule.next_run):'—'} · ${schedule.message||''}`:'Henüz başlatılmadı. Yukarıdaki "Otomasyonu başlat" düğmesine basınca ilk video grubu alınır.',!!schedule?.failures);
+        if(schedule && !loadedPreferences) {
+          $('auto-mode').value=schedule.config.mode;$('auto-account').value=schedule.config.account;
+          $('auto-count').value=schedule.config.limit;
+          if(schedule.config.scheduledHour!=null){
+            $('auto-when').value='daily';
+            $('auto-time').value=`${String(schedule.config.scheduledHour).padStart(2,'0')}:${String(schedule.config.scheduledMinute||0).padStart(2,'0')}`;
+          } else {
+            $('auto-when').value='instant';
+          }
+          loadedPreferences=true;autoSource();autoWhen();
+        }
+        renderQueues(state.batches);
+      } catch(error) {workMessage('worker-status',error.message,true);}
+      finally {workerRefreshing=false;}
+    }
+    function autoSource() {$('auto-account-field').hidden=$('auto-mode').value!=='profile';$('auto-account').required=$('auto-mode').value==='profile';}
+    function autoWhen() {const daily=$('auto-when').value==='daily';$('auto-time-field').hidden=!daily;$('auto-time').required=daily;}
+    async function startAutomation() {
+      if(!$('automation-form').reportValidity())return;
+      $('auto-start').disabled=true;
+      try {
+        const daily=$('auto-when').value==='daily';
+        const payload={enabled:true,mode:$('auto-mode').value,account:$('auto-account').value.trim(),
+          limit:Number($('auto-count').value),intervalMinutes:daily?1440:60,dailyLimit:1000,maxRuns:daily?0:1};
+        if(daily){const [h,m]=$('auto-time').value.split(':');payload.scheduledHour=Number(h);payload.scheduledMinute=Number(m);}
+        await workPost('automation/schedule',payload);
+        feedback(daily?`Her gün saat ${$('auto-time').value}'de ${payload.limit} video otomatik çekilecek.`:`${payload.limit} video çekimi şimdi başladı. Videolar birkaç dakika içinde Circle'a yüklenecek; iş bitince otomatik duracak.`,'success');await refreshWorker();
+      }catch(error){feedback(error.message,'error');}
+      finally{$('auto-start').disabled=false;}
+    }
+    async function loadDatabase() {
+      if(location.protocol==='file:')return;
+      try {
+        const config=await request(readConfig(),'configuration'), database=config.database;
+        $('db-host').value=database.host;$('db-port').value=database.port;$('db-name').value=database.database;$('db-user').value=database.username;$('db-ssl').checked=database.ssl;
+        $('circle-login-link').href=`${config.circleUrl}/login`;
+        workMessage('database-status',`Mevcut PostgreSQL bağlantısı yüklendi. ${database.passwordConfigured?'Parola kayıtlı; güvenlik için gösterilmez.':'Kayıtlı parola yok.'}`);
+        $('storage-summary').textContent=`Circle API: ${config.circleUrl}/api/backend/api · NestJS portu: ${config.serverPort} · Storage: ${config.storageDriver} / ${config.storageDirectory}. Video dosyaları PostgreSQL’e yazılmaz.`;
+      }catch(error){workMessage('database-status',error.message,true);}
+    }
+    async function databaseAction(apply=false) {
+      if(!$('database-form').reportValidity())return;
+      if(apply && !confirm(`Circle bağlantısı ${$('db-host').value}:${$('db-port').value} / ${$('db-name').value} olarak değişecek ve backend yeniden başlatılacak. Bu işlem mevcut verileri taşımaz. Devam edilsin mi?`))return;
+      $('db-test').disabled=true;$('db-apply').disabled=true;
+      const data={host:$('db-host').value.trim(),port:Number($('db-port').value),database:$('db-name').value.trim(),username:$('db-user').value.trim(),password:$('db-password').value,ssl:$('db-ssl').checked,clearPassword:$('db-clear-password').checked};
+      try {
+        workMessage('database-status',apply?'Bağlantı test ediliyor; başarılıysa kaydedilip Circle yeniden başlatılacak…':'PostgreSQL bağlantısı ve Circle şeması test ediliyor…');
+        const result=await workPost(apply?'database/apply':'database/test',data);
+        workMessage('database-status',`${result.message}${result.schema && !result.schema.compatible ? ` Eksik tablolar: ${result.schema.missingTables.join(', ')}. Eksik migrationlar: ${result.schema.missingMigrations.join(', ')}. Eksik izinler: ${(result.schema.missingPrivileges||[]).join(', ')}.`:''}${result.restart?` ${result.restart.message}`:''}`,result.saved===false && apply || result.restart?.ok===false || result.schema?.compatible===false);
+        if(apply){$('db-password').value='';$('db-clear-password').checked=false;lastQueues='';await refreshWorker();}
+      }catch(error){workMessage('database-status',error.message,true);}
+      finally{data.password='';$('db-test').disabled=false;$('db-apply').disabled=false;}
+    }
+    $('automation-form').addEventListener('submit',event=>{event.preventDefault();startAutomation();});
+    $('auto-mode').addEventListener('change',autoSource);
+    $('auto-when').addEventListener('change',autoWhen);
+    $('auto-stop').addEventListener('click',async()=>{try{await workPost('automation/schedule',{enabled:false});feedback('Otomasyon durduruldu. Şu an alınan videolar tamamlanacak; sonrası beklemeyecek. Kuyruğu da durdurmak istersen aşağıdan duraklat/iptal et.');await refreshWorker();}catch(error){feedback(error.message,'error');}});
+    $('tiktok-login').addEventListener('click',async()=>{try{const result=await workPost('browser/login',{});feedback(result.message||'TikTok giriş penceresi açıldı. Kendi hesabına giriş yapıp pencereyi kapat.');await refreshWorker();}catch(error){feedback(error.message,'error');}});
+    $('circle-connect').addEventListener('click',async()=>{try{await workPost('automation/connect',{});feedback('Circle için ayrı arka plan oturumu bağlandı.','success');await refreshWorker();}catch(error){feedback(error.message,'error');}});
+    $('background-queues').addEventListener('click',async event=>{const button=event.target.closest('button[data-action]');if(!button)return;button.disabled=true;try{await workPost('batches/control',{batchId:button.dataset.batch,action:button.dataset.action});await refreshWorker();}catch(error){feedback(error.message,'error');button.disabled=false;}});
+    $('database-form').addEventListener('submit',event=>{event.preventDefault();databaseAction();});
+    $('db-apply').addEventListener('click',()=>databaseAction(true));
+    $('startup-enabled').addEventListener('change',async()=>{const checkbox=$('startup-enabled');checkbox.disabled=true;try{const result=await workPost('startup',{enabled:checkbox.checked});checkbox.checked=result.enabled;$('startup-status').textContent=result.enabled?'Windows oturumunda arka plan servisi otomatik başlar.':'Windows otomatik başlangıcı kapalı.';}catch(error){checkbox.checked=!checkbox.checked;feedback(error.message,'error');}finally{checkbox.disabled=false;}});
+    async function loadStartup(){try{const result=await request(readConfig(),'startup');$('startup-enabled').checked=result.enabled;$('startup-enabled').disabled=!result.supported;$('startup-status').textContent=result.supported?(result.enabled?'Windows otomatik başlangıcı açık.':'İstersen bu bilgisayarda Windows otomatik başlangıcını açabilirsin.'):'Otomatik başlangıç bu sistemde desteklenmiyor.';}catch(error){$('startup-status').textContent=error.message;}}
+    async function stopEverything(cancelAll){if(cancelAll && !confirm('Bu yerel araçtaki tüm bekleyen işler iptal edilecek. Devam eden video tamamlanır. Devam edilsin mi?'))return;try{const result=await workPost('automation/stop-all',{cancelAll});feedback(result.message);await refreshWorker();}catch(error){feedback(error.message,'error');}}
+    $('stop-all').addEventListener('click',()=>stopEverything(false));$('cancel-all').addEventListener('click',()=>stopEverything(true));
+    $('search-form').addEventListener('submit',event => {event.preventDefault();fetchVideos();});
+    $('source-mode').addEventListener('change',() => {updateSourceFields();updateControls();});
+    $('video-limit').addEventListener('input',updatePersonalBookmark);
+    $('personal-bookmark').addEventListener('click',event => {event.preventDefault();feedback('Bu bağlantıyı yer imleri çubuğuna sürükle; ardından açık TikTok Sizin İçin sekmesinde yer imine tıkla.');});
+    $('copy-personal-bookmark').addEventListener('click',async () => {try {await navigator.clipboard.writeText($('personal-bookmark').href);feedback('Yer imi bağlantısı kopyalandı. Tarayıcıda yeni bir yer imi oluşturup adres alanına yapıştır; sonra TikTok Sizin İçin sekmesinde çalıştır.');} catch {feedback('Bağlantıyı yer imleri çubuğuna sürükleyerek ekleyebilirsin.','error');}});
+    $('load-more').addEventListener('click',() => fetchVideos(true));
+    $('select-all').addEventListener('click',() => {const available = [...videos.values()].filter(canSelect), clear = available.every(video => selected.has(video.id));for (const video of available) {if (clear) selected.delete(video.id);else selected.add(video.id);}updateControls();});
+    $('import-button').addEventListener('click',importSelected);
+    $('close-preview').addEventListener('click',() => $('preview-dialog').close());
+    $('preview-dialog').addEventListener('click',event => {if (event.target === $('preview-dialog')) $('preview-dialog').close();});
+    $('preview-dialog').addEventListener('close',() => {const player = $('preview-content').querySelector('video');if (player) {player.pause();player.removeAttribute('src');player.load();}$('preview-content').replaceChildren();});
+    recentProfiles();updateSourceFields();updateControls();autoSource();loadDatabase();refreshWorker();loadStartup();
+    workerTimer=setInterval(refreshWorker,4000);
+    receivePersonalFeed();
+    if (window.location.protocol === 'file:') {
+      feedback('Başlamak için proje klasöründeki start-importer.cmd dosyasını açın. Araç http://localhost:4317 adresinde açılır.','info');
+      const link = el('a','button secondary small','Yerel aracı aç');
+      link.href = 'http://localhost:4317';
+      $('feedback').append(document.createTextNode(' '), link);
+    }
+  </script>
+</body>
+</html>
