@@ -1721,6 +1721,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/posts/{id}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pin or unpin a post at the top of the home feed
+         * @description Up to 3 of the most recently pinned public posts lead the first page of the home feeds. Audited as `post.pinned` / `post.unpinned`.
+         */
+        post: operations["adminContentSetPinned"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/posts/{id}/delete": {
         parameters: {
             query?: never;
@@ -2973,6 +2993,11 @@ export interface components {
              * @example null
              */
             editedAt: string | null;
+            /**
+             * @description Pinned by an administrator to the top of the home feed
+             * @example false
+             */
+            isPinned: boolean;
         };
         PostDto: {
             /**
@@ -3049,6 +3074,11 @@ export interface components {
              * @example null
              */
             editedAt: string | null;
+            /**
+             * @description Pinned by an administrator to the top of the home feed
+             * @example false
+             */
+            isPinned: boolean;
             /** @description Embedded original for REPOST/QUOTE (one level deep). null for POST or when unavailable. */
             referencedPost: components["schemas"]["ReferencedPostDto"] | null;
             /**
@@ -3940,6 +3970,18 @@ export interface components {
             /** @description Comments whose status changed */
             comments: number;
             resolvedReports: number;
+        };
+        SetPinnedDto: {
+            /**
+             * @description true pins the post to the top of the home feed, false unpins it
+             * @example true
+             */
+            pinned: boolean;
+        };
+        PinnedResultDto: {
+            /** Format: uuid */
+            id: string;
+            isPinned: boolean;
         };
         /** @enum {string} */
         ContentFilterStatus: "ACTIVE" | "HIDDEN" | "REMOVED" | "DELETED";
@@ -11052,6 +11094,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BulkModerationResultDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not staff, missing permission (`FORBIDDEN`), insufficient rank or step-up required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Rate limit exceeded (`RATE_LIMITED`) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    adminContentSetPinned: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPinnedDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinnedResultDto"];
                 };
             };
             /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */

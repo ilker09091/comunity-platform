@@ -20,6 +20,11 @@ const EXPLORE_SCORE = `round(
   ((p.like_count + 2 * p.comment_count + 3 * (p.repost_count + p.quote_count) + p.bookmark_count + 1)::numeric
    / power((extract(epoch FROM ($2::timestamptz - p.created_at)) / 3600.0 + 2)::numeric, 1.5)), 12)`;
 
+/** At most this many pinned posts lead the home feed (most recently pinned first). */
+const MAX_PINNED = 3;
+/** Excludes pinned posts from the regular stream of feeds that show them at the top. */
+const notPinnedSql = (content: ContentFilter) => (content === 'reels' ? 'TRUE' : 'p.pinned_at IS NULL');
+
 @Injectable()
 export class FeedService {
   constructor(
@@ -28,6 +33,26 @@ export class FeedService {
     private readonly query: PostsQueryService,
     @Inject(appConfig.KEY) private readonly config: ConfigType<typeof appConfig>,
   ) {}
+
+  /** Pinned public posts visible to the viewer, for the top of the first home-feed page. */
+  private async pinned(viewerId: string | null, cursorStr: string | undefined, content: ContentFilter): Promise<PostDto[]> {
+    if (cursorStr || content === 'reels') return [];
+    const rows = await sqlRows<{ id: string }>(
+      this.db,
+      `SELECT p.id FROM posts p JOIN users a ON a.id = p.author_id
+        WHERE p.pinned_at IS NOT NULL AND p.kind <> 'REPOST' AND p.visibility = 'PUBLIC' AND a.is_private = false
+          AND ${postVisibleSql('p', 'a', '$1')}
+          AND ${contentSql('p', content)}
+        ORDER BY p.pinned_at DESC
+        LIMIT ${MAX_PINNED}`,
+      [viewerId],
+    );
+    return rows.length ? this.query.hydrate(rows.map((r) => r.id), viewerId) : [];
+  }
+
+  private withPinned(page: Page<PostDto>, pinned: PostDto[]): Page<PostDto> {
+    return pinned.length ? { ...page, items: [...pinned, ...page.items] } : page;
+  }
 
   /** Newest public original posts and quotes (simple reposts are excluded to avoid duplicates). */
   async global(viewerId: string | null, cursorStr: string | undefined, limit: number, content: ContentFilter = 'home'): Promise<Page<PostDto>> {
@@ -38,12 +63,13 @@ export class FeedService {
         WHERE p.kind <> 'REPOST' AND p.visibility = 'PUBLIC' AND a.is_private = false
           AND ${postVisibleSql('p', 'a', '$1')}
           AND ${contentSql('p',content)}
+          AND ${notPinnedSql(content)}
           ${cursor ? 'AND (p.created_at, p.id) < ($3::timestamptz, $4::uuid)' : ''}
         ORDER BY p.created_at DESC, p.id DESC
         LIMIT $2`,
       cursor ? [viewerId, limit + 1, ...cursor] : [viewerId, limit + 1],
     );
-    return this.posts.pageOf(rows, limit, viewerId);
+    return this.withPinned(await this.posts.pageOf(rows, limit, viewerId), await this.pinned(viewerId, cursorStr, content));
   }
 
   /** Posts, quotes and reposts from followed accounts plus the viewer's own, newest first. */
@@ -56,12 +82,13 @@ export class FeedService {
           AND ${postVisibleSql('p', 'a', '$1')}
           AND ${repostTargetVisibleSql('p', '$1')}
           AND ${contentSql('p',content)}
+          AND ${notPinnedSql(content)}
           ${cursor ? 'AND (p.created_at, p.id) < ($3::timestamptz, $4::uuid)' : ''}
         ORDER BY p.created_at DESC, p.id DESC
         LIMIT $2`,
       cursor ? [viewerId, limit + 1, ...cursor] : [viewerId, limit + 1],
     );
-    return this.posts.pageOf(rows, limit, viewerId);
+    return this.withPinned(await this.posts.pageOf(rows, limit, viewerId), await this.pinned(viewerId, cursorStr, content));
   }
 
   /** Recent public posts ranked by engagement with time decay. */
@@ -80,6 +107,7 @@ export class FeedService {
             AND p.created_at > $2::timestamptz - make_interval(hours => $3)
             AND ${postVisibleSql('p', 'a', '$1')}
             AND ${contentSql('p',content)}
+            AND ${notPinnedSql(content)}
        ) s
        ${cursor ? 'WHERE (s.score, s.id) < ($5::numeric, $6::uuid)' : ''}
        ORDER BY s.score DESC, s.id DESC
@@ -89,10 +117,13 @@ export class FeedService {
     const hasMore = rows.length > limit;
     const pageRows = hasMore ? rows.slice(0, limit) : rows;
     const last = pageRows[pageRows.length - 1];
-    return {
-      items: await this.query.hydrate(pageRows.map((r) => r.id), viewerId),
-      nextCursor: hasMore ? encodeCursor([iso(asOf)!, last.score, last.id]) : null,
-      hasMore,
-    };
+    return this.withPinned(
+      {
+        items: await this.query.hydrate(pageRows.map((r) => r.id), viewerId),
+        nextCursor: hasMore ? encodeCursor([iso(asOf)!, last.score, last.id]) : null,
+        hasMore,
+      },
+      await this.pinned(viewerId, cursorStr, content),
+    );
   }
 }

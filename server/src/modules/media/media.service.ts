@@ -123,13 +123,14 @@ export class MediaService implements OnModuleInit {
 
       const id = randomBytes(16).toString('hex');
       if (image) {
+        // Every new photo is stored as WebP (much smaller than JPEG/PNG, so feeds open faster).
         const processed = await this.processImage(file.path, image.format);
-        const key = `${id}.${image.ext}`;
-        await this.storage.put(key, processed.data, mime);
+        const key = `${id}.webp`;
+        await this.storage.put(key, processed.data, 'image/webp');
         return this.insert(ownerId, {
           type: MediaTypeEnum.IMAGE,
           key,
-          mime,
+          mime: 'image/webp',
           size: processed.data.length,
           width: processed.width,
           height: processed.height,
@@ -165,10 +166,8 @@ export class MediaService implements OnModuleInit {
       let pipeline = sharp(path, { animated: format === 'gif' || format === 'webp', limitInputPixels: 100_000_000 })
         .rotate()
         .resize({ width: max, height: max, fit: 'inside', withoutEnlargement: true });
-      if (format === 'jpeg') pipeline = pipeline.jpeg({ quality: 82, mozjpeg: true });
-      else if (format === 'png') pipeline = pipeline.png({ compressionLevel: 9 });
-      else if (format === 'webp') pipeline = pipeline.webp({ quality: 82 });
-      else pipeline = pipeline.gif();
+      // Output is always WebP: transparency is kept and animated GIF/WebP stay animated.
+      pipeline = pipeline.webp({ quality: 80, alphaQuality: 90, effort: 4, smartSubsample: true });
       const { data, info } = await pipeline.toBuffer({ resolveWithObject: true });
       return { data, width: info.width, height: info.pageHeight ?? info.height };
     } catch (error) {

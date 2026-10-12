@@ -108,7 +108,7 @@ export class PostsQueryService {
       this.db,
       `SELECT p.id, p.kind, p.content, p.referenced_post_id, p.visibility,
               p.like_count, p.comment_count, p.repost_count, p.quote_count, p.bookmark_count,
-              p.created_at, p.updated_at, p.edited_at,
+              p.created_at, p.updated_at, p.edited_at, p.pinned_at,
               u.id AS author_id, u.username::text AS username, u.display_name, u.is_private, u.is_verified,
               av.storage_key AS avatar_key,
               ($2::uuid IS NOT NULL AND EXISTS (
@@ -166,6 +166,7 @@ export class PostsQueryService {
       createdAt: iso(r.created_at)!,
       updatedAt: iso(r.updated_at)!,
       editedAt: iso(r.edited_at),
+      isPinned: !!r.pinned_at,
     }));
   }
 }

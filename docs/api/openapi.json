@@ -9216,6 +9216,104 @@
         ]
       }
     },
+    "/api/admin/posts/{id}/pin": {
+      "post": {
+        "description": "Up to 3 of the most recently pinned public posts lead the first page of the home feeds. Audited as `post.pinned` / `post.unpinned`.",
+        "operationId": "adminContentSetPinned",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPinnedDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinnedResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not staff, missing permission (`FORBIDDEN`), insufficient rank or step-up required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Pin or unpin a post at the top of the home feed",
+        "tags": [
+          "Admin · Content"
+        ]
+      }
+    },
     "/api/admin/posts/{id}/delete": {
       "post": {
         "operationId": "adminContentDeletePost",
@@ -14163,6 +14261,11 @@
             "format": "date-time",
             "nullable": true,
             "example": null
+          },
+          "isPinned": {
+            "type": "boolean",
+            "example": false,
+            "description": "Pinned by an administrator to the top of the home feed"
           }
         },
         "required": [
@@ -14184,7 +14287,8 @@
           "isFollowingAuthor",
           "createdAt",
           "updatedAt",
-          "editedAt"
+          "editedAt",
+          "isPinned"
         ]
       },
       "PostDto": {
@@ -14292,6 +14396,11 @@
             "nullable": true,
             "example": null
           },
+          "isPinned": {
+            "type": "boolean",
+            "example": false,
+            "description": "Pinned by an administrator to the top of the home feed"
+          },
           "referencedPost": {
             "nullable": true,
             "description": "Embedded original for REPOST/QUOTE (one level deep). null for POST or when unavailable.",
@@ -14328,6 +14437,7 @@
           "createdAt",
           "updatedAt",
           "editedAt",
+          "isPinned",
           "referencedPost",
           "referencedPostUnavailable"
         ]
@@ -16980,6 +17090,35 @@
           "posts",
           "comments",
           "resolvedReports"
+        ]
+      },
+      "SetPinnedDto": {
+        "type": "object",
+        "properties": {
+          "pinned": {
+            "type": "boolean",
+            "example": true,
+            "description": "true pins the post to the top of the home feed, false unpins it"
+          }
+        },
+        "required": [
+          "pinned"
+        ]
+      },
+      "PinnedResultDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "isPinned": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "isPinned"
         ]
       },
       "ContentFilterStatus": {

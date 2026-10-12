@@ -22,6 +22,8 @@ import {
   Flag,
   Clapperboard,
   EyeOff,
+  Pin,
+  PinOff,
 } from "lucide-react";
 import ReportDialog from "./report-dialog";
 import { useFeatures } from "@/lib/platform-config";
@@ -265,6 +267,16 @@ function PostMenu({
   const [reporting, setReporting] = useState(false);
   const { on } = useFeatures();
   const hasVideo = visible.media.some((m) => m.type === "VIDEO");
+  // Administrators can pin public original posts and quotes to the top of the home feed.
+  const canPin = (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") && post.kind !== "REPOST" && post.visibility === "PUBLIC";
+  const pin = useMutation({
+    mutationFn: () => api("adminContentSetPinned", { params: { id: post.id }, body: { pinned: !post.isPinned } }),
+    onSuccess: (data) => {
+      void client.invalidateQueries({ predicate: (q) => q.queryKey[0] === "posts" || q.queryKey[0] === "post" });
+      toast(data.isPinned ? "Pinned to the top of the home feed." : "Unpinned from the home feed.");
+    },
+    onError: (e) => toast(e.message, true),
+  });
   const follow = useMutation({
     mutationFn: () => api(visible.isFollowingAuthor ? "followsUnfollow" : "followsFollow", { params: { id: author.id } }),
     onSuccess: (data) => {
@@ -310,6 +322,12 @@ function PostMenu({
         <button type="button" disabled={follow.isPending} onClick={() => follow.mutate()}>
           {visible.isFollowingAuthor ? <UserMinus size={16} /> : <UserPlus size={16} />}
           {visible.isFollowingAuthor ? `Unfollow @${author.username}` : `Follow @${author.username}`}
+        </button>
+      )}
+      {canPin && (
+        <button type="button" disabled={pin.isPending} onClick={() => pin.mutate()}>
+          {post.isPinned ? <PinOff size={16} /> : <Pin size={16} />}
+          {post.isPinned ? "Unpin from home" : "Pin to top of home"}
         </button>
       )}
       {own && post.kind !== "REPOST" && (
@@ -370,7 +388,12 @@ export default function PostCard({ post, detail = false }: { post: Post; detail?
   const mediaClickHandler = useDoubleTap(doubleTapLike);
 
   return (
-    <article className="card post-card" aria-labelledby={`post-${post.id}-author`}>
+    <article className={`card post-card ${post.isPinned ? "is-pinned" : ""}`} aria-labelledby={`post-${post.id}-author`}>
+      {post.isPinned && (
+        <div className="reposted-label pinned-label">
+          <Pin size={14} aria-hidden="true" /> Pinned
+        </div>
+      )}
       {post.kind === "REPOST" && (
         <div className="reposted-label">
           <Repeat2 size={14} aria-hidden="true" />

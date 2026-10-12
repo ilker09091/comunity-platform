@@ -308,6 +308,17 @@ export class AccountStatusResultDto {
   @ApiProperty({ enum: UserStatusEnum, enumName: 'UserStatus' }) status: UserStatusEnum;
 }
 
+export class SetPinnedDto {
+  @ApiProperty({ example: true, description: 'true pins the post to the top of the home feed, false unpins it' })
+  @IsBoolean()
+  pinned: boolean;
+}
+
+export class PinnedResultDto {
+  @ApiProperty({ format: 'uuid' }) id: string;
+  @ApiProperty() isPinned: boolean;
+}
+
 export class SetVerifiedDto {
   @ApiProperty({ example: true, description: 'true grants the blue badge, false removes it' })
   @IsBoolean()

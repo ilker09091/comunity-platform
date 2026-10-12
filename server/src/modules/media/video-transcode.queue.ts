@@ -143,7 +143,10 @@ export class VideoTranscodeQueue implements OnModuleInit, OnApplicationBootstrap
     const files = await this.db.transaction(async (m) => {
       await sqlRows(m, `UPDATE media SET status = 'FAILED' WHERE id = $1 AND status = 'PROCESSING'`, [mediaId]);
       // A post published while this video was compressing would stay invisible forever: remove it.
+      // The FAILED video row is detached first and kept, so the uploader can still see what happened
+      // (unattached media is cleaned up later like any other abandoned upload).
       const posts = await sqlRows<{ post_id: string }>(m, `SELECT post_id FROM post_media WHERE media_id = $1`, [mediaId]);
+      await sqlRows(m, `DELETE FROM post_media WHERE media_id = $1`, [mediaId]);
       return (await this.deletion.deletePosts(m, posts.map((p) => p.post_id))).pending;
     });
     await this.deletion.removeFiles(files);

@@ -54,7 +54,7 @@ describe('Video upload and compression (e2e)', () => {
     expect(key.endsWith('.mp4')).toBe(true);
     expect(probe).toMatchObject({ videoCodec: 'h264', audioCodec: 'aac', pixelFormat: 'yuv420p' });
     // The uploaded original is gone once the compressed copy is stored.
-    expect(await readdir(queue.incomingDir)).toEqual([]);
+    expect((await readdir(queue.incomingDir)).filter((name) => name !== 'uploads')).toEqual([]); // `uploads/` holds resumable upload sessions
   });
 
   it('scales large videos down to fit 1080p, keeping orientation, and never upscales', async () => {
@@ -103,7 +103,7 @@ describe('Video upload and compression (e2e)', () => {
     // Whether compression was still running or had just finished, nothing is left behind.
     const deadline = Date.now() + 30_000;
     while ((queue.stats.active || queue.stats.waiting) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 100));
-    expect(await readdir(queue.incomingDir)).toEqual([]);
+    expect((await readdir(queue.incomingDir)).filter((name) => name !== 'uploads')).toEqual([]); // `uploads/` holds resumable upload sessions
     expect((await storage.stat(new URL(res.body.url).pathname.split("/").at(-1)!)).exists).toBe(false);
   });
 

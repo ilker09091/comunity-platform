@@ -30,11 +30,12 @@ describe('Media uploads (e2e)', () => {
   it('uploads images, serves them via signed URLs and attaches them in order', async () => {
     const a = (await upload(alice, png, 'a.png', 'image/png').expect(201)).body;
     const b = (await upload(alice, png, 'b.png', 'image/png').expect(201)).body;
-    expect(a).toMatchObject({ type: 'IMAGE', status: 'READY', mimeType: 'image/png', width: 64, height: 32 });
+    // Every uploaded photo is stored as WebP, whatever format it was sent in.
+    expect(a).toMatchObject({ type: 'IMAGE', status: 'READY', mimeType: 'image/webp', width: 64, height: 32 });
 
     const path = new URL(a.url).pathname + new URL(a.url).search;
     const file = await api.http.get(path).expect(200);
-    expect(file.headers['content-type']).toBe('image/png');
+    expect(file.headers['content-type']).toBe('image/webp');
     expect(file.headers['x-content-type-options']).toBe('nosniff');
     await api.http.get(path.replace(/sig=[^&]+/, 'sig=forged')).expect(403);
 
@@ -69,7 +70,7 @@ describe('Media uploads (e2e)', () => {
 
   it('sets avatars (images only) visible on the public profile', async () => {
     const me = await api.http.post('/api/users/me/avatar').set(alice.auth).attach('file', png, { filename: 'me.png', contentType: 'image/png' }).expect(200);
-    expect(me.body.avatarUrl).toMatch(/\/api\/media\/files\/[a-f0-9]{32}\.png\?exp=\d+&sig=/);
+    expect(me.body.avatarUrl).toMatch(/\/api\/media\/files\/[a-f0-9]{32}\.webp\?exp=\d+&sig=/);
     expect((await api.get(`/users/${alice.username}`)).body.avatarUrl).toEqual(expect.any(String));
     await api.delete('/users/me/avatar', alice).expect(200);
   });

@@ -77,6 +77,9 @@ export class ReferencedPostDto {
   updatedAt: string;
   @ApiProperty({ type: String, format: 'date-time', nullable: true, example: null })
   editedAt: string | null;
+
+  @ApiProperty({ example: false, description: 'Pinned by an administrator to the top of the home feed' })
+  isPinned: boolean;
 }
 
 /**

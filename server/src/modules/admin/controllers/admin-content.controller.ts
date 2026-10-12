@@ -6,6 +6,7 @@ import { ReqContext, type RequestContext } from '../../platform/audit.service.js
 import { ContentModerationService } from '../../platform/content-moderation.service.js';
 import { AdminContentService } from '../admin-content.service.js';
 import { AdminDeletionService } from '../admin-deletion.service.js';
+import { AdminPinsService } from '../admin-pins.service.js';
 import { AdminController, ApiStepUp, RequirePermissions } from '../admin.guard.js';
 import {
   AdminCommentDetailDto,
@@ -19,7 +20,9 @@ import {
   AdminReelRowDto,
   ModerateContentDto,
   ModerationOutcomeDto,
+  PinnedResultDto,
   ReasonDto,
+  SetPinnedDto,
   DeletionResultDto,
   type AdminPage,
 } from '../dto/admin.dto.js';
@@ -35,7 +38,22 @@ export class AdminContentController {
     private readonly content: AdminContentService,
     private readonly moderation: ContentModerationService,
     private readonly deletion: AdminDeletionService,
+    private readonly pins: AdminPinsService,
   ) {}
+
+  @Post('posts/:id/pin')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('settings.update')
+  @ApiOperation({
+    summary: 'Pin or unpin a post at the top of the home feed',
+    description: 'Up to 3 of the most recently pinned public posts lead the first page of the home feeds. Audited as `post.pinned` / `post.unpinned`.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiOkResponse({ type: PinnedResultDto })
+  @ApiErrors(400, 404)
+  setPinned(@ReqContext() ctx: RequestContext, @Param('id', UuidPipe) id: string, @Body() dto: SetPinnedDto): Promise<PinnedResultDto> {
+    return this.pins.setPinned(ctx, id, dto.pinned);
+  }
 
   @Post('posts/:id/delete')
   @HttpCode(HttpStatus.OK)

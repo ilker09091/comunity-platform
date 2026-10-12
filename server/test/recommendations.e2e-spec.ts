@@ -42,7 +42,9 @@ describe('Persistent recommendations and attachment classification (e2e)',()=>{
     const profile=(await api.get(`/users/${a.id}/posts?content=home`,viewer).expect(200)).body;
     expect(new Set(ids(profile))).toEqual(new Set([text,image]));
     const profileVideos=(await api.get(`/users/${a.id}/posts?content=reels`,viewer).expect(200)).body;
-    expect(new Set(ids(profileVideos))).toEqual(new Set([video,processing]));
+    // A post whose video is still compressing stays hidden until the video is ready.
+    expect(new Set(ids(profileVideos))).toEqual(new Set([video]));
+    expect(ids(profileVideos)).not.toContain(processing);
     expect(ids((await api.get('/feed/global?content=all',viewer).expect(200)).body)).toContain(video);
   });
 

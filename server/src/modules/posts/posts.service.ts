@@ -102,7 +102,10 @@ export class PostsService {
       }),
     );
     this.logger.log({ message: 'Post created', postId: id, authorId, mediaCount: mediaIds.length });
-    return this.query.getOne(id, authorId);
+    // Returned to the author directly: a post whose video is still compressing stays hidden from
+    // feeds and `GET /posts/:id` until it is ready, but publishing it must still succeed.
+    const [post] = await this.query.hydrate([id], authorId);
+    return post;
   }
 
   async update(authorId: string, postId: string, dto: UpdatePostDto): Promise<PostDto> {

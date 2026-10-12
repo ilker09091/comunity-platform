@@ -9,6 +9,7 @@ import { AdminDeletionService } from './admin-deletion.service.js';
 import { AdminGuard } from './admin.guard.js';
 import { AdminMediaService } from './admin-media.service.js';
 import { AdminOpsService } from './admin-ops.service.js';
+import { AdminPinsService } from './admin-pins.service.js';
 import { AdminReadService } from './admin-read.service.js';
 import { AdminReportsService } from './admin-reports.service.js';
 import { AdminUsersService } from './admin-users.service.js';
@@ -53,6 +54,7 @@ import { AdminUsersController } from './controllers/admin-users.controller.js';
     AdminAnnouncementsService,
     AdminAnalyticsService,
     AdminOpsService,
+    AdminPinsService,
   ],
 })
 export class AdminModule {}

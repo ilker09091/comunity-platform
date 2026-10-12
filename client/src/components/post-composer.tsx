@@ -33,7 +33,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * A post published while its video is still compressing stays hidden until the video is ready.
  * Watch for it in the background (survives closing the composer) and refresh feeds when it goes live.
  */
-async function announceWhenLive(postId: string, onLive: () => void) {
+async function announceWhenLive(postId: string, videoIds: string[], onLive: () => void, onFailed: () => void) {
   const deadline = Date.now() + 30 * 60_000;
   while (Date.now() < deadline) {
     await sleep(2500);
@@ -42,7 +42,13 @@ async function announceWhenLive(postId: string, onLive: () => void) {
       onLive();
       return;
     } catch {
-      /* still compressing (404) or a transient error: keep waiting */
+      /* still compressing (404) or a transient error: check the videos before waiting again */
+    }
+    // If compression fails the server removes the post; the video itself reports FAILED.
+    const states = await Promise.all(videoIds.map((id) => api("mediaGet", { params: { id } }).then((m) => m.status, () => null)));
+    if (states.includes("FAILED")) {
+      onFailed();
+      return;
     }
   }
 }
@@ -373,6 +379,7 @@ export default function PostComposer({
     },
     onSuccess: (post) => {
       const stillCompressing = attachments.some((a) => a.media?.status === "PROCESSING");
+      const compressingIds = attachments.flatMap((a) => (a.media?.status === "PROCESSING" ? [a.media.id] : []));
       live.current.clear();
       setContent("");
       for (const item of attachments) {
@@ -383,10 +390,15 @@ export default function PostComposer({
       void client.invalidateQueries({ predicate: (q) => q.queryKey[0] !== "suggestions" });
       if (stillCompressing) {
         toast(mode === "reel" ? "Reel'in hazırlanıyor, birkaç saniye içinde yayında olacak." : "Gönderin hazırlanıyor, birkaç saniye içinde yayında olacak.");
-        void announceWhenLive(post.id, () => {
-          void client.invalidateQueries({ predicate: (q) => q.queryKey[0] !== "suggestions" });
-          toast(mode === "reel" ? "Reel'in yayında 🎉" : "Gönderin yayında 🎉");
-        });
+        void announceWhenLive(
+          post.id,
+          compressingIds,
+          () => {
+            void client.invalidateQueries({ predicate: (q) => q.queryKey[0] !== "suggestions" });
+            toast(mode === "reel" ? "Reel'in yayında 🎉" : "Gönderin yayında 🎉");
+          },
+          () => toast("Videon işlenemedi, bu yüzden gönderi yayınlanmadı. Lütfen başka bir video dene.", true),
+        );
       } else toast(quoteId ? "Your quote has been shared." : "Your post is live.");
       setOpen(false);
       onModalClose?.();

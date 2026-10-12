@@ -545,6 +545,11 @@ export const endpoints = {
     "method": "POST",
     "authenticated": true
   },
+  "adminContentSetPinned": {
+    "path": "/api/admin/posts/{id}/pin",
+    "method": "POST",
+    "authenticated": true
+  },
   "adminContentDeletePost": {
     "path": "/api/admin/posts/{id}/delete",
     "method": "POST",
