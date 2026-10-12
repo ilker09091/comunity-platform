@@ -42,7 +42,7 @@ export class CommentsService {
     // $1 = viewer (nullable). Tombstones (deleted/removed) are only listed when they have
     // children, so threads never break while empty deleted comments disappear.
     return `
-      SELECT c.*, u.username::text AS username, u.display_name, u.is_private, av.storage_key AS avatar_key,
+      SELECT c.*, u.username::text AS username, u.display_name, u.is_private, u.is_verified, av.storage_key AS avatar_key,
              EXISTS (SELECT 1 FROM comments ch WHERE ch.parent_id = c.id) AS has_replies,
              ($1::uuid IS NOT NULL AND EXISTS (
                SELECT 1 FROM comment_likes cl WHERE cl.comment_id = c.id AND cl.user_id = $1::uuid)) AS is_liked
@@ -75,6 +75,7 @@ export class CommentsService {
             username: r.username,
             display_name: r.display_name,
             is_private: r.is_private,
+            is_verified: r.is_verified,
             avatar_key: r.avatar_key,
           })
         : null,

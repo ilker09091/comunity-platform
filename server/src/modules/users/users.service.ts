@@ -19,7 +19,7 @@ import {
 } from './dto/user.dto.js';
 
 /** Columns needed for `UserSummaryDto`; expects `users u` and `LEFT JOIN media av`. */
-export const USER_SUMMARY_COLUMNS = `u.id, u.username::text AS username, u.display_name, u.is_private, av.storage_key AS avatar_key`;
+export const USER_SUMMARY_COLUMNS = `u.id, u.username::text AS username, u.display_name, u.is_private, u.is_verified, av.storage_key AS avatar_key`;
 export const USER_AVATAR_JOIN = `LEFT JOIN media av ON av.id = u.avatar_media_id`;
 
 export interface UserSummaryRow {
@@ -27,6 +27,7 @@ export interface UserSummaryRow {
   username: string;
   display_name: string;
   is_private: boolean;
+  is_verified?: boolean;
   avatar_key: string | null;
 }
 
@@ -75,6 +76,7 @@ export class UsersService {
       displayName: row.display_name,
       avatarUrl: this.urls.url(row.avatar_key),
       isPrivate: row.is_private,
+      isVerified: !!row.is_verified,
     };
   }
 
@@ -156,6 +158,7 @@ export class UsersService {
       username: row.username,
       email: row.email,
       displayName: row.display_name,
+      isVerified: !!row.is_verified,
       avatarUrl: this.urls.url(row.avatar_key),
       coverUrl: this.urls.url(row.cover_key),
       bio: row.bio,
@@ -197,6 +200,7 @@ export class UsersService {
       avatarUrl: this.urls.url(row.avatar_key),
       coverUrl: this.urls.url(row.cover_key),
       isPrivate: row.is_private,
+      isVerified: !!row.is_verified,
       bio: row.bio,
       location: row.location,
       website: row.website,

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 from contextlib import contextmanager
 import http.client
 import json
@@ -22,11 +23,14 @@ from urllib import error, parse, request
 from importer_automation import Automation, AutomationError, collect_personal, process_lock
 
 ROOT = Path(__file__).resolve().parents[1]
+WORKER_VERSION = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 sys.path.insert(0, str(ROOT / '.tools' / 'tiktok'))
 PORT = int(os.getenv('IMPORTER_PORT', '4317'))
 CIRCLE = os.getenv('CIRCLE_WEB_URL', 'http://localhost:3000').rstrip('/')
 BASE = '/api/backend/importer'
-STATE = ROOT / '.tools' / 'importer'
+STATE = Path(os.getenv('IMPORTER_STATE_DIR',str(ROOT / '.tools' / 'importer')))
+DEPLOYED = os.getenv('IMPORTER_DEPLOYED')=='1'
+SECRET_FILE = Path(os.getenv('IMPORTER_SECRET_FILE',str(ROOT/'server/storage/importer-control/key')))
 MAX_BYTES = int(os.getenv('IMPORTER_MAX_VIDEO_BYTES', '104857600'))
 LOCK = threading.RLock()
 JOBS: dict = {}
@@ -467,6 +471,17 @@ def run_import(job_id, session, author, video_id, source, update_hook=None):
                 with db() as connection:
                     connection.execute('UPDATE imports SET media=?, description=? WHERE destination=? AND author=? AND video=?', (media, description, *key))
                 row['description'] = description
+        # Publishing is only successful after the existing asynchronous video processor is ready.
+        deadline=time.monotonic()+1800
+        while True:
+            metadata=session.call('media/'+media)
+            if metadata.get('status')=='READY':break
+            if metadata.get('status')=='FAILED':raise Failure('Circle video dönüştürmesi başarısız oldu. Media panelindeki hatayı kontrol edin.','VIDEO_PROCESSING_FAILED',422)
+            if metadata.get('status')!='PROCESSING':raise Failure('Circle geçerli medya işleme durumu döndürmedi.','INVALID_RESPONSE',502)
+            if time.monotonic()>=deadline:raise Failure('Circle videosu hâlâ işleniyor; aynı ID ile güvenle tekrar deneyebilirsin.','VIDEO_PROCESSING_TIMEOUT',504)
+            progress=metadata.get('processingProgress')
+            update(status='processing',stage='Circle videosu sıkıştırılıyor',progress=90+min(4,max(0,float(progress or 0)*.04)))
+            time.sleep(2)
         update(stage='Circle gönderisi oluşturuluyor', progress=95)
         # Reuse the same media after an ambiguous timeout. Circle locks attachments,
         # so retrying cannot attach it to a second post; reconciliation finds the first.
@@ -499,21 +514,36 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
+    def service_request(self):
+        supplied=self.headers.get('X-Importer-Key','')
+        try:expected=os.getenv('IMPORTER_SHARED_SECRET') or SECRET_FILE.read_text(encoding='utf-8').strip()
+        except OSError:expected=''
+        return bool(supplied and len(expected)>=32 and hmac.compare_digest(supplied.encode(),expected.encode()))
+
+    def session(self):
+        trusted=self.service_request()
+        session=CircleSession('social_access='+self.headers.get('X-Circle-Access','')) if trusted else CircleSession(self.headers.get('Cookie'))
+        session.admin_required=trusted
+        return session
+
     def check_origin(self):
+        if self.service_request():return
+        if DEPLOYED:raise Failure('Importer yalnızca yetkili Circle admin adaptöründen kullanılabilir.','FORBIDDEN',403)
         expected = f'localhost:{PORT}'
         if self.headers.get('Host') != expected:
-            raise Failure(f'Aracı http://{expected} adresinden açın.', 'INVALID_HOST', 403)
+            raise Failure('Fiktok aracını Circle admin panelinden açın. Sunucudaki importer adaptörünün yapılandırmasını kontrol edin.', 'INVALID_HOST', 403)
         if self.headers.get('Origin') not in (None, f'http://{expected}'):
             raise Failure('Bu araç yalnızca kendi yerel sayfasından çağrılabilir.', 'INVALID_ORIGIN', 403)
         if self.headers.get('Sec-Fetch-Site') in ('cross-site', 'same-site') or self.headers.get('X-Social-Client') != 'web':
             raise Failure('Geçersiz yerel araç isteği.', 'INVALID_ORIGIN', 403)
 
     def do_GET(self):
-        session = CircleSession(self.headers.get('Cookie'))
+        session = self.session()
         try:
             parsed = parse.urlsplit(self.path)
-            if self.headers.get('Host') != f'localhost:{PORT}':
-                raise Failure(f'Aracı http://localhost:{PORT} adresinden açın.', 'INVALID_HOST', 403)
+            if DEPLOYED and not self.service_request():raise Failure('Importer yalnızca admin panelinden kullanılabilir.','FORBIDDEN',403)
+            if not self.service_request() and self.headers.get('Host') != f'localhost:{PORT}':
+                raise Failure('Fiktok aracını Circle admin panelinden açın. Sunucudaki importer adaptörünün yapılandırmasını kontrol edin.', 'INVALID_HOST', 403)
             if parsed.path in ('/', '/index.html'):
                 payload = (ROOT / 'index.html').read_bytes()
                 self.send_response(200)
@@ -527,11 +557,14 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self.check_origin()
             if parsed.path == BASE + '/health':
-                self.send_json({'ok': True, 'circleUrl': CIRCLE, 'features': ['profile', 'explore', 'personal', 'personal_auto', 'video-limit', 'background-queue', 'automation', 'database-settings']})
+                self.send_json({'ok': True, 'workerVersion': WORKER_VERSION, 'circleUrl': CIRCLE, 'features': ['admin-relay', 'profile', 'explore', 'personal', 'personal_auto', 'video-limit', 'background-queue', 'automation', 'database-settings']})
             elif parsed.path == BASE + '/automation/state':
                 self.send_json(AUTOMATION.state(session),cookies=session.set_cookies)
             elif parsed.path == BASE + '/configuration':
                 self.send_json(AUTOMATION.database('read'))
+            elif parsed.path == BASE + '/browser/frame':
+                if not self.service_request():raise Failure('Admin adaptörü gerekiyor.','FORBIDDEN',403)
+                self.send_json(AUTOMATION.remote_browser.status(self.headers.get('X-Circle-User')))
             elif parsed.path == BASE + '/browser/status':
                 self.send_json(AUTOMATION.browser_status())
             elif parsed.path == BASE + '/startup':
@@ -566,17 +599,15 @@ class Handler(BaseHTTPRequestHandler):
         except (Failure,AutomationError) as exc:
             self.send_json({'code': exc.code, 'message': str(exc)}, exc.status, session.set_cookies)
         except Exception as exc:
-            import traceback
-            tb = traceback.format_exc()
-            print(f'[IMPORTER ERROR] {self.command} {self.path}\n{tb}', flush=True)
-            self.send_json({'code': 'INTERNAL_ERROR', 'message': f'Yerel araç beklenmeyen bir hata aldı: {type(exc).__name__}: {str(exc)[:200]}'}, 500)
+            print(f'[IMPORTER ERROR] {self.command} {type(exc).__name__}', flush=True)
+            self.send_json({'code': 'INTERNAL_ERROR', 'message': 'Importer beklenmeyen bir hata aldı. Sunucudaki servis durumunu kontrol edin.'}, 500)
 
     def do_POST(self):
-        session = CircleSession(self.headers.get('Cookie'))
+        session = self.session()
         try:
             self.check_origin()
             allowed = ('/imports','/personal-feed','/batches','/batches/control','/automation/schedule','/automation/connect',
-                       '/browser/login','/database/test','/database/apply','/automation/stop-all','/startup')
+                       '/browser/login','/browser/input','/browser/close','/database/test','/database/apply','/automation/stop-all','/startup')
             if self.path not in tuple(BASE+p for p in allowed):
                 raise Failure('Uç nokta bulunamadı.', 'NOT_FOUND', 404)
             length = int(self.headers.get('Content-Length', '0'))
@@ -586,7 +617,7 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(data,dict):
                 raise Failure('Geçersiz istek.', 'VALIDATION')
             action = self.path.removeprefix(BASE)
-            if action in ('/batches','/batches/control','/automation/schedule','/automation/connect','/browser/login','/database/test','/database/apply','/automation/stop-all','/startup'):
+            if action in ('/batches','/batches/control','/automation/schedule','/automation/connect','/browser/login','/browser/input','/browser/close','/database/test','/database/apply','/automation/stop-all','/startup'):
                 if action == '/batches':
                     reply = AUTOMATION.enqueue_selected(data,session)
                 elif action == '/batches/control':
@@ -596,7 +627,10 @@ class Handler(BaseHTTPRequestHandler):
                 elif action == '/automation/connect':
                     reply = AUTOMATION.connect(session)
                 elif action == '/browser/login':
-                    reply = AUTOMATION.login()
+                    reply = AUTOMATION.remote_browser.start(self.headers.get('X-Circle-User')) if self.service_request() else AUTOMATION.login()
+                elif action in ('/browser/input','/browser/close'):
+                    if not self.service_request():raise Failure('Admin adaptörü gerekiyor.','FORBIDDEN',403)
+                    reply = AUTOMATION.remote_browser.command(self.headers.get('X-Circle-User'),data if action=='/browser/input' else {'action':data.get('action','save')})
                 elif action == '/automation/stop-all':
                     reply = AUTOMATION.stop_all(data.get('cancelAll') is True)
                 elif action == '/startup':
@@ -654,9 +688,8 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, KeyError):
             self.send_json({'code': 'VALIDATION', 'message': 'Geçersiz aktarım isteği.'}, 400)
         except Exception as exc:
-            import traceback
-            print(f'[IMPORT ERROR] {traceback.format_exc()}', flush=True)
-            self.send_json({'code': 'INTERNAL_ERROR', 'message': f'Aktarım başlatılamadı: {type(exc).__name__}: {str(exc)[:200]}'}, 500)
+            print('[IMPORT ERROR] '+type(exc).__name__,flush=True)
+            self.send_json({'code':'INTERNAL_ERROR','message':'Aktarım başlatılamadı; worker bağlantısı ve kaynak oturumunu kontrol edin.'},500)
 
 
 if __name__ == '__main__':
@@ -682,7 +715,7 @@ if __name__ == '__main__':
     if target.scheme not in ('http', 'https') or not target.netloc or target.username or target.password or target.query or target.fragment:
         raise SystemExit('CIRCLE_WEB_URL must be an HTTP(S) URL without credentials, query or fragment.')
     worker_lock = process_lock(STATE)
-    server = ThreadingHTTPServer(('127.0.0.1', PORT), Handler)
+    server = ThreadingHTTPServer((os.getenv('IMPORTER_BIND','127.0.0.1'), PORT), Handler)
     initialize()
     AUTOMATION.start()
     print(f'Circle Video Importer: http://localhost:{PORT}', flush=True)

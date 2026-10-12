@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { api, type Models } from "@/lib/api/client";
 import { useSession, useToast } from "./providers";
-import { Avatar, ConfirmDialog, Dropdown, EmptyState, ErrorState, LoadMore, Modal } from "./ui";
+import { Avatar, ConfirmDialog, Dropdown, EmptyState, ErrorState, LoadMore, Modal, VerifiedBadge } from "./ui";
 import FollowButton from "./follow-button";
 import Feed from "./feed";
 import ReportDialog from "./report-dialog";
@@ -64,7 +64,7 @@ function Connections({ id, mode }: { id: string; mode: "followers" | "following"
             <Link href={`/profile/${user.username}`} className="user-identity">
               <Avatar user={user} size={40} />
               <div>
-                <strong>{user.displayName}</strong>
+                <strong>{user.displayName}{user.isVerified && <VerifiedBadge size={14} />}</strong>
                 <span>@{user.username}</span>
               </div>
             </Link>
@@ -296,6 +296,7 @@ export default function Profile({ username }: { username: string }) {
           </div>
           <h1 className="profile-name">
             {user.displayName}
+            {user.isVerified && <VerifiedBadge size={22} className="profile-verified" />}
             {user.isPrivate && <LockKeyhole size={16} aria-label="Private account" />}
           </h1>
           <p className="profile-handle">

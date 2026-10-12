@@ -42,7 +42,9 @@ class CircleStub(BaseHTTPRequestHandler):
         if not any(cookie in self.headers.get('Cookie', '') for cookie in (COOKIE,BACKGROUND_COOKIE)):
             self.reply({'code': 'INVALID_TOKEN'}, 401)
         elif self.path == '/api/backend/api/users/me':
-            self.reply({'id': AUTHOR})
+            self.reply({'id': AUTHOR,'role':'ADMIN'})
+        elif self.path == '/api/backend/api/media/'+MEDIA:
+            self.reply({'id':MEDIA,'status':'READY','processingProgress':None})
         elif self.path.startswith(f'/api/backend/api/users/{AUTHOR}/posts?'):
             self.reply({'items': self.posts, 'nextCursor': None})
         else:
@@ -220,7 +222,7 @@ class ImporterTests(unittest.TestCase):
         command = run.call_args.args[0]
         self.assertEqual(command[command.index('--playlist-items') + 1], '7:10')
         self.assertTrue(all(isinstance(video['id'], str) for video in page['videos']))
-        for limit in ('0', '101', '2.5', 'abc'):
+        for limit in ('0', '501', '2.5', 'abc'):
             self.assertEqual(self.call('/videos?account=%40creator&limit=' + limit)[0], 400)
 
     def test_explore_filters_real_video_items_and_bounds_count(self):
@@ -425,6 +427,67 @@ class ImporterTests(unittest.TestCase):
                 worker.database('apply',{})
             self.assertEqual(caught.exception.code,'WORKER_BUSY')
             bridge.assert_not_called()
+
+
+    def test_deploy_private_worker_requires_server_key(self):
+        key=Path(self.temp.name)/'control-key';key.write_text('k'*64,encoding='utf-8')
+        with patch.object(app,'DEPLOYED',True),patch.object(app,'SECRET_FILE',key):
+            self.assertEqual(self.call('/health')[0],403)
+            req=request.Request(self.base+app.BASE+'/health',headers={'Host':'importer:4317','X-Importer-Key':'k'*64,'X-Social-Client':'web'})
+            with request.urlopen(req,timeout=5) as response:self.assertTrue(json.load(response)['ok'])
+            req=request.Request(self.base+app.BASE+'/health',headers={'Host':'importer:4317','X-Importer-Key':'wrong','X-Social-Client':'web'})
+            with self.assertRaises(error.HTTPError) as caught:request.urlopen(req,timeout=5)
+            self.assertEqual(caught.exception.code,403)
+            caught.exception.close()
+
+    def test_expired_background_session_is_renewed_from_current_admin_submission(self):
+        worker=app.AUTOMATION
+        session=app.CircleSession(COOKIE);session.admin_required=True
+        worker.remember(session,AUTHOR)
+        for code in ('CIRCLE_LOGIN_REQUIRED','CIRCLE_RECONNECT_REQUIRED'):
+            with self.subTest(code=code),patch.object(worker,'session_for',side_effect=app.Failure('Expired',code,401)),patch.object(worker,'connect') as reconnect:
+                worker.ensure_connected(session,AUTHOR)
+                reconnect.assert_called_once_with(session)
+        with patch.object(worker,'session_for',side_effect=automation.AutomationError('Role revoked','CIRCLE_ADMIN_REVOKED',401)),patch.object(worker,'connect') as reconnect:
+            with self.assertRaises(automation.AutomationError):worker.ensure_connected(session,AUTHOR)
+            reconnect.assert_not_called()
+
+    def test_deploy_credentials_use_authenticated_encryption(self):
+        with patch.dict('os.environ',{'IMPORTER_DEPLOYED':'1','IMPORTER_SHARED_SECRET':'k'*64}):
+            encrypted=automation.protect(COOKIE)
+            self.assertTrue(encrypted.startswith('aesgcm:v1:'))
+            self.assertNotIn(COOKIE,encrypted)
+            self.assertEqual(automation.protect(encrypted,True),COOKIE)
+            with patch.dict('os.environ',{'IMPORTER_SHARED_SECRET':'different-key-'*8}):
+                with self.assertRaises(automation.AutomationError):automation.protect(encrypted,True)
+
+    def test_admin_background_work_stops_after_role_revocation(self):
+        session=app.CircleSession(COOKIE);session.admin_required=True
+        app.AUTOMATION.remember(session,AUTHOR)
+        with patch.object(app.AUTOMATION,'identify',return_value=(AUTHOR,{'id':AUTHOR,'role':'USER'})):
+            with self.assertRaises(automation.AutomationError) as caught:app.AUTOMATION.session_for(AUTHOR)
+            self.assertEqual(caught.exception.code,'CIRCLE_ADMIN_REVOKED')
+
+    def test_remote_login_frames_and_commands_are_owner_scoped(self):
+        remote=app.AUTOMATION.remote_browser
+        remote.owner=AUTHOR;remote.thread=types.SimpleNamespace(is_alive=lambda:True);remote.frame='private-frame'
+        self.assertEqual(remote.status(AUTHOR)['frame'],'private-frame')
+        self.assertIsNone(remote.status('someone-else')['frame'])
+        with self.assertRaises(automation.AutomationError):remote.command('someone-else',{'action':'text','text':'hidden'})
+        with self.assertRaises(automation.AutomationError):remote.command(AUTHOR,{'action':'move','x':-1,'y':0})
+        with self.assertRaises(automation.AutomationError):remote.command(AUTHOR,{'action':'save'})
+        remote.command(AUTHOR,{'action':'text','text':'typed explicitly'})
+        self.assertEqual(remote.commands.get_nowait()['action'],'text')
+
+    def test_failed_transcoding_never_reports_a_published_import(self):
+        original=app.CircleSession.call
+        def call(session,path,body=None):
+            if path=='media/'+MEDIA:return {'id':MEDIA,'status':'FAILED'}
+            return original(session,path,body)
+        with patch.dict('sys.modules',{'yt_dlp':types.SimpleNamespace(YoutubeDL=DownloadFixture)}),patch.object(app.CircleSession,'call',call):
+            result=self.import_and_wait()
+        self.assertEqual(result['status'],'failed');self.assertEqual(result['code'],'VIDEO_PROCESSING_FAILED')
+        self.assertEqual(CircleStub.posts,[])
 
 
 if __name__ == '__main__':

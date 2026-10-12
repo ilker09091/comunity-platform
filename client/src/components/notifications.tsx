@@ -31,6 +31,7 @@ import {
   LoadMore,
   relativeTime,
   SignInPrompt,
+  VerifiedBadge,
 } from "./ui";
 import { InboxSection, useInboxUnread } from "./inbox";
 import { useSession, useToast } from "./providers";
@@ -206,7 +207,7 @@ export function NotificationRow({
         </Link>
         <span className="notice-text">
           <span className="notice-line">
-            <Link href={`/profile/${item.actor.username}`} onClick={markIfUnread}><strong>{item.actor.displayName}</strong></Link> <Link href={notificationHref(item)} onClick={markIfUnread}>{label}</Link>
+            <Link href={`/profile/${item.actor.username}`} onClick={markIfUnread}><strong>{item.actor.displayName}{item.actor.isVerified && <VerifiedBadge size={14} />}</strong></Link> <Link href={notificationHref(item)} onClick={markIfUnread}>{label}</Link>
           </span>
           {!compact && item.type === "FOLLOW_REQUEST" && (
             <span className="notice-handle">@{item.actor.username}</span>

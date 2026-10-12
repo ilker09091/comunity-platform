@@ -21,6 +21,7 @@ import {
   UserMinus,
   Flag,
   Clapperboard,
+  EyeOff,
 } from "lucide-react";
 import ReportDialog from "./report-dialog";
 import { useFeatures } from "@/lib/platform-config";
@@ -28,7 +29,7 @@ import { api, type Post, type Models } from "@/lib/api/client";
 import { sharePath, usePostEngagement } from "@/lib/use-post-engagement";
 import { useDoubleTap } from "@/lib/use-double-tap";
 import { useSession, useToast } from "./providers";
-import { Avatar, ConfirmDialog, Dropdown, Modal, relativeTime } from "./ui";
+import { Avatar, ConfirmDialog, Dropdown, Modal, relativeTime, VerifiedBadge } from "./ui";
 import CommentList, { CommentInput } from "./comments";
 import PostComposer from "./post-composer";
 import VideoPlayerCore from "./video-player-core";
@@ -66,34 +67,59 @@ function mediaAspect(item: Models["MediaDto"]): CSSProperties | undefined {
   return { aspectRatio: String(ratio) };
 }
 
+/** Threads-style spoiler veil: drifting sparkles and a frosted pill; tapping dissolves it. */
+function SpoilerCover({ leaving, onReveal, onDone }: { leaving: boolean; onReveal: () => void; onDone: () => void }) {
+  return (
+    <button
+      type="button"
+      className={`media-spoiler-cover ${leaving ? "leaving" : ""}`}
+      onClick={onReveal}
+      onAnimationEnd={(e) => {
+        if (leaving && e.target === e.currentTarget) onDone();
+      }}
+      aria-label="Spoiler: show media"
+      disabled={leaving}
+    >
+      <span className="spoiler-particles" aria-hidden="true" />
+      <span className="media-spoiler-pill">
+        <EyeOff size={16} aria-hidden="true" /> Spoiler
+      </span>
+      <span className="media-spoiler-hint">Görmek için dokun</span>
+    </button>
+  );
+}
+
 export function PostMedia({ media, postId, spoiler = false }: { media: Models["MediaDto"][]; postId?: string; spoiler?: boolean }) {
   const client = useQueryClient();
-  const [revealed, setRevealed] = useState(false);
+  /** hidden → revealing (unblur animation) → shown */
+  const [spoilerPhase, setSpoilerPhase] = useState<"hidden" | "revealing" | "shown">("hidden");
+  const reveal = () => setSpoilerPhase((phase) => (phase === "hidden" ? "revealing" : phase));
   const refresh = postId ? async () => {
     const post = await api("postsGet", { params: { id: postId } });
     client.setQueryData(["post", postId], post);
     await client.invalidateQueries({ predicate: query => query.queryKey[0] === "posts" || query.queryKey[0] === "discovery" });
   } : undefined;
   const single = media.length === 1;
-  const showSpoilerCover = spoiler && !revealed;
+  const showSpoilerCover = spoiler && spoilerPhase !== "shown";
+  const spoilerClass = !showSpoilerCover ? "" : spoilerPhase === "revealing" ? "spoilered revealing" : "spoilered";
   const inner = media.length && media.every(item => item.type==='IMAGE' && item.status==='READY')
     ? <PhotoGallery photos={media}/>
     : null;
   if (inner) {
+    // The frame takes the first photo's shape: tall (9:16) photos get a narrower frame instead of side bars.
+    const first = media[0];
+    const ratio = first.width && first.height ? first.width / first.height : 1;
     return (
-      <div className={`post-media-spoiler-wrap ${showSpoilerCover ? "spoilered" : ""}`}>
+      <div className={`post-media-spoiler-wrap is-gallery ${spoilerClass}`} style={{ "--photo-ratio": String(ratio) } as CSSProperties}>
         {inner}
         {showSpoilerCover && (
-          <button type="button" className="media-spoiler-cover" onClick={() => setRevealed(true)}>
-            <span className="media-spoiler-label">👁 Spoiler</span>
-            <span className="media-spoiler-hint">Dokunarak göster</span>
-          </button>
+          <SpoilerCover leaving={spoilerPhase === "revealing"} onReveal={reveal} onDone={() => setSpoilerPhase("shown")} />
         )}
       </div>
     );
   }
   return (
-    <div className={`post-media-spoiler-wrap ${showSpoilerCover ? "spoilered" : ""}`}>
+    <div className={`post-media-spoiler-wrap ${spoilerClass}`}>
       <div className={`post-media count-${Math.min(media.length, 4)}`}>
         {media.slice(0, 4).map((item) => (
           <div key={item.id} className={`post-media-item ${item.type === "VIDEO" ? "has-video" : ""}`} style={single && item.type !== "VIDEO" ? mediaAspect(item) : undefined}>
@@ -119,10 +145,7 @@ export function PostMedia({ media, postId, spoiler = false }: { media: Models["M
         ))}
       </div>
       {showSpoilerCover && (
-        <button type="button" className="media-spoiler-cover" onClick={() => setRevealed(true)}>
-          <span className="media-spoiler-label">👁 Spoiler</span>
-          <span className="media-spoiler-hint">Dokunarak göster</span>
-        </button>
+        <SpoilerCover leaving={spoilerPhase === "revealing"} onReveal={reveal} onDone={() => setSpoilerPhase("shown")} />
       )}
     </div>
   );
@@ -360,7 +383,7 @@ export default function PostCard({ post, detail = false }: { post: Post; detail?
         <Link href={`/profile/${visible.author.username}`} className="user-identity">
           <Avatar user={visible.author} size={42} />
           <span className="post-author">
-            <strong id={`post-${post.id}-author`}>{visible.author.displayName}</strong>
+            <strong id={`post-${post.id}-author`}>{visible.author.displayName}{visible.author.isVerified && <VerifiedBadge />}</strong>
             <span className="post-meta">
               <span className="post-handle">@{visible.author.username}</span>
               <span className="meta-dot" aria-hidden="true">
@@ -427,7 +450,7 @@ export default function PostCard({ post, detail = false }: { post: Post; detail?
           <div className="quoted-post">
             <Link className="user-identity" href={`/profile/${quoted.author.username}`}>
               <Avatar user={quoted.author} size={24} />
-              <strong>{quoted.author.displayName}</strong>
+              <strong>{quoted.author.displayName}{quoted.author.isVerified && <VerifiedBadge size={14} />}</strong>
               <span className="muted">@{quoted.author.username}</span>
             </Link>
             {quoted.content && <Link className="quoted-content" href={`/post/${quoted.id}`}>{quoted.content}</Link>}

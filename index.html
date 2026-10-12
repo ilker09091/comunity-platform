@@ -146,6 +146,10 @@
 
 
     <div id="feedback" role="status" aria-live="polite" hidden></div>
+<section id="remote-browser" class="card work-panel" hidden aria-label="Fiktok hesap girişi">
+<h2>Fiktok hesabını bağla</h2><p>QR koduyla veya gerçek giriş ekranıyla hesabına giriş yap. Ekrana tıklayıp yazabilirsin; Tab, Enter ve yapıştırma desteklenir. Giriş tamamlanınca kaydet ve kapat.</p>
+<p id="remote-status" role="status">Ekran açılıyor…</p><img id="remote-frame" alt="Kaynak hesabının canlı giriş ekranı" tabindex="0" style="display:block;width:100%;height:auto;aspect-ratio:1280/900;background:#f3f5f8;border:1px solid #e4e9ef;border-radius:12px;touch-action:none"/>
+<div class="work-actions"><button id="remote-save" class="button" type="button">Kaydet ve kapat</button><button id="remote-cancel" class="button secondary" type="button">İptal</button><button id="remote-reload" class="button secondary" type="button">Giriş ekranını yenile</button></div></section>
     <section class="card work-panel" aria-labelledby="automation-title">
       <div class="eyebrow">Arka planda çalışır</div><h2 id="automation-title">Keşfet otomasyonu</h2>
       <p>Bu sayfayı kapatabilirsin; servis açık kaldığı sürece toplama ve yayınlama devam eder. Bilgisayar kapalıyken çalışmaz. TikTok penceresinde aynı hesabına bir kez giriş yapıp pencereyi kapat.</p>
@@ -154,8 +158,8 @@
       <div id="worker-status" class="work-status" role="status" aria-live="polite">Servis ve hesap bilgileri yükleniyor…</div>
       <form id="automation-form">
         <div class="form-grid">
-          <label><span class="label">Ne zaman çeksin?</span><select id="auto-when"><option value="instant">Şimdi direkt çek</option><option value="daily">Her gün belli saatte çek</option></select></label>
-          <label id="auto-time-field" hidden><span class="label">Saat kaçta çeksin?</span><input id="auto-time" type="time" value="09:00"></label>
+          <label><span class="label">Ne zaman çeksin?</span><select id="auto-when"><option value="instant">Şimdi direkt çek</option><option value="daily">Her gün belli saatte çek</option><option value="interval">Seçili aralıkla tekrar çek</option></select></label>
+          <label id="auto-interval-field" hidden><span class="label">Kaç dakikada bir?</span><input id="auto-interval" type="number" min="1" max="1440" value="30"></label><label id="auto-daily-field" hidden><span class="label">Günlük yayın limiti</span><input id="auto-daily" type="number" min="1" max="1000" value="200"></label><label id="auto-time-field" hidden><span class="label">Saat kaçta çeksin?</span><input id="auto-time" type="time" value="09:00"></label>
           <label><span class="label">Videolar nereden alınsın?</span><select id="auto-mode"><option value="personal_auto">Benim Keşfetim</option><option value="explore">Genel Keşfet</option><option value="profile">TikTok profili</option></select></label>
           <label id="auto-account-field" hidden><span class="label">TikTok kullanıcı adı</span><input id="auto-account" placeholder="@kullanici" maxlength="500" autocomplete="off"></label>
           <label><span class="label">Kaç video alsın?</span><input id="auto-count" type="number" min="1" max="500" step="1" value="200" required></label>
@@ -211,6 +215,7 @@
     let account = '', cursor = null, activeConfig = null, activeMode = 'profile', activeLimit = 20, fetching = false, importing = false;
     // Run start-importer.cmd to serve the tool and its real download adapters.
     // Configure a compatible helper here; Circle destination is CIRCLE_WEB_URL.
+    const EMBEDDED = document.querySelector('meta[name="circle-importer-mode"]')?.content === "admin" || location.pathname.endsWith("/fiktok-importer.html") || new URLSearchParams(location.search).get("admin") === "1";
     const API_CONFIG = Object.freeze({
       base: window.location.protocol === 'file:' ? 'http://localhost:4317/api/backend/importer' : `${window.location.origin}/api/backend/importer`,
       videosPath: 'videos',
@@ -224,7 +229,7 @@
     function feedback(message, kind = 'info') { $('feedback').textContent = message; $('feedback').dataset.kind = kind; $('feedback').hidden = false; }
     function el(tag, className, text) { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; }
     function safeUrl(value) {
-      try { const url = new URL(value); if (url.username || url.password) return null; if (url.protocol === 'https:' || url.protocol === 'http:' && ['localhost','127.0.0.1','[::1]'].includes(url.hostname)) return url.href; } catch {}
+      try { const url = new URL(value); if (url.username || url.password) return null; if (url.protocol === 'https:' || url.protocol === 'http:' && (url.origin === location.origin || ['localhost','127.0.0.1','[::1]'].includes(url.hostname))) return url.href; } catch {}
       return null;
     }
     function readConfig() {
@@ -243,16 +248,19 @@
       const timeout = setTimeout(() => controller.abort(), 180000);
       const headers = {Accept:'application/json','X-Social-Client':'web',...options.headers};
       try {
-        const response = await fetch(apiUrl(config,path), {...options, headers, signal:controller.signal, credentials:'include', redirect:'error'});
-        let data; try { data = await response.json(); } catch { throw failure(response.status === 404 ? 'Yerel araç uç noktası bulunamadı. Aracı start-importer.cmd ile başlatın.' : 'Yerel araç geçerli bir yanıt döndürmedi.','INVALID_RESPONSE',response.status); }
+        const target = EMBEDDED ? `${location.origin}/api/backend/api/admin/importer/request` : apiUrl(config,path);
+        const relay = EMBEDDED ? {method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({method:options.method||'GET',path,data:options.body?JSON.parse(options.body):undefined})} : {...options,headers};
+        const response = await fetch(target, {...relay, signal:controller.signal, credentials:'include', redirect:'error'});
+        let data; try { data = await response.json(); } catch { throw failure(EMBEDDED ? 'Fiktok admin servisi geçerli yanıt vermedi. Sunucudaki api ve importer servislerini güncelleyin.' : response.status === 404 ? 'Yerel araç uç noktası bulunamadı. Aracı start-importer.cmd ile başlatın.' : 'Yerel araç geçerli bir yanıt döndürmedi.','INVALID_RESPONSE',response.status); }
         const code = data?.code || data?.error?.code;
         if (!response.ok || code && code !== 'ok') {
-          const message = data?.message || data?.error?.message || (response.status === 401 ? 'Circle hesabınıza localhost:3000 üzerinden giriş yapın; token gerekmiyor.' : response.status === 429 ? 'Çok fazla istek gönderildi. Biraz bekleyip tekrar deneyin.' : `İstek başarısız (${response.status}).`);
+          const message = data?.message || data?.error?.message || (response.status === 401 ? 'Circle oturumunuz sona erdi. Sitede tekrar giriş yapın.' : response.status === 429 ? 'Çok fazla istek gönderildi. Biraz bekleyip tekrar deneyin.' : `İstek başarısız (${response.status}).`);
           throw failure(String(message),code || 'API_ERROR',response.status);
         }
-        return data;
+        return EMBEDDED ? data.result : data;
       } catch (error) {
         if (error.name === 'AbortError') throw failure('Request timed out. An import may still finish on the server; retry safely using the same video ID.','TIMEOUT');
+        if (EMBEDDED && error instanceof TypeError) throw failure('Circle admin adaptörüne ulaşılamıyor. Sayfayı yenileyip oturumunu kontrol et.','NETWORK');
         if (error instanceof TypeError) throw failure('Yerel indirme servisi çalışmıyor. Proje klasöründeki start-importer.cmd dosyasını açın ve aracı http://localhost:4317 adresinde kullanın.','NETWORK');
         throw error;
       } finally { clearTimeout(timeout); }
@@ -287,7 +295,7 @@
       const limit = Number(value);
       if (!Number.isInteger(limit) || limit < 1 || limit > 100) {alert('Video sayısı 1–100 arasında tam sayı olmalı.');return;}
       const target = new URL(returnUrl);
-      if (!['localhost','127.0.0.1'].includes(target.hostname) || !['http:','https:'].includes(target.protocol)) {alert('Circle yerel araç adresi geçersiz.');return;}
+      if (!['http:','https:'].includes(target.protocol) || target.username || target.password) {alert('Circle araç adresi geçersiz.');return;}
       if (document.getElementById('circle-personal-feed-overlay')) {alert('Bir video toplama işlemi zaten çalışıyor.');return;}
       const box = document.createElement('div');box.id = 'circle-personal-feed-overlay';
       Object.assign(box.style,{position:'fixed',top:'16px',right:'16px',zIndex:'2147483647',padding:'18px',borderRadius:'14px',background:'#fff',color:'#172033',font:'14px system-ui,sans-serif',boxShadow:'0 8px 40px #0004',maxWidth:'320px'});
@@ -354,7 +362,7 @@
     }
     function updatePersonalBookmark() {
       const value = Number($('video-limit').value), limit = Number.isInteger(value) && value >= 1 && value <= 100 ? value : 20;
-      const destination = window.location.protocol === 'file:' ? 'http://localhost:4317/' : `${window.location.origin}/`;
+      const destination = EMBEDDED ? `${location.origin}/fiktok-importer.html?admin=1` : window.location.protocol === 'file:' ? 'http://localhost:4317/' : `${window.location.origin}/`;
       $('personal-bookmark').href = 'javascript:' + encodeURIComponent(`void (${collectPersonalFeed.toString()})(${JSON.stringify(destination)},${limit})`);
     }
     async function receivePersonalFeed() {
@@ -573,17 +581,17 @@
       finally {workerRefreshing=false;}
     }
     function autoSource() {$('auto-account-field').hidden=$('auto-mode').value!=='profile';$('auto-account').required=$('auto-mode').value==='profile';}
-    function autoWhen() {const daily=$('auto-when').value==='daily';$('auto-time-field').hidden=!daily;$('auto-time').required=daily;}
+    function autoWhen() {$('auto-interval-field').hidden=$('auto-when').value!=='interval';$('auto-daily-field').hidden=$('auto-when').value!=='interval';const daily=$('auto-when').value==='daily', repeating=$('auto-when').value==='interval';$('auto-time-field').hidden=!daily;$('auto-time').required=daily;}
     async function startAutomation() {
       if(!$('automation-form').reportValidity())return;
       $('auto-start').disabled=true;
       try {
-        const daily=$('auto-when').value==='daily';
+        const daily=$('auto-when').value==='daily', repeating=$('auto-when').value==='interval';
         const payload={enabled:true,mode:$('auto-mode').value,account:$('auto-account').value.trim(),
-          limit:Number($('auto-count').value),intervalMinutes:daily?1440:60,dailyLimit:1000,maxRuns:daily?0:1};
+          limit:Number($('auto-count').value),intervalMinutes:daily?1440:repeating?Number($('auto-interval').value):60,dailyLimit:repeating?Number($('auto-daily').value):1000,maxRuns:daily||repeating?0:1};
         if(daily){const [h,m]=$('auto-time').value.split(':');payload.scheduledHour=Number(h);payload.scheduledMinute=Number(m);}
         await workPost('automation/schedule',payload);
-        feedback(daily?`Her gün saat ${$('auto-time').value}'de ${payload.limit} video otomatik çekilecek.`:`${payload.limit} video çekimi şimdi başladı. Videolar birkaç dakika içinde Circle'a yüklenecek; iş bitince otomatik duracak.`,'success');await refreshWorker();
+        feedback(repeating?`${payload.limit} video, ${payload.intervalMinutes} dakikada bir; günlük en fazla ${payload.dailyLimit} yayın. İlk tur şimdi başlıyor.`:daily?`Her gün saat ${$('auto-time').value}'de ${payload.limit} video otomatik çekilecek.`:`${payload.limit} video çekimi şimdi başladı. Videolar birkaç dakika içinde Circle'a yüklenecek; iş bitince otomatik duracak.`,'success');await refreshWorker();
       }catch(error){feedback(error.message,'error');}
       finally{$('auto-start').disabled=false;}
     }
@@ -592,13 +600,14 @@
       try {
         const config=await request(readConfig(),'configuration'), database=config.database;
         $('db-host').value=database.host;$('db-port').value=database.port;$('db-name').value=database.database;$('db-user').value=database.username;$('db-ssl').checked=database.ssl;
-        $('circle-login-link').href=`${config.circleUrl}/login`;
+        $('circle-login-link').href=EMBEDDED?`${location.origin}/login`:`${config.circleUrl}/login`;
+        if(config.managed){for(const input of $('database-form').querySelectorAll('input'))input.disabled=true;$('db-apply').hidden=true;$('database-panel').querySelector('p').textContent='Circle’ın mevcut PostgreSQL ve storage bağlantısı otomatik kullanılıyor. Deploy bağlantısını değiştirmek için sunucudaki .env/Compose ayarlarını değiştirip servisleri yeniden başlat; panelde parola veya token girmen gerekmiyor.';}
         workMessage('database-status',`Mevcut PostgreSQL bağlantısı yüklendi. ${database.passwordConfigured?'Parola kayıtlı; güvenlik için gösterilmez.':'Kayıtlı parola yok.'}`);
         $('storage-summary').textContent=`Circle API: ${config.circleUrl}/api/backend/api · NestJS portu: ${config.serverPort} · Storage: ${config.storageDriver} / ${config.storageDirectory}. Video dosyaları PostgreSQL’e yazılmaz.`;
       }catch(error){workMessage('database-status',error.message,true);}
     }
     async function databaseAction(apply=false) {
-      if(!$('database-form').reportValidity())return;
+      if(!EMBEDDED && !$('database-form').reportValidity())return;
       if(apply && !confirm(`Circle bağlantısı ${$('db-host').value}:${$('db-port').value} / ${$('db-name').value} olarak değişecek ve backend yeniden başlatılacak. Bu işlem mevcut verileri taşımaz. Devam edilsin mi?`))return;
       $('db-test').disabled=true;$('db-apply').disabled=true;
       const data={host:$('db-host').value.trim(),port:Number($('db-port').value),database:$('db-name').value.trim(),username:$('db-user').value.trim(),password:$('db-password').value,ssl:$('db-ssl').checked,clearPassword:$('db-clear-password').checked};
@@ -614,7 +623,7 @@
     $('auto-mode').addEventListener('change',autoSource);
     $('auto-when').addEventListener('change',autoWhen);
     $('auto-stop').addEventListener('click',async()=>{try{await workPost('automation/schedule',{enabled:false});feedback('Otomasyon durduruldu. Şu an alınan videolar tamamlanacak; sonrası beklemeyecek. Kuyruğu da durdurmak istersen aşağıdan duraklat/iptal et.');await refreshWorker();}catch(error){feedback(error.message,'error');}});
-    $('tiktok-login').addEventListener('click',async()=>{try{const result=await workPost('browser/login',{});feedback(result.message||'TikTok giriş penceresi açıldı. Kendi hesabına giriş yapıp pencereyi kapat.');await refreshWorker();}catch(error){feedback(error.message,'error');}});
+    $('tiktok-login').addEventListener('click',async()=>{try{const result=await workPost('browser/login',{});if(result.remote)openRemoteBrowser();feedback(result.message||'TikTok giriş penceresi açıldı. Kendi hesabına giriş yapıp pencereyi kapat.');await refreshWorker();}catch(error){feedback(error.message,'error');}});
     $('circle-connect').addEventListener('click',async()=>{try{await workPost('automation/connect',{});feedback('Circle için ayrı arka plan oturumu bağlandı.','success');await refreshWorker();}catch(error){feedback(error.message,'error');}});
     $('background-queues').addEventListener('click',async event=>{const button=event.target.closest('button[data-action]');if(!button)return;button.disabled=true;try{await workPost('batches/control',{batchId:button.dataset.batch,action:button.dataset.action});await refreshWorker();}catch(error){feedback(error.message,'error');button.disabled=false;}});
     $('database-form').addEventListener('submit',event=>{event.preventDefault();databaseAction();});
@@ -634,6 +643,23 @@
     $('close-preview').addEventListener('click',() => $('preview-dialog').close());
     $('preview-dialog').addEventListener('click',event => {if (event.target === $('preview-dialog')) $('preview-dialog').close();});
     $('preview-dialog').addEventListener('close',() => {const player = $('preview-content').querySelector('video');if (player) {player.pause();player.removeAttribute('src');player.load();}$('preview-content').replaceChildren();});
+
+    let remoteTimer, remoteChain=Promise.resolve(), remoteDragging=false, remoteMoved=0;
+    function remoteInput(data){remoteChain=remoteChain.then(()=>workPost('browser/input',data)).catch(error=>workMessage('remote-status',error.message,true));return remoteChain;}
+    async function remoteFrame(){try{const state=await request(readConfig(),'browser/frame');workMessage('remote-status',state.message||'Giriş ekranı hazır.');$('remote-save').disabled=!state.authenticated;if(state.frame)$('remote-frame').src='data:image/jpeg;base64,'+state.frame;if(!state.running){clearInterval(remoteTimer);$('remote-frame').removeAttribute('src');}}catch(error){workMessage('remote-status',error.message,true);}}
+    function openRemoteBrowser(){$('remote-browser').hidden=false;clearInterval(remoteTimer);remoteFrame();remoteTimer=setInterval(remoteFrame,2000);$('remote-browser').scrollIntoView({behavior:'smooth',block:'start'});}
+    function remotePoint(event){const r=$('remote-frame').getBoundingClientRect();return {x:Math.max(0,Math.min(1280,(event.clientX-r.left)*1280/r.width)),y:Math.max(0,Math.min(900,(event.clientY-r.top)*900/r.height))};}
+    $('remote-frame').addEventListener('pointerdown',event=>{event.preventDefault();remoteDragging=true;event.target.focus();event.target.setPointerCapture(event.pointerId);remoteInput({action:'down',...remotePoint(event)});});
+    $('remote-frame').addEventListener('pointermove',event=>{if(remoteDragging&&performance.now()-remoteMoved>100){remoteMoved=performance.now();remoteInput({action:'move',...remotePoint(event)});}});
+    const remoteUp=event=>{if(!remoteDragging)return;remoteDragging=false;remoteInput({action:'up',...remotePoint(event)});};
+    $('remote-frame').addEventListener('pointerup',remoteUp);$('remote-frame').addEventListener('pointercancel',remoteUp);
+    $('remote-frame').addEventListener('wheel',event=>{event.preventDefault();remoteInput({action:'scroll',delta:Math.max(-2000,Math.min(2000,event.deltaY))});},{passive:false});
+    $('remote-frame').addEventListener('paste',event=>{event.preventDefault();remoteInput({action:'text',text:event.clipboardData.getData('text').slice(0,2000)});});
+    $('remote-frame').addEventListener('keydown',event=>{if(event.ctrlKey&&event.key.toLowerCase()==='v')return;let key=event.key;if(event.ctrlKey&&key.toLowerCase()==='a')key='Control+A';else if(event.shiftKey&&key==='Tab')key='Shift+Tab';if(key.length===1&&!event.ctrlKey&&!event.metaKey){event.preventDefault();remoteInput({action:'text',text:key});}else if(['Enter','Tab','Shift+Tab','Backspace','Delete','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Control+A','Home','End','Escape'].includes(key)){event.preventDefault();remoteInput({action:'key',key});}});
+    async function closeRemote(action){try{await remoteChain;await workPost('browser/close',{action});clearInterval(remoteTimer);$('remote-browser').hidden=true;$('remote-frame').removeAttribute('src');feedback(action==='save'?'Kaynak oturumu sunucuda kaydedildi. Kişisel Keşfet otomasyonunu başlatabilirsin.':'Giriş ekranı kapatıldı.');await refreshWorker();}catch(error){workMessage('remote-status',error.message,true);}}
+    $('remote-save').addEventListener('click',()=>closeRemote('save'));$('remote-cancel').addEventListener('click',()=>closeRemote('cancel'));$('remote-reload').addEventListener('click',()=>remoteInput({action:'reload'}));
+    if(EMBEDDED){$('startup-enabled').closest('label').hidden=true;$('startup-status').hidden=true;document.querySelector('[aria-labelledby="automation-title"]>p').textContent='İşler sunucudaki kalıcı worker’da çalışır; paneli kapatabilirsin. Circle hesabı admin oturumundan alınır. Kaynak hesabına bir kez panelde giriş yap; adet ve zamanlamayı seç.';}
+
     recentProfiles();updateSourceFields();updateControls();autoSource();loadDatabase();refreshWorker();loadStartup();
     workerTimer=setInterval(refreshWorker,4000);
     receivePersonalFeed();

@@ -25,7 +25,9 @@ import {
   ChangeRoleDto,
   ReasonDto,
   RoleResultDto,
+  SetVerifiedDto,
   SuspendUserDto,
+  VerifiedResultDto,
   WarningCreatedDto,
   WarnUserDto,
   type AdminPage,
@@ -155,6 +157,16 @@ export class AdminUsersController {
   async role(@ReqContext() ctx: RequestContext, @Param('id', UuidPipe) id: string, @Body() dto: ChangeRoleDto): Promise<RoleResultDto> {
     const r = await this.governance.setRole(ctx, id, dto.role);
     return { id, role: r.role as RoleResultDto['role'] };
+  }
+
+  @Patch(':id/verified')
+  @RequirePermissions('users.update')
+  @ApiOperation({ summary: 'Grant or remove the blue verification badge', description: 'Shown next to the name everywhere. Audited as `user.verified` / `user.unverified`.' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiOkResponse({ type: VerifiedResultDto })
+  @ApiErrors(400, 404)
+  setVerified(@ReqContext() ctx: RequestContext, @Param('id', UuidPipe) id: string, @Body() dto: SetVerifiedDto): Promise<VerifiedResultDto> {
+    return this.governance.setVerified(ctx, id, dto.verified);
   }
 
   @Post(':id/content/moderation')

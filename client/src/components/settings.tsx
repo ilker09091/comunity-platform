@@ -34,6 +34,7 @@ import {
   SignInPrompt,
   ConfirmDialog,
   PageHeader,
+  VerifiedBadge,
 } from "./ui";
 
 /** Account privacy. Public profile details are edited from the profile page (Edit Profile). */
@@ -211,7 +212,7 @@ function FollowRequestRow({ requester }: { requester: Models["UserSummaryDto"] }
       <Link className="user-identity" href={`/profile/${requester.username}`}>
         <Avatar user={requester} size={40} />
         <div>
-          <strong>{requester.displayName}</strong>
+          <strong>{requester.displayName}{requester.isVerified && <VerifiedBadge size={14} />}</strong>
           <span>@{requester.username}</span>
         </div>
       </Link>
@@ -310,7 +311,7 @@ function BlockedAccounts() {
           <div className="people-result" key={item.user.id}>
             <Link className="user-identity" href={`/profile/${item.user.username}`}>
               <Avatar user={item.user} />
-              <strong>{item.user.displayName}</strong>
+              <strong>{item.user.displayName}{item.user.isVerified && <VerifiedBadge size={14} />}</strong>
             </Link>
             <button
               className="button secondary small"

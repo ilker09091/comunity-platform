@@ -52,6 +52,9 @@ export class UserSummaryDto {
 
   @ApiProperty({ example: false })
   isPrivate: boolean;
+
+  @ApiProperty({ example: false, description: 'Blue verification badge, granted by administrators' })
+  isVerified: boolean;
 }
 
 export class UserListItemDto extends UserSummaryDto {
@@ -125,6 +128,8 @@ export class MeDto {
   email: string;
   @ApiProperty({ example: 'Jane Doe' })
   displayName: string;
+  @ApiProperty({ example: false, description: 'Blue verification badge, granted by administrators' })
+  isVerified: boolean;
   @ApiProperty({ type: String, nullable: true, example: null })
   avatarUrl: string | null;
   @ApiProperty({ type: String, nullable: true, example: null })

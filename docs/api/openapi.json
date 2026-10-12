@@ -7428,6 +7428,74 @@
         ]
       }
     },
+    "/api/admin/importer/request": {
+      "post": {
+        "description": "Allowlisted worker operations only. Database/storage settings come from Circle automatically; credentials never reach the browser. Import queues and schedules keep running after the panel closes. Requires ADMIN or SUPER_ADMIN. Source-account login happens in the isolated remote browser; no invented scraping endpoint or fake video results.",
+        "operationId": "adminImporterRequest",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImporterRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImporterReplyDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not staff, missing permission (`FORBIDDEN`), insufficient rank or step-up required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Operate the persistent Fiktok importer through the current admin session",
+        "tags": [
+          "Admin · Fiktok Importer"
+        ]
+      }
+    },
     "/api/admin/me": {
       "get": {
         "description": "Any staff role. Ordinary users get 403.",
@@ -8938,6 +9006,104 @@
           }
         ],
         "summary": "Change an account’s role (step-up)",
+        "tags": [
+          "Admin · Users"
+        ]
+      }
+    },
+    "/api/admin/users/{id}/verified": {
+      "patch": {
+        "description": "Shown next to the name everywhere. Audited as `user.verified` / `user.unverified`.",
+        "operationId": "adminUsersSetVerified",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetVerifiedDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifiedResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not staff, missing permission (`FORBIDDEN`), insufficient rank or step-up required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Grant or remove the blue verification badge",
         "tags": [
           "Admin · Users"
         ]
@@ -12717,6 +12883,11 @@
           "INVALID_STATE",
           "FEATURE_DISABLED",
           "READ_ONLY_MODE",
+          "IMPORTER_CONFIGURATION",
+          "IMPORTER_UNAVAILABLE",
+          "IMPORTER_INVALID_RESPONSE",
+          "IMPORTER_SOURCE_ERROR",
+          "TIKTOK_LOGIN_REQUIRED",
           "INTERNAL_ERROR"
         ]
       },
@@ -12961,6 +13132,11 @@
             "type": "string",
             "example": "Jane Doe"
           },
+          "isVerified": {
+            "type": "boolean",
+            "example": false,
+            "description": "Blue verification badge, granted by administrators"
+          },
           "avatarUrl": {
             "type": "string",
             "nullable": true,
@@ -13039,6 +13215,7 @@
           "username",
           "email",
           "displayName",
+          "isVerified",
           "avatarUrl",
           "coverUrl",
           "bio",
@@ -13135,6 +13312,11 @@
             "type": "boolean",
             "example": false
           },
+          "isVerified": {
+            "type": "boolean",
+            "example": false,
+            "description": "Blue verification badge, granted by administrators"
+          },
           "bio": {
             "type": "string",
             "nullable": true,
@@ -13208,6 +13390,7 @@
           "displayName",
           "avatarUrl",
           "isPrivate",
+          "isVerified",
           "bio",
           "location",
           "website",
@@ -13387,6 +13570,11 @@
           "isPrivate": {
             "type": "boolean",
             "example": false
+          },
+          "isVerified": {
+            "type": "boolean",
+            "example": false,
+            "description": "Blue verification badge, granted by administrators"
           }
         },
         "required": [
@@ -13394,7 +13582,8 @@
           "username",
           "displayName",
           "avatarUrl",
-          "isPrivate"
+          "isPrivate",
+          "isVerified"
         ]
       },
       "FollowRequestStatus": {
@@ -13595,6 +13784,11 @@
             "type": "boolean",
             "example": false
           },
+          "isVerified": {
+            "type": "boolean",
+            "example": false,
+            "description": "Blue verification badge, granted by administrators"
+          },
           "bio": {
             "type": "string",
             "nullable": true,
@@ -13626,6 +13820,7 @@
           "displayName",
           "avatarUrl",
           "isPrivate",
+          "isVerified",
           "bio",
           "followerCount",
           "isFollowing",
@@ -13760,6 +13955,11 @@
             "type": "boolean",
             "example": false
           },
+          "isVerified": {
+            "type": "boolean",
+            "example": false,
+            "description": "Blue verification badge, granted by administrators"
+          },
           "bio": {
             "type": "string",
             "nullable": true,
@@ -13786,6 +13986,7 @@
           "displayName",
           "avatarUrl",
           "isPrivate",
+          "isVerified",
           "bio",
           "followerCount",
           "isFollowing",
@@ -15107,6 +15308,45 @@
           "updated"
         ]
       },
+      "ImporterRequestDto": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "description": "Allowlisted importer path, e.g. videos?mode=profile&account=@creator or automation/state",
+            "maxLength": 2048
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Action payload validated by the existing worker; never include Circle tokens or database credentials."
+          }
+        },
+        "required": [
+          "method",
+          "path"
+        ]
+      },
+      "ImporterReplyDto": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Existing importer response: actual video pages, durable queue/schedule state, browser login frame or sanitized configuration."
+          }
+        },
+        "required": [
+          "result"
+        ]
+      },
       "AdminUserRefDto": {
         "type": "object",
         "properties": {
@@ -15346,6 +15586,10 @@
             "nullable": true,
             "description": "null unless the viewer has users.email.read"
           },
+          "isVerified": {
+            "type": "boolean",
+            "description": "Blue verification badge"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -15382,6 +15626,7 @@
           "role",
           "status",
           "email",
+          "isVerified",
           "createdAt",
           "lastActiveAt",
           "postCount",
@@ -16637,6 +16882,35 @@
         "required": [
           "id",
           "role"
+        ]
+      },
+      "SetVerifiedDto": {
+        "type": "object",
+        "properties": {
+          "verified": {
+            "type": "boolean",
+            "example": true,
+            "description": "true grants the blue badge, false removes it"
+          }
+        },
+        "required": [
+          "verified"
+        ]
+      },
+      "VerifiedResultDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "isVerified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "isVerified"
         ]
       },
       "BulkModerateUserContentDto": {

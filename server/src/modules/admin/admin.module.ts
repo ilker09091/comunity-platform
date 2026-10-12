@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { AdminImporterService } from './admin-importer.service.js';
+import { AdminImporterController } from './controllers/admin-importer.controller.js';
 import { MediaModule } from '../media/media.module.js';
 import { AdminAnalyticsService } from './admin-analytics.service.js';
 import { AdminAnnouncementsService } from './admin-announcements.service.js';
@@ -28,6 +30,7 @@ import { AdminUsersController } from './controllers/admin-users.controller.js';
 @Module({
   imports: [MediaModule],
   controllers: [
+    AdminImporterController,
     AdminCoreController,
     AdminAnalyticsController,
     AdminUsersController,
@@ -39,6 +42,7 @@ import { AdminUsersController } from './controllers/admin-users.controller.js';
     AdminSystemController,
   ],
   providers: [
+    AdminImporterService,
     AdminGuard,
     AdminReadService,
     AdminUsersService,

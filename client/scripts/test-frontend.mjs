@@ -77,6 +77,11 @@ const upstream = createServer(async (request, response) => {
     return request.headers.authorization
       ? json(200, user)
       : json(401, { code: "UNAUTHORIZED", message: "Sign in" });
+  if (url.pathname === "/api/admin/importer/request") {
+    const operation=JSON.parse(raw);
+    if(operation.path==='videos?mode=personal_auto')return json(422,{code:'TIKTOK_LOGIN_REQUIRED',message:'Source account login required'});
+    return json(200,{result:{ok:true,workerAlive:true}});
+  }
   if (url.pathname === "/api/media")
     return json(201, { id: "media-id", status: "READY" });
   if (url.pathname === "/api/posts" && request.method === "POST")
@@ -220,6 +225,20 @@ try {
   assert.equal(response.headers.get("cache-control"), "no-store");
   const loginCookies = cookies(response);
   passed("login hides both tokens and sets scoped HttpOnly cookies");
+  const importerAsset=await fetch(base+'/fiktok-importer.html');
+  assert.equal(importerAsset.status,200);
+  assert.match(await importerAsset.text(),/name="circle-importer-mode" content="admin"/);
+  passed("deployed Fiktok HTML automatically uses admin mode without a query parameter");
+  response=await call('/api/admin/importer/request',{method:'POST',headers:{Cookie:loginCookies},body:JSON.stringify({method:'GET',path:'health'})});
+  assert.equal(response.status,200);assert.equal((await response.json()).result.workerAlive,true);
+  assert.equal(requests.at(-1).authorization,'Bearer access-login');
+  assert.equal(JSON.parse(requests.at(-1).raw).path,'health');
+  passed("production admin relay forwards the session server-side and preserves the worker response");
+  response=await call('/api/admin/importer/request',{method:'POST',headers:{Cookie:loginCookies},body:JSON.stringify({method:'GET',path:'videos?mode=personal_auto'})});
+  assert.equal(response.status,422);assert.equal((await response.json()).code,'TIKTOK_LOGIN_REQUIRED');
+  assert.deepEqual(response.headers.getSetCookie(),[]);
+  passed("source login errors preserve the Circle session in the production gateway");
+
   response = await call("/api/auth/register", {
     method: "POST",
     body: JSON.stringify({

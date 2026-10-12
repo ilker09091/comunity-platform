@@ -54,6 +54,9 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET must be set}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
 
+      IMPORTER_ORIGIN: http://importer:4317
+      IMPORTER_SECRET_FILE: /app/storage/importer-control/key
+
       MEDIA_URL_SECRET: ${MEDIA_URL_SECRET:-}
       MEDIA_LOCAL_DIR: /app/storage/media
       MEDIA_PUBLIC_URL: ${MEDIA_PUBLIC_URL:-/api/backend}
@@ -67,6 +70,14 @@ services:
 
     volumes:
       - media_data:/app/storage/media
+      - importer_control:/app/storage/importer-control
+
+    healthcheck:
+      test: ["CMD", "node", "--input-type=module", "-e", "try{const r=await fetch('http://127.0.0.1:3002/');process.exit(r.ok?0:1)}catch{process.exit(1)}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
     command: >
       sh -c "node dist/database/migrate.js run &&
@@ -91,6 +102,41 @@ services:
     ports:
       - "127.0.0.1:3100:3000"
 
+  importer:
+    build:
+      context: .
+      dockerfile: tools/Dockerfile
+    restart: unless-stopped
+    init: true
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started
+    environment:
+      CIRCLE_WEB_URL: http://web:3000
+      IMPORTER_DEPLOYED: "1"
+      IMPORTER_BIND: 0.0.0.0
+      IMPORTER_PORT: 4317
+      IMPORTER_STATE_DIR: /app/importer-state
+      IMPORTER_SECRET_FILE: /run/circle-importer/key
+      IMPORTER_MAX_VIDEO_BYTES: ${MEDIA_MAX_VIDEO_UPLOAD_BYTES:-4294967296}
+    volumes:
+      - importer_state:/app/importer-state
+      - importer_control:/run/circle-importer:ro
+    # No public port: browser requests go through the authenticated NestJS admin relay.
+    shm_size: 512m
+    mem_limit: 1g
+    cpus: 1.5
+    healthcheck:
+      test: ["CMD", "node", "--input-type=module", "-e", "import fs from 'node:fs';try{const r=await fetch('http://127.0.0.1:4317/api/backend/importer/health',{headers:{'X-Importer-Key':fs.readFileSync('/run/circle-importer/key','utf8').trim(),'X-Social-Client':'web'}});process.exit(r.ok?0:1)}catch{process.exit(1)}"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
 volumes:
   db_data:
   media_data:
+  importer_state:
+  importer_control:

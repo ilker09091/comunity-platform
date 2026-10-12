@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight, AlertCircle, Compass, X, Loader2, AlertTriangle } from "lucide-react";
+import { ArrowRight, AlertCircle, Compass, X, Loader2, AlertTriangle, BadgeCheck } from "lucide-react";
 import type { Models } from "@/lib/api/client";
 
 export function Avatar({
@@ -29,6 +29,15 @@ export function Avatar({
     </span>
   );
 }
+/** Blue verification badge shown next to a verified account's name. */
+export function VerifiedBadge({ size = 16, className = "" }: { size?: number; className?: string }) {
+  return (
+    <span className={`verified-badge ${className}`} role="img" aria-label="Verified account" title="Verified account">
+      <BadgeCheck size={size} fill="#1d9bf0" stroke="#fff" strokeWidth={2.2} aria-hidden="true" />
+    </span>
+  );
+}
+
 export function EmptyState({
   title,
   description,

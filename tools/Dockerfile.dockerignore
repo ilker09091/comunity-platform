@@ -1,0 +1,11 @@
+# Worker build only: keep local node_modules, storage, cookies and .env out.
+**
+!index.html
+!tools/
+!tools/*.py
+!tools/*.mjs
+!tools/requirements-importer.txt
+!tools/Dockerfile
+!tools/Dockerfile.dockerignore
+tools/tools/
+tools/__pycache__/

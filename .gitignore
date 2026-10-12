@@ -24,3 +24,7 @@ Thumbs.db
 # Editor
 .vscode/
 .idea/
+
+# Local Python caches and private runtime credentials
+**/__pycache__/
+server/storage/

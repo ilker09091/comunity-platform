@@ -11,6 +11,7 @@ import {
   ErrorState,
   LoadingSkeleton,
   LoadMore,
+  VerifiedBadge,
 } from "./ui";
 import FollowButton from "./follow-button";
 import PostCard from "./post-card";
@@ -175,7 +176,7 @@ function ExploreResults({
                     >
                       <Avatar user={user} size={48} />
                       <div>
-                        <strong>{user.displayName}</strong>
+                        <strong>{user.displayName}{user.isVerified && <VerifiedBadge />}</strong>
                         <span>@{user.username}</span>
                         {user.bio && <p>{user.bio}</p>}
                       </div>

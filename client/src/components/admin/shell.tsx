@@ -59,6 +59,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
     items: [
       { href: "/admin/notifications", label: "Announcements", icon: Megaphone, permission: "notifications.broadcast" },
       { href: "/admin/media", label: "Media", icon: ImageIcon, permission: "media.manage" },
+      { href: "/admin/fiktok", label: "Fiktok Importer", icon: Clapperboard, permission: "media.manage" },
       { href: "/admin/settings", label: "Settings", icon: Settings2, permission: "settings.read" },
     ],
   },
@@ -78,6 +79,7 @@ const LABELS: Record<string, string> = {
   posts: "Content",
   comments: "Content",
   system: "System status",
+  fiktok: "Fiktok Importer",
 };
 
 export default function AdminShell({ children }: { children: ReactNode }) {

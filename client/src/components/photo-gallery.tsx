@@ -122,7 +122,9 @@ export default function PhotoGallery({ photos }: { photos: Photo[] }) {
   return <div className="photo-gallery" style={{'--photo-ratio':String(ratio)} as CSSProperties}>
     <div className="photo-carousel" ref={track} aria-label="Post photos" onScroll={event => { const el=event.currentTarget;setIndex(Math.round(el.scrollLeft/Math.max(1,el.clientWidth))); }}>
       {photos.map((photo,i) => <button key={photo.id} type="button" className="photo-preview" onClick={() => setView(i)} aria-label={`Enlarge photo ${i+1} of ${photos.length}`}>
-        <img src={photo.url} alt={`Photo ${i+1} shared in this post`} loading="lazy" decoding="async" width={photo.width??undefined} height={photo.height??undefined}
+        {/* A photo shaped differently from the frame sits on a soft blurred copy of itself, not grey bars. */}
+        {i>0 && photo.width && photo.height && Math.abs(photo.width/photo.height-ratio)/ratio>.02 && <img className="photo-backdrop" src={photo.url} alt="" aria-hidden="true" loading="lazy" decoding="async"/>}
+        <img className="photo-main" src={photo.url} alt={`Photo ${i+1} shared in this post`} loading="lazy" decoding="async" width={photo.width??undefined} height={photo.height??undefined}
           onLoad={event => {if(i===0 && !first.width) {const img=event.currentTarget;setIntrinsic({width:img.naturalWidth,height:img.naturalHeight});}}}/>
         <span className="photo-expand"><Expand size={15}/></span>
       </button>)}

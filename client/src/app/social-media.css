@@ -3,6 +3,8 @@
 .photo-carousel::-webkit-scrollbar { display:none; }
 .photo-preview { position:relative; min-width:100%; height:100%; flex:0 0 100%; padding:0; background:transparent; scroll-snap-align:start; cursor:zoom-in; }
 .photo-preview img { width:100%; height:100%; object-fit:contain; display:block; }
+.photo-preview .photo-main { position:relative; }
+.photo-preview .photo-backdrop { position:absolute; inset:-10%; width:120%; height:120%; object-fit:cover; filter:blur(24px) saturate(1.1) brightness(.9); }
 .photo-expand { position:absolute; bottom:10px; right:10px; display:grid; place-items:center; width:30px; height:30px; border-radius:9px; background:#17203399; color:#fff; }
 .gallery-controls { display:flex; gap:12px; align-items:center; justify-content:center; background:#fff; padding:3px 8px; font-size:11px; color:#697589; }
 .photo-viewer.modal {
@@ -98,4 +100,17 @@
   .reel-info {padding-top:4px;}
   .reel-caption-text {-webkit-line-clamp:1;}
   .reels-topbar {padding-bottom:6px;}
+}
+
+/* Post photo frame follows the photo's shape: full width for landscape/square, narrower for tall (9:16) photos. */
+.post-media-spoiler-wrap.is-gallery {
+  --photo-max-h: min(72svh, 620px);
+  width: min(100%, calc(var(--photo-max-h) * var(--photo-ratio, 1)));
+  margin-top: 14px;
+}
+.post-media-spoiler-wrap.is-gallery .photo-gallery { margin-top: 0; }
+.post-media-spoiler-wrap.is-gallery .photo-carousel { max-height: none; }
+@media (max-width: 640px) {
+  /* Phones: tall photos use more of the narrow screen, like other social apps (up to 4:5 crop-free height). */
+  .post-media-spoiler-wrap.is-gallery { --photo-max-h: min(78svh, 640px); }
 }

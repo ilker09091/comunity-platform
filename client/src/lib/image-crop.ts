@@ -41,11 +41,20 @@ export async function prepareCropImage(file: File): Promise<Blob> {
 }
 
 export function cropOutputSize(area: CropArea, kind: "avatar" | "cover") {
-  if (![area.x, area.y, area.width, area.height].every(Number.isFinite) || area.x < 0 || area.y < 0 || area.width < 1 || area.height < 1) throw new Error("Choose a valid crop area.");
+  // The area may start outside the photo (negative x/y) when it was zoomed out to fit entirely.
+  if (![area.x, area.y, area.width, area.height].every(Number.isFinite) || area.width < 1 || area.height < 1) throw new Error("Choose a valid crop area.");
   const ratio = kind === "avatar" ? 1 : 3;
-  // High-density output, bounded to source resolution; never stretch or upscale.
+  // High-density output, bounded to the selected area; never upscale beyond it.
   const width = Math.max(ratio, Math.floor(Math.min(kind === "avatar" ? 1024 : 1800, area.width, area.height * ratio) / ratio) * ratio);
   return { width, height: width / ratio };
+}
+
+/** Smallest zoom that still shows the whole photo inside the frame (below 100% for wide/tall photos). */
+export function fitZoom(imageWidth: number, imageHeight: number, kind: "avatar" | "cover") {
+  if (!imageWidth || !imageHeight) return 1;
+  const image = imageWidth / imageHeight;
+  const frame = kind === "avatar" ? 1 : 3;
+  return Math.min(1, image / frame, frame / image);
 }
 
 export async function exportCrop(url: string, area: CropArea, kind: "avatar" | "cover"): Promise<File> {
@@ -57,7 +66,22 @@ export async function exportCrop(url: string, area: CropArea, kind: "avatar" | "
   if (!context) throw new Error("Image editing is unavailable in this browser.");
   const ratio = kind === "avatar" ? 1 : 3;
   const width = Math.min(area.width, area.height * ratio), height = width / ratio;
-  context.drawImage(image, area.x + (area.width - width) / 2, area.y + (area.height - height) / 2, width, height, 0, 0, size.width, size.height);
+  const x = area.x + (area.width - width) / 2, y = area.y + (area.height - height) / 2;
+  const scale = size.width / width;
+  const outside = x < 0 || y < 0 || x + width > image.naturalWidth || y + height > image.naturalHeight;
+  if (outside) {
+    // Empty edges (photo zoomed out to fit): fill them with a soft, blurred copy of the photo.
+    context.fillStyle = "#eef1f5";
+    context.fillRect(0, 0, size.width, size.height);
+    if ("filter" in context) {
+      const cover = Math.max(size.width / image.naturalWidth, size.height / image.naturalHeight) * 1.15;
+      context.filter = `blur(${Math.round(size.width / 18)}px) brightness(0.92)`;
+      context.drawImage(image, (size.width - image.naturalWidth * cover) / 2, (size.height - image.naturalHeight * cover) / 2, image.naturalWidth * cover, image.naturalHeight * cover);
+      context.filter = "none";
+    }
+  }
+  // Draw the whole photo positioned relative to the frame; the canvas clips whatever lies outside.
+  context.drawImage(image, -x * scale, -y * scale, image.naturalWidth * scale, image.naturalHeight * scale);
   const blob = await blobFromCanvas(canvas);
   return new File([blob], `${kind}-${Date.now()}.jpg`, { type: "image/jpeg" });
 }

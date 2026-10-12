@@ -5,21 +5,28 @@ $taskPython = (Get-Command python -ErrorAction Stop).Source
 $env:PYTHONPATH = Join-Path $taskRoot '.tools\tiktok'
 $taskPort = if ($env:IMPORTER_PORT) { $env:IMPORTER_PORT } else { '4317' }
 $taskUrl = "http://localhost:$taskPort"
+$taskScript = Join-Path $PSScriptRoot 'tiktok_importer.py'
+$taskKeyFile = if($env:IMPORTER_SECRET_FILE){$env:IMPORTER_SECRET_FILE}else{Join-Path $taskRoot 'server\storage\importer-control\key'}
 
 function Test-Importer {
     # Connect directly over IPv4; Windows PowerShell may wait on localhost IPv6.
     $taskCheck = @'
-import json,sys,urllib.request
+import json,sys,urllib.request,hashlib
+from pathlib import Path
 try:
     port=sys.argv[1]
-    req=urllib.request.Request('http://127.0.0.1:'+port+'/api/backend/importer/health',headers={'Host':'localhost:'+port,'X-Social-Client':'web'})
+    headers={'Host':'localhost:'+port,'X-Social-Client':'web'}
+    keyfile=Path(sys.argv[3])
+    if keyfile.is_file():headers['X-Importer-Key']=keyfile.read_text(encoding='utf-8').strip();headers['Host']='127.0.0.1:'+port
+    req=urllib.request.Request('http://127.0.0.1:'+port+'/api/backend/importer/health',headers=headers)
     with urllib.request.urlopen(req,timeout=2) as response:
         data=json.load(response)
-        sys.exit(0 if data.get('ok') is True and 'automation' in data.get('features',[]) else 1)
+        expected=hashlib.sha256(Path(sys.argv[2]).read_bytes()).hexdigest()
+        sys.exit(0 if data.get('ok') is True and 'admin-relay' in data.get('features',[]) and data.get('workerVersion')==expected else 1)
 except Exception:
     sys.exit(1)
 '@
-    & $taskPython -c $taskCheck $taskPort
+    & $taskPython -c $taskCheck $taskPort $taskScript $taskKeyFile
     return $LASTEXITCODE -eq 0
 }
 
@@ -43,6 +50,6 @@ if (-not (Test-Importer)) {
         if (Test-Importer) { $taskReady = $true; break }
         Start-Sleep -Milliseconds 300
     }
-    if (-not $taskReady) { throw 'Local importer could not start. Run python tools/tiktok_importer.py to see the error.' }
+    if (-not $taskReady) { throw 'Fiktok worker could not start. Port 4317 may belong to a different project copy. Check the port owner and run tools/start-importer.ps1 from the current Circle project.' }
 }
 if (-not $NoBrowser) { Start-Process $taskUrl }

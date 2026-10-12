@@ -225,6 +225,24 @@ export class AccountGovernanceService implements OnModuleInit {
     });
   }
 
+  /** Grants or removes the blue verification badge. Audited; no-op when unchanged. */
+  async setVerified(ctx: RequestContext, userId: string, verified: boolean) {
+    assertPermission(ctx.actor.role, 'users.update');
+    return this.db.transaction(async (m) => {
+      await this.lockTarget(m, userId);
+      const row = await sqlOne<{ is_verified: boolean }>(m, `SELECT is_verified FROM users WHERE id = $1`, [userId]);
+      if (row!.is_verified === verified) return { id: userId, isVerified: verified };
+      await sqlRows(m, `UPDATE users SET is_verified = $2, updated_at = now() WHERE id = $1`, [userId, verified]);
+      await this.audit.record(m, ctx, {
+        action: verified ? 'user.verified' : 'user.unverified',
+        targetType: 'USER',
+        targetId: userId,
+        metadata: {},
+      });
+      return { id: userId, isVerified: verified };
+    });
+  }
+
   /** Lifts expired temporary suspensions (scheduled, and lazily at sign-in). */
   async liftExpired(userId?: string): Promise<number> {
     const lifted = await this.db.transaction(async (m) => {

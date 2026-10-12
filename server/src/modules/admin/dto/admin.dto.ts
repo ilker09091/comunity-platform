@@ -187,6 +187,7 @@ export class AdminUsersQueryDto extends AdminPageQueryDto {
 
 export class AdminUserRowDto extends AdminUserRefDto {
   @ApiProperty({ type: String, nullable: true, description: 'null unless the viewer has users.email.read' }) email: string | null;
+  @ApiProperty({ description: 'Blue verification badge' }) isVerified: boolean;
   @ApiProperty({ format: 'date-time' }) createdAt: string;
   @ApiProperty({ type: String, format: 'date-time', nullable: true, description: 'Tracked since the admin release' }) lastActiveAt: string | null;
   @ApiProperty() postCount: number;
@@ -305,6 +306,17 @@ export class ChangeRoleDto {
 export class AccountStatusResultDto {
   @ApiProperty({ format: 'uuid' }) id: string;
   @ApiProperty({ enum: UserStatusEnum, enumName: 'UserStatus' }) status: UserStatusEnum;
+}
+
+export class SetVerifiedDto {
+  @ApiProperty({ example: true, description: 'true grants the blue badge, false removes it' })
+  @IsBoolean()
+  verified: boolean;
+}
+
+export class VerifiedResultDto {
+  @ApiProperty({ format: 'uuid' }) id: string;
+  @ApiProperty() isVerified: boolean;
 }
 
 export class RoleResultDto {

@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import subprocess
 import time
+import tempfile
 from urllib.request import urlopen
 from playwright.sync_api import sync_playwright
 
@@ -16,7 +17,7 @@ BASE = 'http://127.0.0.1:3004'
 ARTIFACTS = ROOT / 'docs' / 'qa'
 ARTIFACTS.mkdir(exist_ok=True)
 USER = {'id': '10000000-0000-4000-8000-000000000001', 'username': 'qa_creator', 'displayName': 'QA Creator', 'avatarUrl': None}
-VIEWER = {'id': '20000000-0000-4000-8000-000000000001', 'username': 'qa_viewer', 'displayName': 'QA Viewer', 'avatarUrl': None, 'role': 'USER'}
+VIEWER = {'id': '20000000-0000-4000-8000-000000000001', 'username': 'qa_viewer', 'displayName': 'QA Viewer', 'avatarUrl': None, 'role':'USER','postCount':0,'followerCount':0,'followingCount':0}
 SESSION = '30000000-0000-4000-8000-000000000001'
 
 def svg(width, height, color):
@@ -29,7 +30,7 @@ def post(n, kind='image'):
         video = kind in ('portrait', 'landscape')
         width, height = (256, 144) if kind == 'landscape' else (900, 1600)
         media = [{'id':f'50000000-0000-4000-8000-{n:012}', 'type':'VIDEO' if video else 'IMAGE', 'status':'READY',
-                  'url':BASE+'/qa/'+kind+'.webm' if video else svg(width,height,'#3986e9'), 'width':width, 'height':height, 'durationMs':None, 'mimeType':'video/webm' if video else 'image/svg+xml', 'sizeBytes':1000}]
+                  'url':BASE+'/qa/'+kind+'.mp4' if video else svg(width,height,'#3986e9'), 'width':width, 'height':height, 'durationMs':None, 'mimeType':'video/mp4' if video else 'image/svg+xml', 'sizeBytes':1000}]
     return {'id':f'40000000-0000-4000-8000-{n:012}', 'kind':'POST', 'author':USER, 'content':f'QA {kind} post {n}', 'visibility':'PUBLIC', 'media':media,
             'createdAt':'2026-10-11T10:00:00Z', 'updatedAt':'2026-10-11T10:00:00Z', 'editedAt':None,
             'likeCount':7, 'commentCount':2, 'bookmarkCount':1, 'repostCount':0, 'quoteCount':0,
@@ -48,7 +49,7 @@ def route_api(route):
     request = route.request
     path = request.url.split('/api/backend/api/')[-1]
     queries.append(path)
-    if path.startswith('users/me'):
+    if path=='users/me':
         body = {**VIEWER, 'isPrivate':False, 'status':'ACTIVE', 'email':'qa@example.invalid'}
     elif path.startswith('feed/reels/expose'):
         body = {'nextSequence':1+max([e['sequence'] for e in events if e['postId']==request.post_data_json['postId']] or [0])}
@@ -69,6 +70,8 @@ def route_api(route):
     elif path.startswith('posts/'):
         identifier = path.split('/')[1].split('?')[0]
         body = next((p for p in images+videos if p['id']==identifier),images[0])
+    elif path.startswith('notifications') or path.startswith('users/me/'):
+        body={'items':[], 'count':0, 'unreadCount':0,'hasMore':False,'nextCursor':None}
     else:
         return route.continue_()  # existing configuration endpoints remain real/read-only
     route.fulfill(status=200,content_type='application/json',body=json.dumps(body))
@@ -98,11 +101,17 @@ try:
         page=context.new_page();page.on('pageerror',lambda error:errors.append(str(error)))
         page.goto(BASE+'/qa',wait_until='domcontentloaded')
         for kind,width,height in [('portrait',144,256),('landscape',256,144)]:
-            clips[kind]=base64.b64decode(page.evaluate(RECORD,{'width':width,'height':height}))
-        context.route('**/qa/*.webm',lambda route:route.fulfill(status=200,content_type='video/webm',body=clips['landscape' if 'landscape' in route.request.url else 'portrait']))
+            raw=base64.b64decode(page.evaluate(RECORD,{'width':width,'height':height}))
+            with tempfile.TemporaryDirectory(prefix='circle-qa-clip-') as directory:
+                incoming=Path(directory)/'recorded.webm';outgoing=Path(directory)/'recorded.mp4';incoming.write_bytes(raw)
+                binary=ROOT/'server/node_modules/ffmpeg-static/ffmpeg.exe'
+                subprocess.run([str(binary),'-hide_banner','-loglevel','error','-i',str(incoming),'-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart','-y',str(outgoing)],check=True,capture_output=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+                clips[kind]=outgoing.read_bytes()
+        context.route('**/qa/*.mp4',lambda route:route.fulfill(status=200,content_type='video/mp4',body=clips['landscape' if 'landscape' in route.request.url else 'portrait']))
         page.goto(BASE,wait_until='networkidle')
+        print(json.dumps({'homeErrors':errors,'homeQueries':queries[:20],'homeBody':page.locator('body').inner_text()[:1500]}),flush=True)
         page.locator('.photo-preview').first.wait_for()
-        assert page.locator('input[type=file]').first.get_attribute('accept').find('video')<0
+        assert all('video' not in (node.get_attribute('accept') or '') for node in page.locator('input[type=file]').all())
         assert page.get_by_role('link',name='Create Reel',exact=True).count()>0
         page.locator('.photo-preview').first.click()
         page.locator('dialog.photo-viewer[open]').wait_for()
@@ -124,6 +133,7 @@ try:
         page.wait_for_function("!document.querySelector('section[aria-hidden=false] video').paused")
         first=page.locator('section[aria-hidden=false] video').evaluate('(v)=>({src:v.src,width:v.videoWidth,height:v.videoHeight,loop:v.loop,inline:v.playsInline})')
         assert first['width']/first['height']==9/16 and first['loop'] and first['inline']
+        page.wait_for_timeout(2700)
         page.screenshot(path=str(ARTIFACTS/'reels-desktop.png'))
         page.get_by_role('button',name='Next reel',exact=True).click();page.wait_for_timeout(350)
         page.get_by_role('button',name='Previous reel',exact=True).click();page.wait_for_timeout(350)
@@ -154,9 +164,16 @@ try:
         page.screenshot(path=str(ARTIFACTS/'reels-mobile-rotation.png'))
         assert not errors,errors
         assert any(e['type']=='VIDEO_START' for e in events),events
+        assert any(e['type']=='VIDEO_COMPLETE' for e in events),events
+        assert any(e['type']=='VIDEO_REPLAY' for e in events),events
         print(json.dumps({'ok':True,'nativeChromeDecoding':True,'watchEvents':len(events),'profileLayoutRefetch':False,'apiFixturesOnly':True,'iosHardwareTested':False,'screenshots':str(ARTIFACTS)}))
         context.close();browser.close()
 finally:
+    if 'page' in globals():
+        try:
+            print(json.dumps({'qaErrors':errors,'qaQueries':queries[:20],'qaBody':page.locator('body').inner_text()[:1200]}))
+            page.screenshot(path=str(ARTIFACTS/'qa-last-state.png'))
+        except Exception:pass
     server.terminate()
     try:server.wait(timeout=10)
     except subprocess.TimeoutExpired:server.kill()

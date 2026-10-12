@@ -12,6 +12,7 @@ import { ReelRecommendations1760190400000 } from './1760190400000-ReelRecommenda
 import { PostInteractionResponses1760190500000 } from './1760190500000-PostInteractionResponses.js';
 import { MediaUploadSessions1760190600000 } from './1760190600000-MediaUploadSessions.js';
 import { PostCountExcludesReposts1760190700000 } from './1760190700000-PostCountExcludesReposts.js';
+import { VerifiedBadge1760190800000 } from './1760190800000-VerifiedBadge.js';
 
 /** Ordered list of migrations. Append new migrations here; never edit applied ones. */
 export const migrations = [
@@ -29,4 +30,5 @@ export const migrations = [
   PostInteractionResponses1760190500000,
   MediaUploadSessions1760190600000,
   PostCountExcludesReposts1760190700000,
+  VerifiedBadge1760190800000,
 ];

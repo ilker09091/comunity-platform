@@ -23,7 +23,7 @@ import {
 import { api } from "@/lib/api/client";
 import { useFeatures } from "@/lib/platform-config";
 import { useSession } from "./providers";
-import { Avatar, Dropdown, ErrorState } from "./ui";
+import { Avatar, Dropdown, ErrorState, VerifiedBadge } from "./ui";
 import FollowButton from "./follow-button";
 import { ActivityWidget, useUnreadTotal, WidgetSkeleton } from "./notifications";
 
@@ -216,7 +216,7 @@ export function ProfileCard() {
         <Link href={`/profile/${user.username}`} className="profile-card-avatar" aria-label="Your profile">
           <Avatar user={user} size={74} />
         </Link>
-        <h2><Link href={`/profile/${user.username}`}>{user.displayName}</Link></h2>
+        <h2><Link href={`/profile/${user.username}`}>{user.displayName}</Link>{user.isVerified && <VerifiedBadge size={17} />}</h2>
         <p className="muted"><Link href={`/profile/${user.username}`}>@{user.username}</Link></p>
         <dl className="profile-stats">
           {(
@@ -312,7 +312,7 @@ export function SuggestedUsers() {
               <Link href={`/profile/${person.username}`} className="user-identity">
                 <Avatar user={person} size={38} />
                 <span>
-                  <strong>{person.displayName}</strong>
+                  <strong>{person.displayName}{person.isVerified && <VerifiedBadge size={14} />}</strong>
                   <small>
                     {person.mutualFollowerCount > 0
                       ? `${person.mutualFollowerCount} mutual connection${person.mutualFollowerCount === 1 ? "" : "s"}`
@@ -338,7 +338,14 @@ export function RightSidebar() {
     <aside className="right-sidebar" aria-label="Activity and suggestions">
       <ActivityWidget />
       <SuggestedUsers />
-      <footer className="sidebar-footer">Circle © {new Date().getFullYear()}</footer>
+      <footer className="sidebar-footer">
+        <span>Circle © {new Date().getFullYear()}</span>
+        <a className="sidebar-credit" href="https://566dev.com/" target="_blank" rel="noopener" aria-label="Developed by 566dev">
+          <span>developed by</span>
+          {/* External vector logo; plain img keeps it crisp without image-optimizer config. */}
+          <img src="https://566dev.com/566dev.svg" alt="566dev" width={62} height={20} loading="lazy" decoding="async" />
+        </a>
+      </footer>
     </aside>
   );
 }

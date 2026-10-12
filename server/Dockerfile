@@ -48,7 +48,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 1001 nodejs \
     && useradd  --system --uid 1001 --gid nodejs --home /app nestjs \
-    && mkdir -p /app/storage/media \
+    && mkdir -p /app/storage/media /app/storage/importer-control \
     && chown -R nestjs:nodejs /app
 
 COPY --chown=nestjs:nodejs --from=build /app/node_modules ./node_modules

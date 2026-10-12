@@ -104,7 +104,7 @@ const AUDIT_ROW_SQL = `
 
 export const USER_ROW_SQL = (emailVisible: boolean) => `
   SELECT ${userRefCols('u', 'uav', 'u')}, ${emailVisible ? 'u.email::text' : 'NULL::text'} AS email,
-         u.created_at, u.last_active_at, u.post_count, u.follower_count, u.following_count,
+         u.created_at, u.last_active_at, u.post_count, u.follower_count, u.following_count, u.is_verified,
          rc.total AS report_count, rc.open AS open_report_count
     FROM users u
     LEFT JOIN media uav ON uav.id = u.avatar_media_id
@@ -141,6 +141,7 @@ export class AdminReadService {
     return {
       ...this.ref(r, 'u')!,
       email: r.email ?? null,
+      isVerified: !!r.is_verified,
       createdAt: iso(r.created_at)!,
       lastActiveAt: iso(r.last_active_at),
       postCount: r.post_count,

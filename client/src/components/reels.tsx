@@ -29,7 +29,7 @@ import { api, type Models, type Post } from "@/lib/api/client";
 import { sharePath, usePostEngagement } from "@/lib/use-post-engagement";
 import { useDoubleTap } from "@/lib/use-double-tap";
 import { useSession, useToast } from "./providers";
-import { Avatar, ConfirmDialog, Dropdown, relativeTime } from "./ui";
+import { Avatar, ConfirmDialog, Dropdown, relativeTime, VerifiedBadge } from "./ui";
 import FollowButton from "./follow-button";
 import CommentList, { CommentInput } from "./comments";
 import ReportDialog from "./report-dialog";
@@ -291,7 +291,7 @@ function ReelInfo({ post, active }: { post: ReelPost; active: boolean }) {
         <Link href={`/profile/${author.username}`} className="reel-creator-link">
           <Avatar user={author} size={36} />
           <span>
-            <strong>{author.displayName}</strong>
+            <strong>{author.displayName}{author.isVerified && <VerifiedBadge size={14} />}</strong>
             <small>
               @{author.username} · {relativeTime(post.createdAt)}
             </small>

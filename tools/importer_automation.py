@@ -27,8 +27,15 @@ class AutomationError(Exception):
 
 def protect(value, decrypt=False):
     """Windows-user DPAPI encryption, not plaintext/base64 credential storage."""
-    if os.name != 'nt':
-        raise AutomationError('Kalıcı oturum saklama şu an Windows DPAPI gerektiriyor.', 'SECRET_STORAGE_UNAVAILABLE', 503)
+    if os.name != 'nt' or os.getenv('IMPORTER_DEPLOYED')=='1':
+        secret_path=os.getenv('IMPORTER_SECRET_FILE',str(Path(__file__).resolve().parents[1]/'server/storage/importer-control/key'))
+        try:
+            result=subprocess.run(['node',str(Path(__file__).with_name('importer_secrets.mjs')),'decrypt' if decrypt else 'encrypt'],input=json.dumps({'value':value}),capture_output=True,text=True,encoding='utf-8',timeout=10,env={**os.environ,'IMPORTER_SECRET_FILE':secret_path},creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+            data=json.loads(result.stdout)
+            if result.returncode or 'value' not in data:raise ValueError()
+            return data['value']
+        except Exception:
+            raise AutomationError('Güvenli worker anahtarı hazır değil veya değişmiş. Circle backend ve importer kontrol volume’ünü kontrol edip oturumu yeniden bağlayın.','SECRET_STORAGE_UNAVAILABLE',503) from None
     from ctypes import wintypes
     class Blob(ctypes.Structure):
         _fields_ = [('size', wintypes.DWORD), ('data', ctypes.POINTER(ctypes.c_ubyte))]
@@ -87,7 +94,7 @@ def browser_context(playwright, state, headless):
     edge = Path(os.getenv('PROGRAMFILES(X86)', 'C:/Program Files (x86)')) / 'Microsoft/Edge/Application/msedge.exe'
     try:
         return playwright.chromium.launch_persistent_context(str(state / 'tiktok-browser'),
-            channel='msedge' if edge.is_file() else 'chrome', headless=headless,
+            channel=os.getenv('IMPORTER_BROWSER_CHANNEL') or ('msedge' if edge.is_file() else 'chrome' if os.name=='nt' else None), headless=headless,
             viewport={'width': 1280, 'height': 900}, timeout=25000)
     except Exception:
         raise AutomationError('TikTok penceresini kapatıp tekrar deneyin. Edge/Chrome kurulu olmalı; başka bir işlem aynı otomasyon profilini kullanıyor olabilir.', 'TIKTOK_BROWSER_BUSY', 409) from None
@@ -157,6 +164,8 @@ class Automation:
         self.wake = threading.Event()
         self.stop = threading.Event()
         self.browser_lock = threading.Lock()
+        from importer_remote_browser import RemoteBrowser
+        self.remote_browser=RemoteBrowser(app,browser_context,self.browser_lock)
         self.login_process = None
         self.worker = None
         self.configuration_lock = threading.RLock()
@@ -189,6 +198,10 @@ class Automation:
                 c.execute('ALTER TABLE worker_items ADD COLUMN finished REAL DEFAULT 0')
                 c.execute("UPDATE worker_items SET finished=(SELECT updated FROM worker_batches WHERE id=batch) WHERE status='imported'")
 
+        with self.app.db() as c:
+            columns={r['name'] for r in c.execute('PRAGMA table_info(worker_credentials)')}
+            if 'admin_required' not in columns:c.execute('ALTER TABLE worker_credentials ADD COLUMN admin_required INTEGER NOT NULL DEFAULT 0')
+
     def start(self):
         if not self.worker or not self.worker.is_alive():
             self.worker = threading.Thread(target=self.loop, name='circle-import-worker', daemon=True)
@@ -204,7 +217,7 @@ class Automation:
     def remember(self, session, author):
         encrypted = protect(session.cookie())
         with self.app.db() as c:
-            c.execute('INSERT OR REPLACE INTO worker_credentials VALUES(?,?,?)', (self.app.CIRCLE, author, encrypted))
+            c.execute('INSERT OR REPLACE INTO worker_credentials(destination,author,secret,admin_required) VALUES(?,?,?,?)', (self.app.CIRCLE, author, encrypted,int(getattr(session,'admin_required',False) or os.getenv('IMPORTER_DEPLOYED')=='1')))
 
     @submission
     def connect(self, session):
@@ -216,6 +229,7 @@ class Automation:
         if result.get('user',{}).get('id') != author or not result.get('accessToken') or not result.get('refreshToken'):
             raise AutomationError('Circle arka plan oturumu doğrulanmadı. Güncel backend çalışmalı.', 'INVALID_RESPONSE',502)
         background = self.app.CircleSession(f"social_access={result['accessToken']}; social_refresh={result['refreshToken']}")
+        background.admin_required=getattr(session,'admin_required',False)
         self.remember(background,author)
         return {'connected':True,'username':user.get('username','')}
 
@@ -224,15 +238,30 @@ class Automation:
             present=c.execute('SELECT 1 FROM worker_credentials WHERE destination=? AND author=?',(self.app.CIRCLE,author)).fetchone()
         if not present:
             self.connect(session)
+        else:
+            try:
+                background=self.session_for(author)
+                # An admin submission must not reuse a legacy unprivileged background chain.
+                if getattr(session,'admin_required',False) and not getattr(background,'admin_required',False):
+                    self.connect(session)
+            except (self.app.Failure,AutomationError) as exc:
+                if exc.code not in ('CIRCLE_LOGIN_REQUIRED','CIRCLE_RECONNECT_REQUIRED','SECRET_STORAGE_UNAVAILABLE'):
+                    raise
+                # The current authenticated admin request can replace an expired saved session.
+                self.connect(session)
 
     def session_for(self, author):
         with self.app.db() as c:
-            row = c.execute('SELECT secret FROM worker_credentials WHERE destination=? AND author=?', (self.app.CIRCLE, author)).fetchone()
+            row = c.execute('SELECT secret,admin_required FROM worker_credentials WHERE destination=? AND author=?', (self.app.CIRCLE, author)).fetchone()
         if not row:
             raise AutomationError('Arka plan Circle oturumunu yeniden bağlayın.', 'CIRCLE_RECONNECT_REQUIRED', 401)
         session = self.app.CircleSession(protect(row['secret'], decrypt=True))
         session.on_rotation = lambda value: self.remember(value,author)
-        if self.identify(session)[0] != author:
+        actual,user=self.identify(session)
+        session.admin_required=bool(row['admin_required']) or os.getenv('IMPORTER_DEPLOYED')=='1'
+        if session.admin_required and user.get('role') not in ('ADMIN','SUPER_ADMIN'):
+            raise AutomationError('Yönetici yetkisi değişmiş; otomasyon durduruldu.','CIRCLE_ADMIN_REVOKED',401)
+        if actual != author:
             raise AutomationError('Circle hesabı değişmiş; kuyruk güvenlik için durdu.', 'CIRCLE_ACCOUNT_CHANGED', 401)
         self.remember(session, author)
         return session
@@ -414,7 +443,7 @@ class Automation:
 
     def browser_status(self):
         running = bool(self.login_process and self.login_process.poll() is None)
-        return {'loginWindowOpen': running, 'profileExists': (self.app.STATE / 'tiktok-browser').is_dir()}
+        return {'loginWindowOpen': running or bool(self.remote_browser.thread and self.remote_browser.thread.is_alive()), 'remote': bool(self.remote_browser.thread and self.remote_browser.thread.is_alive()), 'profileExists': (self.app.STATE / 'tiktok-browser').is_dir()}
 
     def login(self):
         if self.browser_status()['loginWindowOpen']:
@@ -507,7 +536,7 @@ class Automation:
         if result.get('status') == 'failed':
             code=result.get('code')
             with self.app.db() as c:
-                if code in ('CIRCLE_LOGIN_REQUIRED','CIRCLE_RECONNECT_REQUIRED','CIRCLE_ACCOUNT_CHANGED'):
+                if code in ('CIRCLE_LOGIN_REQUIRED','CIRCLE_RECONNECT_REQUIRED','CIRCLE_ACCOUNT_CHANGED','CIRCLE_ADMIN_REVOKED'):
                     c.execute("UPDATE worker_batches SET status='paused',message=? WHERE id=? AND status!='cancelled'",(result.get('message','Circle girişini yenileyin.'),identifier))
                 elif code in ('CIRCLE_UNAVAILABLE','UPLOAD_FAILED','TIKTOK_TIMEOUT') and item['attempts']<2:
                     c.execute("UPDATE worker_items SET status='queued',stage='Geçici hata; tekrar denenecek',next_attempt=? WHERE batch=? AND video=?",(time.time()+30*(item['attempts']+1),identifier,item['video']))
@@ -556,7 +585,7 @@ class Automation:
                      int(not config['maxRuns'] or config['runs']<config['maxRuns']),schedule['id']))
         except Exception as exc:
             failures=schedule['failures']+1
-            pause=getattr(exc,'code','') in ('TIKTOK_LOGIN_REQUIRED','CIRCLE_LOGIN_REQUIRED','CIRCLE_RECONNECT_REQUIRED','CIRCLE_ACCOUNT_CHANGED') or failures>=3
+            pause=getattr(exc,'code','') in ('TIKTOK_LOGIN_REQUIRED','CIRCLE_LOGIN_REQUIRED','CIRCLE_RECONNECT_REQUIRED','CIRCLE_ACCOUNT_CHANGED','CIRCLE_ADMIN_REVOKED') or failures>=3
             with self.app.db() as c:
                 c.execute('UPDATE worker_schedules SET next_run=?,failures=?,message=?,enabled=? WHERE id=?',
                           (time.time()+max(60,config['intervalMinutes']*60),failures,str(exc)[:1000],0 if pause else 1,schedule['id']))

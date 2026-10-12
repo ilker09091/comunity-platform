@@ -26,6 +26,7 @@ export class UserEntity {
   @Column({ name: 'avatar_media_id', type: 'uuid', nullable: true }) avatarMediaId: string | null;
   @Column({ name: 'cover_media_id', type: 'uuid', nullable: true }) coverMediaId: string | null;
   @Column({ name: 'is_private', type: 'boolean', default: false }) isPrivate: boolean;
+  @Column({ name: 'is_verified', type: 'boolean', default: false }) isVerified: boolean;
   @Column({ type: 'enum', enum: ['ACTIVE', 'SUSPENDED', 'BANNED', 'DEACTIVATED'], enumName: 'user_status' }) status: UserStatus;
   @Column({ type: 'enum', enum: ['USER', 'SUPPORT', 'MODERATOR', 'ADMIN', 'SUPER_ADMIN'], enumName: 'user_role' }) role: Role;
   @Column({ name: 'follower_count', type: 'int' }) followerCount: number;

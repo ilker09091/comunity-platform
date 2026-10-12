@@ -24,6 +24,7 @@ import {
   LoadingSkeleton,
   LoadMore,
   relativeTime,
+  VerifiedBadge,
 } from "./ui";
 import { useFeatures } from "@/lib/platform-config";
 
@@ -172,7 +173,7 @@ export function CommentItem({
           <div className="comment-heading">
             {item.author ? (
               <Link href={`/profile/${item.author.username}`}>
-                <strong>{item.author.displayName}</strong>
+                <strong>{item.author.displayName}{item.author.isVerified && <VerifiedBadge size={14} />}</strong>
               </Link>
             ) : (
               <strong>Deleted comment</strong>

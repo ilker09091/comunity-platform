@@ -455,6 +455,11 @@ export const endpoints = {
     "method": "POST",
     "authenticated": true
   },
+  "adminImporterRequest": {
+    "path": "/api/admin/importer/request",
+    "method": "POST",
+    "authenticated": true
+  },
   "adminCoreMe": {
     "path": "/api/admin/me",
     "method": "GET",
@@ -527,6 +532,11 @@ export const endpoints = {
   },
   "adminUsersRole": {
     "path": "/api/admin/users/{id}/role",
+    "method": "PATCH",
+    "authenticated": true
+  },
+  "adminUsersSetVerified": {
+    "path": "/api/admin/users/{id}/verified",
     "method": "PATCH",
     "authenticated": true
   },

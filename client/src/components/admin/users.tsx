@@ -3,11 +3,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ban, ExternalLink, Flag, MailWarning, MoreHorizontal, PauseCircle, PlayCircle, RotateCcw, ShieldPlus, Trash2, Undo2, UserRound } from "lucide-react";
+import { Ban, ExternalLink, Flag, MailWarning, MoreHorizontal, PauseCircle, PlayCircle, RotateCcw, ShieldPlus, Trash2, Undo2, UserRound, BadgeCheck } from "lucide-react";
 import { api, type Models } from "@/lib/api/client";
 import { compact, dateTime, fmt, humanize, REPORT_REASONS, useAdminMe, useCan, useUrlFilters, type Role } from "@/lib/admin";
 import { useToast } from "@/components/providers";
-import { Avatar, Dropdown } from "@/components/ui";
+import { Avatar, Dropdown, VerifiedBadge } from "@/components/ui";
 import {
   ActionDialog,
   AdminEmpty,
@@ -334,7 +334,8 @@ export function UsersList() {
                   leading={<Avatar user={u} size={40} />}
                   title={
                     <span>
-                      {u.displayName} <span className="muted">@{u.username}</span>
+                      {u.displayName}
+                      {u.isVerified && <VerifiedBadge size={14} />} <span className="muted">@{u.username}</span>
                     </span>
                   }
                   badges={
@@ -371,6 +372,37 @@ export function UsersList() {
 
 /* ============================ Detail ============================ */
 
+/** Grants or removes the blue verification badge (needs `users.update`). */
+function VerifyToggle({ user }: { user: Models["AdminUserRowDto"] }) {
+  const can = useCan();
+  const client = useQueryClient();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  if (!can("users.update")) return null;
+  const next = !user.isVerified;
+  return (
+    <button
+      type="button"
+      className={`button small ${next ? "" : "secondary"} verify-toggle`}
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          await api("adminUsersSetVerified", { params: { id: user.id }, body: { verified: next } });
+          toast(next ? `@${user.username} now has a blue badge.` : `Blue badge removed from @${user.username}.`);
+          await client.invalidateQueries({ queryKey: ["admin"] });
+        } catch (error) {
+          toast(error instanceof Error ? error.message : "Could not update the badge.");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <BadgeCheck size={15} /> {next ? "Give blue badge" : "Remove blue badge"}
+    </button>
+  );
+}
+
 export function UserDetail() {
   const { id } = useParams<{ id: string }>();
   const can = useCan();
@@ -396,7 +428,12 @@ function UserDetailView({ d, canReports }: { d: Models["AdminUserDetailDto"]; ca
           </Link>
         </>
       }
-      actions={<UserActions user={u} variant="buttons" />}
+      actions={
+        <>
+          <VerifyToggle user={u} />
+          <UserActions user={u} variant="buttons" />
+        </>
+      }
     >
       <div className="admin-profile-head">
         <Avatar user={u} size={64} />
@@ -404,6 +441,11 @@ function UserDetailView({ d, canReports }: { d: Models["AdminUserDetailDto"]; ca
           <div className="badges">
             <RoleBadge role={u.role} />
             <Badge value={u.status} />
+            {u.isVerified && (
+              <span className="admin-badge tone-info">
+                <VerifiedBadge size={13} /> Verified
+              </span>
+            )}
             {d.isPrivate && <span className="admin-badge tone-neutral">Private account</span>}
           </div>
           {d.bio && <p className="admin-bio">{d.bio}</p>}

@@ -1373,6 +1373,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/importer/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Operate the persistent Fiktok importer through the current admin session
+         * @description Allowlisted worker operations only. Database/storage settings come from Circle automatically; credentials never reach the browser. Import queues and schedules keep running after the panel closes. Requires ADMIN or SUPER_ADMIN. Source-account login happens in the isolated remote browser; no invented scraping endpoint or fake video results.
+         */
+        post: operations["adminImporterRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/me": {
         parameters: {
             query?: never;
@@ -1659,6 +1679,26 @@ export interface paths {
          * @description Only roles below your own can be granted (SUPER_ADMIN may grant any); ADMIN/SUPER_ADMIN changes need `admins.manage`; the last active SUPER_ADMIN cannot be demoted (409 `LAST_SUPER_ADMIN`).
          */
         patch: operations["adminUsersRole"];
+        trace?: never;
+    };
+    "/api/admin/users/{id}/verified": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Grant or remove the blue verification badge
+         * @description Shown next to the name everywhere. Audited as `user.verified` / `user.unverified`.
+         */
+        patch: operations["adminUsersSetVerified"];
         trace?: never;
     };
     "/api/admin/users/{id}/content/moderation": {
@@ -2280,7 +2320,7 @@ export interface components {
             allowedReportReasons: components["schemas"]["ReportReason"][];
         };
         /** @enum {string} */
-        ErrorCode: "VALIDATION_ERROR" | "BAD_REQUEST" | "INVALID_CURSOR" | "UNAUTHORIZED" | "INVALID_CREDENTIALS" | "INVALID_TOKEN" | "INVALID_REFRESH_TOKEN" | "WRONG_PASSWORD" | "FORBIDDEN" | "ACCOUNT_SUSPENDED" | "PRIVATE_ACCOUNT" | "BLOCKED" | "NOT_FOUND" | "USER_NOT_FOUND" | "POST_NOT_FOUND" | "COMMENT_NOT_FOUND" | "MEDIA_NOT_FOUND" | "NOTIFICATION_NOT_FOUND" | "REPORT_NOT_FOUND" | "CONFLICT" | "ACCOUNT_CONFLICT" | "USERNAME_TAKEN" | "ALREADY_REPORTED" | "CANNOT_FOLLOW_SELF" | "CANNOT_BLOCK_SELF" | "CANNOT_REPORT_SELF" | "MAX_DEPTH_EXCEEDED" | "POST_NOT_REPOSTABLE" | "POST_NOT_EDITABLE" | "INVALID_MEDIA" | "MEDIA_IN_USE" | "UNSUPPORTED_MEDIA_TYPE" | "FILE_TOO_LARGE" | "RATE_LIMITED" | "STEP_UP_REQUIRED" | "INSUFFICIENT_RANK" | "LAST_SUPER_ADMIN" | "INVALID_STATE" | "FEATURE_DISABLED" | "READ_ONLY_MODE" | "INTERNAL_ERROR";
+        ErrorCode: "VALIDATION_ERROR" | "BAD_REQUEST" | "INVALID_CURSOR" | "UNAUTHORIZED" | "INVALID_CREDENTIALS" | "INVALID_TOKEN" | "INVALID_REFRESH_TOKEN" | "WRONG_PASSWORD" | "FORBIDDEN" | "ACCOUNT_SUSPENDED" | "PRIVATE_ACCOUNT" | "BLOCKED" | "NOT_FOUND" | "USER_NOT_FOUND" | "POST_NOT_FOUND" | "COMMENT_NOT_FOUND" | "MEDIA_NOT_FOUND" | "NOTIFICATION_NOT_FOUND" | "REPORT_NOT_FOUND" | "CONFLICT" | "ACCOUNT_CONFLICT" | "USERNAME_TAKEN" | "ALREADY_REPORTED" | "CANNOT_FOLLOW_SELF" | "CANNOT_BLOCK_SELF" | "CANNOT_REPORT_SELF" | "MAX_DEPTH_EXCEEDED" | "POST_NOT_REPOSTABLE" | "POST_NOT_EDITABLE" | "INVALID_MEDIA" | "MEDIA_IN_USE" | "UNSUPPORTED_MEDIA_TYPE" | "FILE_TOO_LARGE" | "RATE_LIMITED" | "STEP_UP_REQUIRED" | "INSUFFICIENT_RANK" | "LAST_SUPER_ADMIN" | "INVALID_STATE" | "FEATURE_DISABLED" | "READ_ONLY_MODE" | "IMPORTER_CONFIGURATION" | "IMPORTER_UNAVAILABLE" | "IMPORTER_INVALID_RESPONSE" | "IMPORTER_SOURCE_ERROR" | "TIKTOK_LOGIN_REQUIRED" | "INTERNAL_ERROR";
         ErrorDetailDto: {
             /**
              * @description Offending field (dot-notation for nested fields)
@@ -2386,6 +2426,11 @@ export interface components {
             email: string;
             /** @example Jane Doe */
             displayName: string;
+            /**
+             * @description Blue verification badge, granted by administrators
+             * @example false
+             */
+            isVerified: boolean;
             /** @example null */
             avatarUrl: string | null;
             /** @example null */
@@ -2474,6 +2519,11 @@ export interface components {
             avatarUrl: string | null;
             /** @example false */
             isPrivate: boolean;
+            /**
+             * @description Blue verification badge, granted by administrators
+             * @example false
+             */
+            isVerified: boolean;
             /** @example Coffee, code and cats. */
             bio: string | null;
             /** @example Berlin */
@@ -2609,6 +2659,11 @@ export interface components {
             avatarUrl: string | null;
             /** @example false */
             isPrivate: boolean;
+            /**
+             * @description Blue verification badge, granted by administrators
+             * @example false
+             */
+            isVerified: boolean;
         };
         /**
          * @description Only for FOLLOW_REQUEST notifications (null otherwise). PENDING: approve/decline with `POST /users/me/follow-requests/{actor.id}/accept` or `DELETE /users/me/follow-requests/{actor.id}` — the request is identified by the requester (`actor.id`). ACCEPTED: the requester now follows you. UNAVAILABLE: no longer actionable (e.g. the follower was later removed). Declined or cancelled requests remove the notification.
@@ -2708,6 +2763,11 @@ export interface components {
             avatarUrl: string | null;
             /** @example false */
             isPrivate: boolean;
+            /**
+             * @description Blue verification badge, granted by administrators
+             * @example false
+             */
+            isVerified: boolean;
             /** @example Coffee, code and cats. */
             bio: string | null;
             /** @example 120 */
@@ -2787,6 +2847,11 @@ export interface components {
             avatarUrl: string | null;
             /** @example false */
             isPrivate: boolean;
+            /**
+             * @description Blue verification badge, granted by administrators
+             * @example false
+             */
+            isVerified: boolean;
             /** @example Coffee, code and cats. */
             bio: string | null;
             /** @example 120 */
@@ -3373,6 +3438,22 @@ export interface components {
             /** @example 2 */
             updated: number;
         };
+        ImporterRequestDto: {
+            /** @enum {string} */
+            method: "GET" | "POST";
+            /** @description Allowlisted importer path, e.g. videos?mode=profile&account=@creator or automation/state */
+            path: string;
+            /** @description Action payload validated by the existing worker; never include Circle tokens or database credentials. */
+            data?: {
+                [key: string]: unknown;
+            };
+        };
+        ImporterReplyDto: {
+            /** @description Existing importer response: actual video pages, durable queue/schedule state, browser login frame or sanitized configuration. */
+            result: {
+                [key: string]: unknown;
+            };
+        };
         AdminUserRefDto: {
             /** Format: uuid */
             id: string;
@@ -3450,6 +3531,8 @@ export interface components {
             status: components["schemas"]["UserStatus"];
             /** @description null unless the viewer has users.email.read */
             email: string | null;
+            /** @description Blue verification badge */
+            isVerified: boolean;
             /** Format: date-time */
             createdAt: string;
             /**
@@ -3816,6 +3899,18 @@ export interface components {
             /** Format: uuid */
             id: string;
             role: components["schemas"]["UserRole"];
+        };
+        SetVerifiedDto: {
+            /**
+             * @description true grants the blue badge, false removes it
+             * @example true
+             */
+            verified: boolean;
+        };
+        VerifiedResultDto: {
+            /** Format: uuid */
+            id: string;
+            isVerified: boolean;
         };
         BulkModerateUserContentDto: {
             /** @example Repeated spam after warnings */
@@ -9811,6 +9906,56 @@ export interface operations {
             };
         };
     };
+    adminImporterRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImporterRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImporterReplyDto"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not staff, missing permission (`FORBIDDEN`), insufficient rank or step-up required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
     adminCoreMe: {
         parameters: {
             query?: never;
@@ -10795,6 +10940,76 @@ export interface operations {
             };
             /** @description Conflict with existing state */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Rate limit exceeded (`RATE_LIMITED`) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    adminUsersSetVerified: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetVerifiedDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifiedResultDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not staff, missing permission (`FORBIDDEN`), insufficient rank or step-up required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

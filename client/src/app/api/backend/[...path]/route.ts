@@ -207,7 +207,7 @@ async function handler(
         },
         body,
         ...(streaming ? { duplex: "half" } : {}),
-        signal: AbortSignal.timeout(streaming ? 60 * 60_000 : 120000),
+        signal: AbortSignal.timeout(streaming ? 60 * 60_000 : apiPath === endpoints.adminImporterRequest.path ? 180000 : 120000),
       } as RequestInit);
     let upstream = await send();
     if (upstream.status === 401 && refresh && !signingIn && !rotated && !streaming) {

@@ -20,10 +20,17 @@ export type VideoPlayerProps = {
   onRefreshSource?: () => Promise<unknown>;
   onAspectRatio?: (ratio: number) => void;
   onPlayback?: (kind: import("@/lib/reel-watch").PlaybackSignal, video: HTMLVideoElement) => void;
+  /**
+   * Reels: whether this is the reel the viewer is on (independent of dialogs pausing it). Coming back
+   * after watching other reels for a while restarts it; a quick swipe back and forth resumes it.
+   */
+  current?: boolean;
 };
+/** Away longer than this → the reel starts over when the viewer returns to it. */
+const REEL_RESTART_AFTER_MS = 2500;
 
 /** Shared ownership, autoplay recovery and controls; presentation stays context-specific. */
-export default function VideoPlayerCore({ media, mode, active = true, preload = "metadata", label, openInReelsHref, onRefreshSource, onAspectRatio, onPlayback }: VideoPlayerProps) {
+export default function VideoPlayerCore({ media, mode, active = true, preload = "metadata", label, openInReelsHref, onRefreshSource, onAspectRatio, onPlayback, current }: VideoPlayerProps) {
   const route = usePathname();
   const prefs = useVideoPreferences();
   const video = useRef<HTMLVideoElement>(null), container = useRef<HTMLDivElement>(null);
@@ -145,6 +152,25 @@ export default function VideoPlayerCore({ media, mode, active = true, preload = 
     if (timeLabel.current) timeLabel.current.textContent = `${clock(current)} / ${total ? clock(total) : "--:--"}`;
   };
   const drawProgress = useEffectEvent((el: HTMLVideoElement) => updateProgress(el));
+  const awaySince = useRef<number | null>(null);
+  const returned = useEffectEvent(() => {
+    const since = awaySince.current;
+    awaySince.current = null;
+    if (since === null || performance.now() - since < REEL_RESTART_AFTER_MS) return; // quick back-and-forth: resume
+    position.current = 0;
+    finished.current = false;
+    setEnded(false);
+    const el = video.current;
+    if (el && el.currentTime > 0) {
+      el.currentTime = 0;
+      updateProgress(el);
+    }
+  });
+  useEffect(() => {
+    if (mode !== "reels" || current === undefined) return;
+    if (current) returned();
+    else awaySince.current = performance.now();
+  }, [current, mode]);
   useEffect(() => {
     const el = video.current;
     if (!el || !selected || paused) return;

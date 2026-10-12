@@ -25,5 +25,5 @@ export default function ReelPlayer(props: {
   const onPlayback = useCallback((kind: PlaybackSignal, video: HTMLVideoElement) => {
     element.current = video; observer.current?.observe(kind, video, performance.now(), !document.hidden);
   }, []);
-  return <VideoPlayerCore {...props} onPlayback={onPlayback} mode="reels" />;
+  return <VideoPlayerCore {...props} current={props.selected} onPlayback={onPlayback} mode="reels" />;
 }
