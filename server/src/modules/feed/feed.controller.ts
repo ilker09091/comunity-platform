@@ -44,7 +44,7 @@ export class FeedController {
   @ApiOptionalAuth()
   @ApiOperation({
     summary: 'Persistent personalized Reels discovery',
-    description: 'Continuous discovery in cycles. Cycle 1 serves Reels the viewer has not meaningfully watched; when it is exhausted the next cycle starts automatically with every eligible Reel in a new, relevance-weighted shuffled order (never opening with the Reel just shown). A Reel appears at most once per cycle; use `entries[].key` as queue identity. Bounded PostgreSQL ranking, 48-hour sessions, signed keyset cursors, creator diversity. `hasMore` is false only when nothing eligible remains (0 Reels, or a single Reel that simply loops). Privacy, blocks, reports and moderation are checked on every page; persistent watch history is never reset.',
+    description: 'Version 2: hard eligibility, discovery/cooldown tiers, then normalized weighted ranking. Actual visible impressions are separate from delivery/preload; exact liked/saved items receive a longer repeat cooldown. Cooldowns relax after better candidates are exhausted. Continuous discovery in cycles. Cycle 1 serves Reels the viewer has not meaningfully watched; when it is exhausted the next cycle starts automatically with every eligible Reel in a new, relevance-weighted shuffled order (never opening with the Reel just shown). A Reel appears at most once per cycle; use `entries[].key` as queue identity. Bounded PostgreSQL ranking, 48-hour sessions, signed keyset cursors, creator diversity. `hasMore` is false only when nothing eligible remains (0 Reels, or a single Reel that simply loops). Privacy, blocks, reports and moderation are checked on every page; persistent watch history is never reset.',
   })
   @ApiOkResponse({ type: ReelsPageDto })
   @ApiErrors(400)
@@ -53,13 +53,13 @@ export class FeedController {
   }
 
   @Public() @Post('reels/expose') @HttpCode(200)
-  @ApiOptionalAuth() @ApiOperation({summary:'Register an exact direct-linked Reel in the existing recommendation session',description:'Does not reset the session or persistent history. Only playable, visible originals/quotes are accepted.'})
+  @ApiOptionalAuth() @ApiOperation({summary:'Register visible exposure or prepare active playback for an exact occurrence',description:'Does not reset the session or persistent history. Only playable, visible originals/quotes are accepted. prepare=true initializes active playback without an impression. Otherwise visibleMs>=750 records a single impression for the exact position.'})
   @ApiOkResponse({type:ReelExposureDto}) @ApiErrors(400,404)
   expose(@Viewer() viewer:AuthUser|null,@Body() body:ReelExposeDto):Promise<ReelExposureDto> {return this.recommendations.expose(viewer?.id??null,body);}
 
   @Public() @Post('reels/watch') @HttpCode(204)
   @Throttle({default:{limit:90,ttl:60000}})
-  @ApiOptionalAuth() @ApiOperation({summary:'Batch meaningful Reel playback events',description:'1–20 events, monotonic idempotent sequences. Requires exposure and VIDEO_START. Duration/position are validated and credited time is bounded by server elapsed time. Meaningful = 2 seconds or 50% of a short video (minimum 250ms). Guests keep temporary impression history; signed-in users retain aggregates across sessions.'})
+  @ApiOptionalAuth() @ApiOperation({summary:'Batch meaningful Reel playback events',description:'1–20 events, monotonic idempotent sequences. Requires a prepared active entry and VIDEO_START. Events bind to immutable positions; prefetched items never call prepare/expose. Duration/position are validated and credited time is bounded by server elapsed time. Meaningful = 50% for videos under 4s, otherwise max(2s,10% of duration), capped at 8s. Completion requires 95% of videos under 2s, 90% over 60s and 85% otherwise. Early skips are counted once, separately from completion. Guests keep temporary impression history; signed-in users retain aggregates across sessions.'})
   @ApiNoContentResponse() @ApiErrors(400,404,429)
   watch(@Viewer() viewer:AuthUser|null,@Body() body:ReelWatchBatchDto):Promise<void> {return this.recommendations.watch(viewer?.id??null,body);}
 

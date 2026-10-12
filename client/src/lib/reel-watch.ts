@@ -32,7 +32,7 @@ export class ReelWatchObserver {
     }
     const elapsed = this.anchor === null ? 0 : Math.max(0, now - this.anchor);
     const advance = position - this.position;
-    const wrap = this.position >= this.duration * .85 && position <= this.duration * .15 && advance < 0;
+    const wrap = this.playing && this.position >= this.duration * .5 && position <= this.duration * .4 && advance < 0;
     if (this.playing && visible && !sample.seeking && kind !== 'seeking' && kind !== 'waiting') {
       const moved = wrap ? this.duration - this.position + position : advance;
       // Seeking, stalled clocks and delayed/background ticks must not manufacture watched time.
@@ -41,7 +41,7 @@ export class ReelWatchObserver {
         this.pending += credit; this.total += credit; this.loopTime += credit;
       }
     }
-    if (this.started && !this.completed && this.loopTime >= this.duration * .85 && (position >= this.duration * .85 || wrap || kind === 'ended')) {
+    if (visible && !sample.seeking && kind !== 'seeking' && kind !== 'waiting' && this.started && !this.completed && this.loopTime >= this.duration * (this.duration<2000?.95:this.duration>60000?.9:.85) && (position >= this.duration * (this.duration<2000?.95:this.duration>60000?.9:.85) || wrap || kind === 'ended')) {
       this.emit('VIDEO_COMPLETE', wrap ? this.duration : position); this.completed = true;
     }
     if (wrap) {
@@ -49,7 +49,7 @@ export class ReelWatchObserver {
       this.completed = false; this.loopTime = 0;
     }
     this.position = position;
-    const threshold = Math.max(250, Math.min(2000, this.duration * .5));
+    const threshold = Math.max(250,Math.min(8000,this.duration<4000?this.duration*.5:Math.max(2000,this.duration*.1)));
     if (this.started && !this.meaningful && this.total >= threshold) { this.emit('WATCH_MILESTONE'); this.meaningful = true; }
     else if (this.pending >= 5000) this.emit('WATCH_MILESTONE');
     if (kind === 'pause' || kind === 'waiting' || kind === 'seeking' || !visible) {

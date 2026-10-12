@@ -1,3 +1,4 @@
+import { ReelSmartState1760191100000 } from './1760191100000-ReelSmartState.js';
 import { CreateUsersAndAuth1760180000000 } from './1760180000000-CreateUsersAndAuth.js';
 import { CreateMedia1760180100000 } from './1760180100000-CreateMedia.js';
 import { CreateSocialGraph1760180200000 } from './1760180200000-CreateSocialGraph.js';
@@ -35,4 +36,5 @@ export const migrations = [
   VerifiedBadge1760190800000,
   PinnedPosts1760190900000,
   ReelDiscoveryCycles1760191000000,
+  ReelSmartState1760191100000,
 ];

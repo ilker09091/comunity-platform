@@ -16,7 +16,8 @@
     "test:upgrade": "node scripts/test-social-upgrade.mjs",
     "test:profile": "node scripts/test-profile-editor.mjs",
     "test:discovery": "node scripts/test-media-discovery.mjs",
-    "check:media": "node scripts/check-live-media.mjs"
+    "check:media": "node scripts/check-live-media.mjs",
+    "test:reels-v2": "node scripts/test-reels-v2.mjs"
   },
   "dependencies": {
     "@fontsource/poppins": "^5.3.0",

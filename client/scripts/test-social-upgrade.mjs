@@ -25,6 +25,7 @@ let checks = 0;
 const pass = (name) => { checks++; console.log("PASS " + name); };
 try {
   await writeFile(join(temp, "shims.mjs"), `
+    export {ApiError} from './client.mjs';
     export const useFeatures = () => ({ config: undefined, on: () => true, readOnly: false, canWrite: () => true });
     import React from "react";
     export function Link({children,href,...props}) { return React.createElement("a",{...props,href},children); }
@@ -32,12 +33,13 @@ try {
     export const useQueryClient = () => ({getQueryData(){},invalidateQueries(){return Promise.resolve();}});
     export const useSearchParams = () => new URLSearchParams(globalThis.reelStartId ? "start="+globalThis.reelStartId+(globalThis.reelMediaId ? "&media="+globalThis.reelMediaId : "") : "");
     export const useInfiniteQuery = () => globalThis.reelsFixture;
-    export const useQuery = ({queryKey}) => queryKey[0] === "profile" ? globalThis.reelProfileQuery ?? {isPending:false,data:{isFollowing:false,isFollowRequested:false,isBlocking:false}} : globalThis.reelStartQuery ?? {isPending:true};
+    export const useQuery = ({queryKey}) => queryKey.includes('reel-access') ? {isPending:false,data:globalThis.reelsFixture.data?.pages[0]?.items[0]} : queryKey[0] === "profile" ? globalThis.reelProfileQuery ?? {isPending:false,data:{isFollowing:false,isFollowRequested:false,isBlocking:false}} : globalThis.reelStartQuery ?? {isPending:true};
     export const api = async () => {};
     export const sharePath = async () => {};
     export const usePostEngagement = () => ({act(){},pending:false,repostable:true});
     export const useSession = () => ({user:{id:"me",username:"me",displayName:"Me"}});
     export const useToast = () => () => {};
+    export const ConfirmDialog=()=>null,VerifiedBadge=()=>null;
     export const Avatar = () => React.createElement("span",null,"Avatar");
     export const Dropdown = ({children,summary}) => React.createElement("details",null,React.createElement("summary",null,summary),children);
     export const relativeTime = () => "now";
@@ -58,6 +60,8 @@ try {
         .replace('import FollowButton from "./follow-button";', 'import { FollowButton } from "./shims.mjs";')
         .replace('import CommentList, { CommentInput } from "./comments";', 'import { CommentList, CommentInput } from "./shims.mjs";')
         .replace('import ReportDialog from "./report-dialog";', 'import { ReportDialog } from "./shims.mjs";');
+      source=source.replace('from "@/lib/use-double-tap"','from "./use-double-tap.mjs"');
+      source=source.replace("from '@/lib/reel-gestures'",'from "./reel-gestures.mjs"').replace("from '@/lib/reel-queue'",'from "./reel-queue.mjs"');
       source = source.replace('from "@/lib/reel-watch-transport"','from "./reel-watch-transport.mjs"').replace('import PostComposer from "./post-composer";', 'import { PostComposer } from "./shims.mjs";').replace('from "@/lib/video-playback-coordinator"', 'from "./video-playback-coordinator.mjs"');
       for (const dependency of ["next/navigation", "@tanstack/react-query", "@/lib/api/client", "@/lib/use-post-engagement", "./providers", "./ui", "./main-layout", "./post-card", "@/lib/platform-config"]) source = source.replace(`from "${dependency}"`, 'from "./shims.mjs"');
       source = source.replace('from "./reel-player"', 'from "./reel-player.mjs"').replace('from "@/lib/reel-watch-transport"', 'from "./reel-watch-transport.mjs"');

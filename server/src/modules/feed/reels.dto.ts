@@ -11,8 +11,9 @@ export class ReelsQueryDto extends CursorQueryDto {
   @IsOptional() @Transform(({value})=>value==='true'?true:value==='false'?false:value) @IsBoolean() rewatch?:boolean;
 }
 export class ReelEntryDto {
-  @ApiProperty({description:'Unique queue identity of this recommendation (`cycle:postId`). The same Reel may return in a later discovery cycle.',example:'2:9b2f3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d'}) key:string;
+  @ApiProperty({description:'Unique queue identity of this recommendation (`session:cycle:position:postId`). The same Reel may return in a later discovery cycle.',example:'session-uuid:2:16:post-uuid'}) key:string;
   @ApiProperty({format:'uuid'}) postId:string;
+  @ApiProperty({minimum:1,description:'Immutable position in this session; binds playback to the exact occurrence.'}) position:number;
   @ApiProperty({minimum:1,description:'Discovery cycle: 1 = unwatched Reels, 2+ = the eligible library again in a new order'}) cycle:number;
 }
 export class ReelsPageDto {
@@ -21,10 +22,13 @@ export class ReelsPageDto {
   @ApiProperty({type:String,nullable:true}) nextCursor:string|null;
   @ApiProperty() hasMore:boolean;
   @ApiProperty({format:'uuid'}) sessionId:string;
+  @ApiProperty({minimum:1}) cycle:number;
+  @ApiProperty({description:'True only when this bounded session reached its storage limit; request a new session to continue.'}) sessionEnded:boolean;
 }
 export const REEL_EVENTS=['VIDEO_START','WATCH_MILESTONE','VIDEO_COMPLETE','VIDEO_REPLAY','VIDEO_SKIP'] as const;
 export class ReelWatchEventDto {
   @ApiProperty({format:'uuid'}) @IsUUID() postId:string;
+  @ApiPropertyOptional({minimum:1,description:'Exact recommendation entry position. Omitted only by legacy clients.'}) @IsOptional() @IsInt() @Min(1) position?:number;
   @ApiPropertyOptional({format:'uuid',description:'Exact video attachment, including legacy multi-video posts. Must belong to this post.'}) @IsOptional() @IsUUID() mediaId?:string;
   @ApiProperty({minimum:1,maximum:1000000,description:'Monotonic sequence per post/session; retry duplicates are ignored.'}) @IsInt() @Min(1) @Max(1000000) sequence:number;
   @ApiProperty({enum:REEL_EVENTS}) @IsIn(REEL_EVENTS) type:typeof REEL_EVENTS[number];
@@ -38,11 +42,16 @@ export class ReelWatchBatchDto {
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(20) @ValidateNested({each:true}) @Type(()=>ReelWatchEventDto) events:ReelWatchEventDto[];
 }
 export class ReelExposeDto {
+  @ApiPropertyOptional({description:"Prepare active playback without counting an impression. Prefetch must not call this."}) @IsOptional() @IsBoolean() prepare?:boolean;
   @ApiProperty({format:'uuid'}) @IsUUID() sessionId:string;
+  @ApiPropertyOptional({minimum:1}) @IsOptional() @IsInt() @Min(1) position?:number;
+  @ApiPropertyOptional({minimum:750,maximum:60000,description:'Continuous foreground visibility, at least 60% of the player for 750ms. Delivery/preload alone is not an impression.'}) @IsOptional() @IsInt() @Min(750) @Max(60000) visibleMs?:number;
   @ApiProperty({format:'uuid',description:'Exact playable post from a direct link; does not reset recommendation history.'}) @IsUUID() postId:string;
 }
 export class ReelExposureDto {
   @ApiProperty() nextSequence:number;
+  @ApiProperty() position:number;
+  @ApiProperty() cycle:number;
 }
 export class ReelFeedbackDto {
   @ApiProperty({format:'uuid'}) @IsUUID() postId:string;

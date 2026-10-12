@@ -4,7 +4,7 @@ import { DataSource } from 'typeorm';
 import { Api, createTestApp, resetDatabase, type TestUser } from './setup/test-app.js';
 import { ReelDiscoveryCycles1760191000000 } from '../src/database/migrations/1760191000000-ReelDiscoveryCycles.js';
 
-type Entry = { key: string; postId: string; cycle: number };
+type Entry = { key: string; postId: string; cycle: number;position:number };
 type Page = { items: { id: string; author: { id: string } }[]; entries: Entry[]; nextCursor: string | null; hasMore: boolean; sessionId: string };
 
 /** Continuous Reels discovery: automatic cycles, small libraries and cursor safety across cycles. */
@@ -62,7 +62,7 @@ describe('Reels discovery cycles (e2e)', () => {
   it('serves a single Reel once and lets it loop instead of queuing copies', async () => {
     const [only] = await reels(a);
     const p = await get();
-    expect(p.entries).toEqual([{ key: `1:${only}`, postId: only, cycle: 1 }]);
+    expect(p.entries).toEqual([expect.objectContaining({postId:only,cycle:1})]);
     expect(p).toMatchObject({ hasMore: false, nextCursor: null });
     expect((await get(`?session=${p.sessionId}`)).entries).toHaveLength(1);
   });
@@ -133,6 +133,7 @@ describe('Reels discovery cycles (e2e)', () => {
     const p = await get('?limit=4');
     const repeated = p.entries.find((e) => e.cycle === 2)!.postId;
     expect(pair).toContain(repeated);
+    await api.post('/feed/reels/expose',{sessionId:p.sessionId,postId:repeated,position:p.entries.find((e)=>e.cycle===2&&e.postId===repeated)!.position,prepare:true},viewer).expect(200);
     await api.post('/feed/reels/watch', { sessionId: p.sessionId, events: [{ postId: repeated, sequence: 1, type: 'VIDEO_START', watchedMs: 0, positionMs: 0, durationMs: 10000 }] }, viewer).expect(204);
     // Only entries already returned to the client count; a look-ahead entry of a later cycle is not credited.
     const rows = await db.query(`SELECT cycle, started_at IS NOT NULL AS started FROM reel_recommendation_impressions WHERE session_id=$1 AND post_id=$2 ORDER BY cycle`, [p.sessionId, repeated]);

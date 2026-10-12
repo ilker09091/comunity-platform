@@ -2,7 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import ts from "typescript";
 export async function compileVideoFixtures(root, temp) {
-  for (const name of ["components/media-video", "components/video-player-core", "components/reel-player", "lib/video-playback-coordinator", "lib/video-preferences", "lib/reel-watch", "lib/reel-watch-transport", "lib/api/client", "lib/api/operations"]) {
+  for (const name of ["components/media-video", "components/video-player-core", "components/reel-player", "lib/video-playback-coordinator", "lib/video-preferences", "lib/use-double-tap", "lib/reel-gestures", "lib/reel-queue", "lib/reel-watch", "lib/reel-watch-transport", "lib/api/client", "lib/api/operations"]) {
     let source = await readFile(join(root, "src", name + (name.startsWith("lib") ? ".ts" : ".tsx")), "utf8");
     source = source.replace('from "next/navigation"', 'from "./video-navigation.mjs"')
       .replace('from "next/link"', 'from "./video-link.mjs"')

@@ -22,8 +22,9 @@ describe('Persistent recommendations and attachment classification (e2e)',()=>{
   }
   const page=async(query='',user:TestUser|undefined=viewer)=>(await api.get('/feed/reels'+query,user).expect(200)).body;
   const ids=(p:any)=>p.items.map((x:any)=>x.id);
-  const watch=(sessionId:string,postId:string,sequence:number,type:string,watchedMs=0,positionMs=0,durationMs=10000,user:TestUser|undefined=viewer)=>
-    api.post('/feed/reels/watch',{sessionId,events:[{postId,sequence,type,watchedMs,positionMs,durationMs}]},user);
+  const watch=(sessionId:string,postId:string,sequence:number,type:string,watchedMs=0,positionMs=0,durationMs=10000,user:TestUser|undefined=viewer)=>{
+    return {expect:async(status:number)=>{await api.post('/feed/reels/expose',{sessionId,postId,prepare:true},user);return api.post('/feed/reels/watch',{sessionId,events:[{postId,sequence,type,watchedMs,positionMs,durationMs}]},user).expect(status);}};
+  };
   async function elapsed(sessionId:string,postId:string,ms=5000) {await db.query(`UPDATE reel_recommendation_impressions SET last_event_at=now()-$3*interval '1 millisecond' WHERE session_id=$1 AND post_id=$2`,[sessionId,postId,ms]);}
 
   it('classifies text, animated images, mixed/processing video and referenced content on the server',async()=>{
@@ -86,8 +87,8 @@ describe('Persistent recommendations and attachment classification (e2e)',()=>{
     // Not offered as unwatched again; it comes back in the rediscovery cycle. A single Reel is served
     // once (the player loops it) instead of an endless list of copies.
     const again=await page();
-    expect(again.entries).toEqual([{key:`2:${post}`,postId:post,cycle:2}]);expect(again.hasMore).toBe(false);expect(again.nextCursor).toBeNull();
-    expect((await page('?rewatch=true')).entries).toEqual([{key:`1:${post}`,postId:post,cycle:1}]);
+    expect(again.entries).toEqual([expect.objectContaining({postId:post,cycle:2})]);expect(again.hasMore).toBe(false);expect(again.nextCursor).toBeNull();
+    expect((await page('?rewatch=true')).entries).toEqual([expect.objectContaining({postId:post,cycle:1})]);
     const [kept]=await db.query('SELECT * FROM reel_watch_history WHERE user_id=$1 AND post_id=$2',[viewer.id,post]);
     expect(Number(kept.watched_ms)).toBe(2200);expect(kept.meaningful_at).not.toBeNull();
     expect(ids(await page(`?session=${p.sessionId}`))).toEqual([post]); // delivered history remains navigable
@@ -133,6 +134,7 @@ describe('Persistent recommendations and attachment classification (e2e)',()=>{
 
   it('supports temporary guest state without creating persistent user watch history',async()=>{
     const [post]=await fixture(a);const p=(await api.get('/feed/reels').expect(200)).body;
+    await api.post('/feed/reels/expose',{sessionId:p.sessionId,postId:post,prepare:true}).expect(200);
     await api.post('/feed/reels/watch',{sessionId:p.sessionId,events:[{postId:post,sequence:1,type:'VIDEO_START',watchedMs:0,positionMs:0,durationMs:10000}]}).expect(204);
     expect((await db.query('SELECT * FROM reel_watch_history')).length).toBe(0);
     await api.get(`/feed/reels?session=${p.sessionId}`,viewer).expect(400);
@@ -159,7 +161,7 @@ describe('Persistent recommendations and attachment classification (e2e)',()=>{
     await db.query('UPDATE posts SET created_at=now()-interval \'1 hour\' WHERE id=ANY($1::uuid[])',[[one,two]]);
     await api.post(`/users/${a.id}/follow`,undefined,viewer).expect(200);
     await api.post(`/posts/${one}/bookmark`,undefined,viewer).expect(200);
-    expect(ids(await page())[0]).toBe(one);
+    expect(ids(await page())[0]).toBe(two); // The exact bookmarked item waits behind unseen alternatives.
     const small=await page('',b);
     expect(new Set(ids(small).slice(0,2))).toEqual(new Set([one,two]));
     for(let i=1;i<small.entries.length;i++)expect(small.entries[i].postId).not.toBe(small.entries[i-1].postId);

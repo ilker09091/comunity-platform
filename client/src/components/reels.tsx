@@ -1,4 +1,6 @@
 "use client";
+import { bindReelGestures } from '@/lib/reel-gestures';
+import { nextReelCursor,readReelRestore,writeReelRestore } from '@/lib/reel-queue';
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
@@ -25,7 +27,7 @@ import {
   Home, Compass, Users, Bell, Search, PlusSquare, Settings,
   Trash2,
 } from "lucide-react";
-import { api, type Models, type Post } from "@/lib/api/client";
+import { api, ApiError, type Models, type Post } from "@/lib/api/client";
 import { sharePath, usePostEngagement } from "@/lib/use-post-engagement";
 import { useDoubleTap } from "@/lib/use-double-tap";
 import { useSession, useToast } from "./providers";
@@ -43,12 +45,8 @@ import { RichText } from "./post-card";
 
 type ReelPost = Post | Models["ReferencedPostDto"];
 /** `key` is the queue identity: a Reel may return in a later discovery cycle (`cycle:postId`). */
-type Reel = { key: string; post: ReelPost; video: Models["MediaDto"] };
+type Reel = { key: string; sessionId?:string;position?:number; post: ReelPost; video: Models["MediaDto"] };
 
-const SWIPE_DISTANCE = 0.16; // fraction of viewport height
-const SWIPE_VELOCITY = 0.45; // px per ms
-const WHEEL_THRESHOLD = 55;
-const WHEEL_IDLE_MS = 200;
 const TRANSITION_MS = 320;
 
 export function toReel(post: Post, mediaId?: string | null, key?: string): Reel | null {
@@ -85,13 +83,13 @@ function count(n: number) {
         : String(n);
 }
 
-function ReelMedia({ reel, index, selected, active, preload, sessionId, onAspectRatio, onRefreshSource }: {
+function ReelMedia({ reel, index, selected, active, preload, sessionId,position, onAspectRatio, onRefreshSource }: {
   reel: Reel;
   index: number;
   selected: boolean;
   active: boolean;
   preload: PreloadLevel;
-  sessionId?: string;
+  sessionId?: string;position?:number;
   onAspectRatio: (ratio: number) => void;
   onRefreshSource: () => Promise<void>;
 }) {
@@ -112,6 +110,7 @@ function ReelMedia({ reel, index, selected, active, preload, sessionId, onAspect
         media={reel.video}
         postId={reel.post.id}
         sessionId={sessionId}
+        position={position}
         selected={selected}
         active={active}
         preload={preload}
@@ -408,21 +407,30 @@ function ReelComments({ post, onClose }: { post: ReelPost; onClose: () => void }
 
 export default function Reels() {
   const router = useRouter();
-  const { user } = useSession();
+  const { user,loading:sessionLoading } = useSession();
   const toast = useToast();
   const cache = useQueryClient();
   const [cycle, setCycle] = useState({ id: 0, rewatch: false });
+  const generation=useRef(cycle.id);generation.current=cycle.id;
   const viewer = user?.id ?? 'guest';
+  const [restoration,setRestoration]=useState<{viewer:string;state?:ReturnType<typeof readReelRestore>}>({viewer:''});
+  const restore=restoration.viewer===viewer?restoration.state:undefined;
   const owner = useRef(viewer);
-  const sessionRef = useRef(cache.getQueryData<{pages: {sessionId: string}[]}>(['posts','reels',viewer,0,false])?.pages[0]?.sessionId);
+  const sessionRef = useRef(cache.getQueryData<{pages: {sessionId: string}[]}>(['posts','reels',viewer,0,false])?.pages[0]?.sessionId??restore?.sessionId);
   if (owner.current !== viewer) { owner.current = viewer; sessionRef.current = undefined; }
   const params = useSearchParams();
   const startId = params.get("start");
   const startMedia = params.get("media");
-  const [selection, setSelection] = useState<{ id: string | null; index: number }>({ id: null, index: 0 });
+  const [selection, setSelection] = useState<{ id: string | null; index: number }>({ id: restore?.selected??null, index: restore?.index??0 });
   const target = `${startId ?? ""}:${startMedia ?? ""}`;
   const [requestedStart, setRequestedStart] = useState(target);
   if (requestedStart !== target) { setRequestedStart(target); setSelection({ id: null, index: 0 }); }
+  useEffect(()=>{
+    const state=params.get("user")?undefined:readReelRestore(viewer);
+    sessionRef.current=cache.getQueryData<{pages:{sessionId:string}[]}>(['posts','reels',viewer,0,false])?.pages[0]?.sessionId??state?.sessionId;
+    if(state)setSelection({id:state.selected??null,index:state.index});else setSelection({id:null,index:0});
+    setUnavailable(new Set());setValidatedKey(null);setRestoration({viewer,state});
+  },[viewer]);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [reporting, setReporting] = useState<ReelPost | null>(null);
   const [deleting, setDeleting] = useState<ReelPost | null>(null);
@@ -431,6 +439,9 @@ export default function Reels() {
   const [ratios, setRatios] = useState<Record<string, number>>({});
   const [stageSize, setStageSize] = useState({ width: 960, height: 760 });
   const shell = useRef<HTMLDivElement>(null);
+  const workspace=useRef<HTMLDivElement>(null);
+  const [validatedKey,setValidatedKey]=useState<string|null>(null);
+  const [unavailable,setUnavailable]=useState<Set<string>>(()=>new Set());
   const [dragOffset, setDragOffset] = useState(0);
   const [preload] = useState<PreloadLevel>(preferredPreload);
   const reducedMotion = useSyncExternalStore(
@@ -450,23 +461,30 @@ export default function Reels() {
   const profileUserId = params.get("user");
   const feed = useInfiniteQuery({
     queryKey: ["posts", "reels", profileUserId ? `user:${profileUserId}` : (user?.id ?? "guest"), cycle.id, cycle.rewatch],
-    queryFn: async ({ pageParam, signal }): Promise<{ items: Post[]; entries?: Models["ReelEntryDto"][]; nextCursor?: string | null; hasMore: boolean; sessionId?: string }> => {
+    queryFn: async ({ pageParam, signal }): Promise<{ items: Post[]; entries?: Models["ReelEntryDto"][]; nextCursor?: string | null; hasMore: boolean; sessionId?: string;sessionEnded?:boolean }> => {
       if (profileUserId)
         return api("postsByUser", { params: { id: profileUserId }, query: { cursor: pageParam, limit: 15, content: "reels", kinds: "POST,QUOTE" }, signal });
-      const page = await api("feedReels", { query: { cursor: pageParam, session: pageParam ? undefined : sessionRef.current, limit: 15, rewatch: cycle.rewatch }, signal });
-      sessionRef.current = page.sessionId;
+      let page;
+      try {page=await api("feedReels", { query: { cursor: pageParam?.startsWith('renew:')?undefined:pageParam, session: pageParam ? undefined : sessionRef.current, limit: 15, rewatch: cycle.rewatch }, signal });}
+      catch(error){
+        if(!(error instanceof ApiError)||error.code!=='INVALID_CURSOR')throw error;
+        page=await api('feedReels',{query:{limit:15},signal});
+      }
+      if(signal.aborted)throw new DOMException('Canceled','AbortError');
+      if(owner.current===viewer&&generation.current===cycle.id)sessionRef.current=page.sessionId;
       return page;
     },
-    initialPageParam: undefined as string | undefined,
+    enabled:!sessionLoading&&restoration.viewer===viewer,
+    initialPageParam: (cycle.id===0&&!profileUserId?restore?.cursor:undefined) as string | undefined,
+    staleTime:60000,refetchOnWindowFocus:false,refetchOnReconnect:false,
     // Discovery continues across cycles; stop only on a genuine end, an empty page or a cursor that did not advance.
-    getNextPageParam: (page, _pages, lastParam) =>
-      page.hasMore && page.items.length && page.nextCursor && page.nextCursor !== lastParam ? page.nextCursor : undefined,
-    retry: 2,
+    getNextPageParam: (page, pages, lastParam) => nextReelCursor(page,pages,lastParam),
+    retry:(attempt,error)=>attempt<2&&(!(error instanceof ApiError)||error.status===0||error.status>=500),
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
   const restart = async (rewatch = false) => {
     await flushReelWatches();
-    sessionRef.current = undefined;
+    sessionRef.current = undefined;writeReelRestore(viewer,undefined);
     setSelection({ id: null, index: 0 }); setCommentsOpen(false);
     setCycle(previous => ({ id: previous.id + 1, rewatch }));
     if (startId || profileUserId) router.replace('/reels');
@@ -521,26 +539,30 @@ export default function Reels() {
     retry: false,
   });
 
+  const profileTracking=useQuery({queryKey:['reels-tracking',viewer,profileUserId],queryFn:({signal})=>api('feedReels',{query:{limit:1},signal}),enabled:!!profileUserId&&!sessionLoading&&restoration.viewer===viewer,retry:false,staleTime:3600000});
+
   const reels = useMemo(() => {
     // Wait for an explicitly requested post before anchoring the selection to a feed item.
     if (startId && (start.isPending || start.isError || (start.data && !toReel(start.data, startMedia)))) return [];
     // Queue identity is `cycle:postId` (from the server's entries); a Reel can legitimately come back in a
     // later discovery cycle, but never twice within one. Profile lists have no cycles.
-    const queue: { post: Post; key: string }[] = [
-      ...(start.data ? [{ post: start.data, key: `1:${start.data.id}` }] : []),
-      ...(feed.data?.pages.flatMap((page) => page.items.map((post, i) => ({ post, key: page.entries?.[i]?.postId === post.id ? page.entries[i].key : `1:${post.id}` }))) ?? []),
+    const directSource=start.data?toReel(start.data,startMedia):null;
+    const directEntry=feed.data?.pages.flatMap(p=>p.entries??[]).find(e=>e.postId===directSource?.post.id);
+    const queue: { post: Post; key: string;sessionId?:string;position?:number }[] = [
+      ...(start.data ? [{ post: start.data, key:directEntry?.key??`profile:${directSource?.post.id??start.data.id}`,sessionId:feed.data?.pages[0]?.sessionId??profileTracking.data?.sessionId,position:directEntry?.position }] : []),
+      ...(feed.data?.pages.flatMap((page) => page.items.map((post, i) => ({ post, key: page.entries?.[i]?.postId === post.id ? page.entries[i].key : `profile:${post.id}`,sessionId:page.sessionId??profileTracking.data?.sessionId,position:page.entries?.[i]?.position }))) ?? []),
     ];
     const seen = new Set<string>();
     const list: Reel[] = [];
-    for (const { post, key } of queue) {
+    for (const { post, key,sessionId,position } of queue) {
       const reel = toReel(post, post.id === startId ? startMedia : undefined, key);
-      if (reel && !seen.has(reel.key)) {
+      if (reel && !unavailable.has(reel.post.id) && !seen.has(reel.key)) {
         seen.add(reel.key);
-        list.push(reel);
+        list.push({...reel,sessionId,position});
       }
     }
     return list;
-  }, [feed.data, start.data, startId, startMedia, start.isPending, start.isError]);
+  }, [feed.data, start.data, startId, startMedia, start.isPending, start.isError,unavailable,profileTracking.data]);
 
   const profileOwner = profileUserId
     ? (reels.find((r) => r.post.author.id === profileUserId)?.post.author.username ?? (start.data?.author.id === profileUserId ? start.data.author.username : null))
@@ -550,6 +572,16 @@ export default function Reels() {
   const selectedIndex = selection.id === "end" ? reels.length : reels.findIndex((reel) => reel.key === selection.id);
   const index = Math.min(selectedIndex >= 0 ? selectedIndex : selection.index, Math.max(0, slideCount - 1));
   const current = reels[index];
+  const access=useQuery({queryKey:['post',current?.post.id,viewer,'reel-access',current?.key],queryFn:({signal})=>api('postsGet',{params:{id:current!.post.id},signal}),enabled:!!current,retry:false,staleTime:0});
+  const accessAllowed=!!current&&!access.isError&&(validatedKey===current.key||!!access.data&&!access.isFetching);
+  useEffect(()=>{if(current&&access.data&&!access.isFetching&&!access.isError)setValidatedKey(current.key);},[current,access.data,access.isFetching,access.isError]);
+  useEffect(()=>{if(current&&access.error instanceof ApiError&&[403,404].includes(access.error.status))setUnavailable(previous=>new Set([...previous,current.post.id]));},[access.error,current]);
+  useEffect(()=>{
+    if(!current||profileUserId||!feed.data)return;
+    const pageIndex=feed.data.pages.findIndex(p=>p.entries?.some(e=>e.key===current.key));
+    if(pageIndex<0)return;
+    writeReelRestore(viewer,{sessionId:current.sessionId!,cursor:typeof feed.data.pageParams[pageIndex]==='string'?feed.data.pageParams[pageIndex] as string:undefined,selected:current.key,index:Math.max(0,feed.data.pages[pageIndex].entries?.findIndex(e=>e.key===current.key)??0)});
+  },[current,viewer,profileUserId,feed.data]);
   const sourceRatio = current ? ratios[current.video.id] ?? (current.video.width && current.video.height ? current.video.width / current.video.height : 16 / 9) : 16 / 9;
   const bounds = fitVideoBounds(sourceRatio, Math.max(1, stageSize.width - 264), Math.max(1, stageSize.height - 48));
   useEffect(() => {
@@ -599,8 +631,8 @@ export default function Reels() {
 
   // Prefetch the next page before the viewer reaches the end.
   useEffect(() => {
-    if (index >= reels.length - 4 && feed.hasNextPage && !feed.isFetchingNextPage && !feed.isFetchNextPageError) void feed.fetchNextPage();
-  }, [index, reels.length, feed]);
+    if (index >= reels.length - 4 && feed.hasNextPage && !feed.isFetchingNextPage && !feed.isFetchNextPageError) void feed.fetchNextPage({cancelRefetch:false});
+  }, [index,reels.length,feed.hasNextPage,feed.isFetchingNextPage,feed.isFetchNextPageError,feed.fetchNextPage]);
 
   const go = useCallback(
     (delta: 1 | -1) => {
@@ -617,106 +649,15 @@ export default function Reels() {
     [slideCount, reducedMotion, reels],
   );
   useEffect(() => () => { window.clearTimeout(lockTimer.current); window.clearTimeout(tapTimer.current); }, []);
-  const navigateWheel = useEffectEvent((delta: 1 | -1) => go(delta));
-
-  // Mouse wheel / trackpad: one gesture moves at most one reel.
-  useEffect(() => {
-    const el = stage.current;
-    if (!el) return;
-    let accumulated = 0;
-    let consumed = false;
-    let idle: number | undefined;
-    const onWheel = (e: WheelEvent) => {
-      if ((commentsOpen && window.matchMedia("(max-width: 899px)").matches) || (e.target as HTMLElement).closest(".dropdown-menu,.reel-caption.expanded,[data-player-controls]")) return;
-      e.preventDefault();
-      window.clearTimeout(idle);
-      idle = window.setTimeout(() => {
-        accumulated = 0;
-        consumed = false;
-      }, WHEEL_IDLE_MS);
-      if (consumed) return;
-      accumulated += e.deltaY;
-      if (Math.abs(accumulated) >= WHEEL_THRESHOLD) {
-        consumed = true;
-        navigateWheel(accumulated > 0 ? 1 : -1);
-      }
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => {
-      el.removeEventListener("wheel", onWheel);
-      window.clearTimeout(idle);
-    };
-  }, [commentsOpen]);
-
-  // Touch: follow the finger, then commit on distance or velocity.
-  useEffect(() => {
-    const el = stage.current;
-    if (!el) return;
-    let startY = 0;
-    let startT = 0;
-    let dy = 0;
-    let tracking = false;
-    const onStart = (e: TouchEvent) => {
-      const target = e.target as HTMLElement;
-      if (commentsOpen || e.touches.length !== 1 || (target.closest("a,button,input,summary,[data-player-controls],.dropdown-menu") && !target.closest(".reel-play-surface")))
-        return;
-      tracking = true;
-      startY = e.touches[0].clientY;
-      startT = performance.now();
-      dy = 0;
-    };
-    const onMove = (e: TouchEvent) => {
-      if (!tracking) return;
-      dy = e.touches[0].clientY - startY;
-      // Resist at the edges so the first/last reel feels anchored.
-      const edge = (dy > 0 && index === 0) || (dy < 0 && index >= slideCount - 1);
-      setDragOffset(edge ? dy * 0.25 : dy);
-    };
-    const onEnd = () => {
-      if (!tracking) return;
-      tracking = false;
-      const height = el.clientHeight || 1;
-      const velocity = Math.abs(dy) / Math.max(1, performance.now() - startT);
-      setDragOffset(0);
-      if (Math.abs(dy) > height * SWIPE_DISTANCE || (Math.abs(dy) > 40 && velocity > SWIPE_VELOCITY)) {
-        go(dy < 0 ? 1 : -1);
-        // Suppress the tap-to-pause click that follows a swipe.
-        el.dataset.swiped = "1";
-        tapTimer.current = window.setTimeout(() => delete el.dataset.swiped, 350);
-      }
-    };
-    el.addEventListener("touchstart", onStart, { passive: true });
-    el.addEventListener("touchmove", onMove, { passive: true });
-    el.addEventListener("touchend", onEnd);
-    const onCancel = () => { tracking = false; setDragOffset(0); };
-    el.addEventListener("touchcancel", onCancel);
-    return () => {
-      el.removeEventListener("touchstart", onStart);
-      el.removeEventListener("touchmove", onMove);
-      el.removeEventListener("touchend", onEnd);
-      el.removeEventListener("touchcancel", onCancel);
-    };
-  }, [go, commentsOpen, index, slideCount]);
-
-  // Keyboard navigation (ignored while typing or when a panel/dialog is open).
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.closest?.("input,textarea,select,[contenteditable]") || document.querySelector("dialog[open]")) return;
-      if (commentsOpen && (window.matchMedia("(max-width: 899px)").matches || target.closest?.(".reel-comments"))) return;
-      if (["ArrowDown", "PageDown", "j"].includes(e.key)) {
-        e.preventDefault();
-        go(1);
-      } else if (["ArrowUp", "PageUp", "k"].includes(e.key)) {
-        e.preventDefault();
-        go(-1);
-      } else if (e.key === "m") {
-        toggleSound();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [go, commentsOpen, toggleSound]);
+  const gestureGo=useEffectEvent((delta:1|-1)=>go(delta));
+  const gestureBlocked=useEffectEvent(()=>!!reporting||!!deleting||creating||commentsOpen&&window.matchMedia('(max-width: 899px)').matches);
+  const gestureDrag=useEffectEvent((dy:number)=>setDragOffset((dy>0&&index===0||dy<0&&index>=slideCount-1)?dy*.25:dy));
+  const gestureSwipe=useEffectEvent(()=>{if(stage.current){stage.current.dataset.swiped='1';tapTimer.current=window.setTimeout(()=>{if(stage.current)delete stage.current.dataset.swiped;},350);}});
+  const gestureMute=useEffectEvent(()=>toggleSound());
+  useEffect(()=>{
+    if(!workspace.current)return;
+    return bindReelGestures(workspace.current,{go:gestureGo,blocked:gestureBlocked,drag:gestureDrag,swiped:gestureSwipe,mute:gestureMute});
+  },[]);
 
   const exit = () => (window.history.length > 1 ? router.back() : router.push("/"));
   const closeComments = useCallback(() => setCommentsOpen(false), []);
@@ -741,7 +682,7 @@ export default function Reels() {
         <button type="button" className="reels-icon-button reels-create" aria-label="Create Reel" onClick={() => setCreating(true)}><PlusSquare size={23} /></button>
       </div>
 
-      <div className="reels-workspace">
+      <div className="reels-workspace" ref={workspace}>
       <div className="reels-shell" ref={shell}>
         <div
           ref={stage}
@@ -812,16 +753,17 @@ export default function Reels() {
                       inert={i !== index}
                       aria-label={`Reel ${i + 1} by @${source.author.username}`}
                     >
-                      <ReelMedia
+                      {(i!==index||accessAllowed)&&<ReelMedia
                         reel={reel}
                         index={i}
                         selected={i === index}
-                        active={i === index && !reporting && !creating}
+                        active={i === index && accessAllowed && !reporting && !creating && !deleting}
                         preload={i === index ? "auto" : preload}
-                        sessionId={feed.data?.pages[0]?.sessionId}
+                        sessionId={reel.sessionId}
+                        position={reel.position}
                         onAspectRatio={ratio => setRatios(previous => previous[reel.video.id] === ratio ? previous : { ...previous, [reel.video.id]: ratio })}
                         onRefreshSource={async () => { await Promise.all([feed.refetch({ throwOnError: true }), ...(startId ? [start.refetch({ throwOnError: true })] : [])]); }}
-                      />
+                      />}
                       <ReelInfo post={reel.post} active={i === index} />
                     </section>
                   );

@@ -1015,7 +1015,7 @@ export interface paths {
         };
         /**
          * Persistent personalized Reels discovery
-         * @description Continuous discovery in cycles. Cycle 1 serves Reels the viewer has not meaningfully watched; when it is exhausted the next cycle starts automatically with every eligible Reel in a new, relevance-weighted shuffled order (never opening with the Reel just shown). A Reel appears at most once per cycle; use `entries[].key` as queue identity. Bounded PostgreSQL ranking, 48-hour sessions, signed keyset cursors, creator diversity. `hasMore` is false only when nothing eligible remains (0 Reels, or a single Reel that simply loops). Privacy, blocks, reports and moderation are checked on every page; persistent watch history is never reset.
+         * @description Version 2: hard eligibility, discovery/cooldown tiers, then normalized weighted ranking. Actual visible impressions are separate from delivery/preload; exact liked/saved items receive a longer repeat cooldown. Cooldowns relax after better candidates are exhausted. Continuous discovery in cycles. Cycle 1 serves Reels the viewer has not meaningfully watched; when it is exhausted the next cycle starts automatically with every eligible Reel in a new, relevance-weighted shuffled order (never opening with the Reel just shown). A Reel appears at most once per cycle; use `entries[].key` as queue identity. Bounded PostgreSQL ranking, 48-hour sessions, signed keyset cursors, creator diversity. `hasMore` is false only when nothing eligible remains (0 Reels, or a single Reel that simply loops). Privacy, blocks, reports and moderation are checked on every page; persistent watch history is never reset.
          */
         get: operations["feedReels"];
         put?: never;
@@ -1036,8 +1036,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Register an exact direct-linked Reel in the existing recommendation session
-         * @description Does not reset the session or persistent history. Only playable, visible originals/quotes are accepted.
+         * Register visible exposure or prepare active playback for an exact occurrence
+         * @description Does not reset the session or persistent history. Only playable, visible originals/quotes are accepted. prepare=true initializes active playback without an impression. Otherwise visibleMs>=750 records a single impression for the exact position.
          */
         post: operations["feedExpose"];
         delete?: never;
@@ -1057,7 +1057,7 @@ export interface paths {
         put?: never;
         /**
          * Batch meaningful Reel playback events
-         * @description 1–20 events, monotonic idempotent sequences. Requires exposure and VIDEO_START. Duration/position are validated and credited time is bounded by server elapsed time. Meaningful = 2 seconds or 50% of a short video (minimum 250ms). Guests keep temporary impression history; signed-in users retain aggregates across sessions.
+         * @description 1–20 events, monotonic idempotent sequences. Requires a prepared active entry and VIDEO_START. Events bind to immutable positions; prefetched items never call prepare/expose. Duration/position are validated and credited time is bounded by server elapsed time. Meaningful = 50% for videos under 4s, otherwise max(2s,10% of duration), capped at 8s. Completion requires 95% of videos under 2s, 90% over 60s and 85% otherwise. Early skips are counted once, separately from completion. Guests keep temporary impression history; signed-in users retain aggregates across sessions.
          */
         post: operations["feedWatch"];
         delete?: never;
@@ -3289,12 +3289,14 @@ export interface components {
         };
         ReelEntryDto: {
             /**
-             * @description Unique queue identity of this recommendation (`cycle:postId`). The same Reel may return in a later discovery cycle.
-             * @example 2:9b2f3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d
+             * @description Unique queue identity of this recommendation (`session:cycle:position:postId`). The same Reel may return in a later discovery cycle.
+             * @example session-uuid:2:16:post-uuid
              */
             key: string;
             /** Format: uuid */
             postId: string;
+            /** @description Immutable position in this session; binds playback to the exact occurrence. */
+            position: number;
             /** @description Discovery cycle: 1 = unwatched Reels, 2+ = the eligible library again in a new order */
             cycle: number;
         };
@@ -3306,10 +3308,18 @@ export interface components {
             hasMore: boolean;
             /** Format: uuid */
             sessionId: string;
+            cycle: number;
+            /** @description True only when this bounded session reached its storage limit; request a new session to continue. */
+            sessionEnded: boolean;
         };
         ReelExposeDto: {
+            /** @description Prepare active playback without counting an impression. Prefetch must not call this. */
+            prepare?: boolean;
             /** Format: uuid */
             sessionId: string;
+            position?: number;
+            /** @description Continuous foreground visibility, at least 60% of the player for 750ms. Delivery/preload alone is not an impression. */
+            visibleMs?: number;
             /**
              * Format: uuid
              * @description Exact playable post from a direct link; does not reset recommendation history.
@@ -3318,10 +3328,14 @@ export interface components {
         };
         ReelExposureDto: {
             nextSequence: number;
+            position: number;
+            cycle: number;
         };
         ReelWatchEventDto: {
             /** Format: uuid */
             postId: string;
+            /** @description Exact recommendation entry position. Omitted only by legacy clients. */
+            position?: number;
             /**
              * Format: uuid
              * @description Exact video attachment, including legacy multi-video posts. Must belong to this post.

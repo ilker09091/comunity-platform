@@ -5722,7 +5722,7 @@
     },
     "/api/feed/reels": {
       "get": {
-        "description": "Continuous discovery in cycles. Cycle 1 serves Reels the viewer has not meaningfully watched; when it is exhausted the next cycle starts automatically with every eligible Reel in a new, relevance-weighted shuffled order (never opening with the Reel just shown). A Reel appears at most once per cycle; use `entries[].key` as queue identity. Bounded PostgreSQL ranking, 48-hour sessions, signed keyset cursors, creator diversity. `hasMore` is false only when nothing eligible remains (0 Reels, or a single Reel that simply loops). Privacy, blocks, reports and moderation are checked on every page; persistent watch history is never reset.",
+        "description": "Version 2: hard eligibility, discovery/cooldown tiers, then normalized weighted ranking. Actual visible impressions are separate from delivery/preload; exact liked/saved items receive a longer repeat cooldown. Cooldowns relax after better candidates are exhausted. Continuous discovery in cycles. Cycle 1 serves Reels the viewer has not meaningfully watched; when it is exhausted the next cycle starts automatically with every eligible Reel in a new, relevance-weighted shuffled order (never opening with the Reel just shown). A Reel appears at most once per cycle; use `entries[].key` as queue identity. Bounded PostgreSQL ranking, 48-hour sessions, signed keyset cursors, creator diversity. `hasMore` is false only when nothing eligible remains (0 Reels, or a single Reel that simply loops). Privacy, blocks, reports and moderation are checked on every page; persistent watch history is never reset.",
         "operationId": "feedReels",
         "parameters": [
           {
@@ -5823,7 +5823,7 @@
     },
     "/api/feed/reels/expose": {
       "post": {
-        "description": "Does not reset the session or persistent history. Only playable, visible originals/quotes are accepted.",
+        "description": "Does not reset the session or persistent history. Only playable, visible originals/quotes are accepted. prepare=true initializes active playback without an impression. Otherwise visibleMs>=750 records a single impression for the exact position.",
         "operationId": "feedExpose",
         "parameters": [],
         "requestBody": {
@@ -5893,7 +5893,7 @@
             "access-token": []
           }
         ],
-        "summary": "Register an exact direct-linked Reel in the existing recommendation session",
+        "summary": "Register visible exposure or prepare active playback for an exact occurrence",
         "tags": [
           "Feed"
         ]
@@ -5901,7 +5901,7 @@
     },
     "/api/feed/reels/watch": {
       "post": {
-        "description": "1–20 events, monotonic idempotent sequences. Requires exposure and VIDEO_START. Duration/position are validated and credited time is bounded by server elapsed time. Meaningful = 2 seconds or 50% of a short video (minimum 250ms). Guests keep temporary impression history; signed-in users retain aggregates across sessions.",
+        "description": "1–20 events, monotonic idempotent sequences. Requires a prepared active entry and VIDEO_START. Events bind to immutable positions; prefetched items never call prepare/expose. Duration/position are validated and credited time is bounded by server elapsed time. Meaningful = 50% for videos under 4s, otherwise max(2s,10% of duration), capped at 8s. Completion requires 95% of videos under 2s, 90% over 60s and 85% otherwise. Early skips are counted once, separately from completion. Guests keep temporary impression history; signed-in users retain aggregates across sessions.",
         "operationId": "feedWatch",
         "parameters": [],
         "requestBody": {
@@ -14866,12 +14866,17 @@
         "properties": {
           "key": {
             "type": "string",
-            "description": "Unique queue identity of this recommendation (`cycle:postId`). The same Reel may return in a later discovery cycle.",
-            "example": "2:9b2f3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d"
+            "description": "Unique queue identity of this recommendation (`session:cycle:position:postId`). The same Reel may return in a later discovery cycle.",
+            "example": "session-uuid:2:16:post-uuid"
           },
           "postId": {
             "type": "string",
             "format": "uuid"
+          },
+          "position": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Immutable position in this session; binds playback to the exact occurrence."
           },
           "cycle": {
             "type": "number",
@@ -14882,6 +14887,7 @@
         "required": [
           "key",
           "postId",
+          "position",
           "cycle"
         ]
       },
@@ -14911,6 +14917,14 @@
           "sessionId": {
             "type": "string",
             "format": "uuid"
+          },
+          "cycle": {
+            "type": "number",
+            "minimum": 1
+          },
+          "sessionEnded": {
+            "type": "boolean",
+            "description": "True only when this bounded session reached its storage limit; request a new session to continue."
           }
         },
         "required": [
@@ -14918,15 +14932,31 @@
           "entries",
           "nextCursor",
           "hasMore",
-          "sessionId"
+          "sessionId",
+          "cycle",
+          "sessionEnded"
         ]
       },
       "ReelExposeDto": {
         "type": "object",
         "properties": {
+          "prepare": {
+            "type": "boolean",
+            "description": "Prepare active playback without counting an impression. Prefetch must not call this."
+          },
           "sessionId": {
             "type": "string",
             "format": "uuid"
+          },
+          "position": {
+            "type": "number",
+            "minimum": 1
+          },
+          "visibleMs": {
+            "type": "number",
+            "minimum": 750,
+            "maximum": 60000,
+            "description": "Continuous foreground visibility, at least 60% of the player for 750ms. Delivery/preload alone is not an impression."
           },
           "postId": {
             "type": "string",
@@ -14944,10 +14974,18 @@
         "properties": {
           "nextSequence": {
             "type": "number"
+          },
+          "position": {
+            "type": "number"
+          },
+          "cycle": {
+            "type": "number"
           }
         },
         "required": [
-          "nextSequence"
+          "nextSequence",
+          "position",
+          "cycle"
         ]
       },
       "ReelWatchEventDto": {
@@ -14956,6 +14994,11 @@
           "postId": {
             "type": "string",
             "format": "uuid"
+          },
+          "position": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Exact recommendation entry position. Omitted only by legacy clients."
           },
           "mediaId": {
             "type": "string",
