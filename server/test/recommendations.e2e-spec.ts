@@ -50,19 +50,28 @@ describe('Persistent recommendations and attachment classification (e2e)',()=>{
 
   it('discovers all 105 videos across ranked windows with no repeat, stable retries and creator diversity',async()=>{
     const library=[...await fixture(a,'VIDEO',75),...await fixture(b,'VIDEO',30)];
-    let p=await page('?limit=15'),seen:string[]=[],creators:string[]=[];
-    const session=p.sessionId,first=ids(p);
+    let p=await page('?limit=15');
+    const session=p.sessionId,first=ids(p),entries:{postId:string;cycle:number;key:string}[]=[],creators:string[]=[];
     expect(ids(await page(`?session=${session}&limit=15`))).toEqual(first);
-    for(let guard=0;guard<12;guard++) {
-      seen.push(...ids(p));creators.push(...p.items.map((x:any)=>x.author.id));
-      if(!p.hasMore)break;
+    for(let guard=0;guard<30 && !entries.some(e=>e.cycle===3);guard++) {
+      expect(p.entries.map((e:any)=>e.postId)).toEqual(ids(p));
+      entries.push(...p.entries);creators.push(...p.items.map((x:any)=>x.author.id));
+      expect(p.hasMore).toBe(true);
       const retry=await page(`?cursor=${encodeURIComponent(p.nextCursor)}&limit=15`);
       p=await page(`?cursor=${encodeURIComponent(p.nextCursor)}&limit=15`);expect(ids(p)).toEqual(ids(retry));
     }
-    expect(seen).toHaveLength(105);expect(new Set(seen)).toEqual(new Set(library));expect(p.hasMore).toBe(false);expect(p.nextCursor).toBeNull();
+    const cycle=(n:number)=>entries.filter(e=>e.cycle===n).map(e=>e.postId);
+    // Every eligible Reel exactly once per cycle; cycles follow each other without a gap.
+    for(const n of [1,2]) {expect(cycle(n)).toHaveLength(105);expect(new Set(cycle(n))).toEqual(new Set(library));}
+    expect(entries.findIndex(e=>e.cycle===2)).toBe(105);expect(entries.findIndex(e=>e.cycle===3)).toBe(210);
+    expect(new Set(entries.map(e=>e.key)).size).toBe(entries.length);
+    expect(cycle(2)).not.toEqual(cycle(1)); // reshuffled, not the old order again
+    for(let i=1;i<entries.length;i++)expect(entries[i].postId).not.toBe(entries[i-1].postId);
+    // Cycle boundaries never open with the Reels shown last.
+    for(const at of [105,210])expect(entries.slice(at-3,at).map(e=>e.postId)).not.toContain(entries[at].postId);
     // A surplus creator may finish alone after all alternative creators have been exhausted.
-    const lastOther=creators.lastIndexOf(b.id);
-    for(let i=2;i<lastOther;i++)expect(creators.slice(i-2,i+1).every(x=>x===creators[i])).toBe(false);
+    const firstCycle=creators.slice(0,105),lastOther=firstCycle.lastIndexOf(b.id);
+    for(let i=2;i<lastOther;i++)expect(firstCycle.slice(i-2,i+1).every(x=>x===firstCycle[i])).toBe(false);
     expect(ids(await page(`?session=${session}&limit=15`))).toEqual(first); // backward/refetch history
   });
 
@@ -74,8 +83,13 @@ describe('Persistent recommendations and attachment classification (e2e)',()=>{
     await watch(p.sessionId,post,2,'WATCH_MILESTONE',2200,2200).expect(204);
     const [history]=await db.query('SELECT * FROM reel_watch_history WHERE user_id=$1 AND post_id=$2',[viewer.id,post]);
     expect(history.meaningful_at).not.toBeNull();expect(Number(history.watched_ms)).toBe(2200);
-    expect(ids(await page())).toEqual([]);
-    expect(ids(await page('?rewatch=true'))).toEqual([post]);
+    // Not offered as unwatched again; it comes back in the rediscovery cycle. A single Reel is served
+    // once (the player loops it) instead of an endless list of copies.
+    const again=await page();
+    expect(again.entries).toEqual([{key:`2:${post}`,postId:post,cycle:2}]);expect(again.hasMore).toBe(false);expect(again.nextCursor).toBeNull();
+    expect((await page('?rewatch=true')).entries).toEqual([{key:`1:${post}`,postId:post,cycle:1}]);
+    const [kept]=await db.query('SELECT * FROM reel_watch_history WHERE user_id=$1 AND post_id=$2',[viewer.id,post]);
+    expect(Number(kept.watched_ms)).toBe(2200);expect(kept.meaningful_at).not.toBeNull();
     expect(ids(await page(`?session=${p.sessionId}`))).toEqual([post]); // delivered history remains navigable
   });
 
@@ -104,7 +118,7 @@ describe('Persistent recommendations and attachment classification (e2e)',()=>{
     await watch(p.sessionId,post,4,'VIDEO_REPLAY',0,0,1000).expect(204);
     const [h]=await db.query('SELECT * FROM reel_watch_history WHERE post_id=$1',[post]);
     expect(h.meaningful_at).not.toBeNull();expect(h.completion_count).toBe(1);expect(h.replay_count).toBe(1);
-    expect(ids(await page())).toEqual([]);
+    expect((await page()).entries.map((e:any)=>e.cycle)).toEqual([2]);
   });
 
   it('binds authenticated cursors to the viewer and rejects tampering or expired sessions',async()=>{
@@ -146,7 +160,10 @@ describe('Persistent recommendations and attachment classification (e2e)',()=>{
     await api.post(`/users/${a.id}/follow`,undefined,viewer).expect(200);
     await api.post(`/posts/${one}/bookmark`,undefined,viewer).expect(200);
     expect(ids(await page())[0]).toBe(one);
-    expect(ids(await page('',b))).toHaveLength(2);
+    const small=await page('',b);
+    expect(new Set(ids(small).slice(0,2))).toEqual(new Set([one,two]));
+    for(let i=1;i<small.entries.length;i++)expect(small.entries[i].postId).not.toBe(small.entries[i-1].postId);
+    expect(small.hasMore).toBe(true);
     expect(new Set(ids(await page()))).toEqual(new Set([one,two]));
   });
 
@@ -154,7 +171,10 @@ describe('Persistent recommendations and attachment classification (e2e)',()=>{
     const old=await fixture(a,'VIDEO',3),p=await page('?limit=1');
     const [fresh]=await fixture(b);await db.query('UPDATE posts SET created_at=now() WHERE id=$1',[fresh]);
     await api.post('/feed/reels/expose',{sessionId:p.sessionId,postId:old[2]},viewer).expect(200);
-    const next=await page(`?cursor=${encodeURIComponent(p.nextCursor)}`);expect(ids(next)).not.toContain(fresh);
+    const next=await page(`?cursor=${encodeURIComponent(p.nextCursor)}`);
+    // The new upload becomes eligible in the running session; nothing already served is repeated in cycle 1.
+    const cycleOne=next.entries.filter((e:any)=>e.cycle===1).map((e:any)=>e.postId);
+    expect(cycleOne).toContain(fresh);expect(cycleOne).not.toContain(ids(p)[0]);expect(new Set(cycleOne).size).toBe(cycleOne.length);
     expect(ids(await page())).toContain(fresh);
     await api.post('/feed/reels/expose',{sessionId:p.sessionId,postId:randomUUID()},viewer).expect(404);
     await api.post(`/users/${a.id}/block`,undefined,viewer).expect(200);

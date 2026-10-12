@@ -42,7 +42,8 @@ import { flushReelWatches } from "@/lib/reel-watch-transport";
 import { RichText } from "./post-card";
 
 type ReelPost = Post | Models["ReferencedPostDto"];
-type Reel = { post: ReelPost; video: Models["MediaDto"] };
+/** `key` is the queue identity: a Reel may return in a later discovery cycle (`cycle:postId`). */
+type Reel = { key: string; post: ReelPost; video: Models["MediaDto"] };
 
 const SWIPE_DISTANCE = 0.16; // fraction of viewport height
 const SWIPE_VELOCITY = 0.45; // px per ms
@@ -50,13 +51,13 @@ const WHEEL_THRESHOLD = 55;
 const WHEEL_IDLE_MS = 200;
 const TRANSITION_MS = 320;
 
-export function toReel(post: Post, mediaId?: string | null): Reel | null {
+export function toReel(post: Post, mediaId?: string | null, key?: string): Reel | null {
   const source = post.kind === "REPOST" && post.referencedPost ? post.referencedPost : post;
   const video = source.media.find((m) => m.type === "VIDEO" && m.status === "READY" && (!mediaId || m.id === mediaId));
-  if (video) return { post: source, video };
+  if (video) return { key: key ?? source.id, post: source, video };
   const referenced = post.referencedPost;
   const inherited = referenced?.media.find(m => m.type === "VIDEO" && m.status === "READY" && (!mediaId || m.id === mediaId));
-  return inherited && referenced ? { post: referenced, video: inherited } : null;
+  return inherited && referenced ? { key: key ?? referenced.id, post: referenced, video: inherited } : null;
 }
 
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
@@ -449,7 +450,7 @@ export default function Reels() {
   const profileUserId = params.get("user");
   const feed = useInfiniteQuery({
     queryKey: ["posts", "reels", profileUserId ? `user:${profileUserId}` : (user?.id ?? "guest"), cycle.id, cycle.rewatch],
-    queryFn: async ({ pageParam, signal }): Promise<{ items: Post[]; nextCursor?: string | null; hasMore: boolean; sessionId?: string }> => {
+    queryFn: async ({ pageParam, signal }): Promise<{ items: Post[]; entries?: Models["ReelEntryDto"][]; nextCursor?: string | null; hasMore: boolean; sessionId?: string }> => {
       if (profileUserId)
         return api("postsByUser", { params: { id: profileUserId }, query: { cursor: pageParam, limit: 15, content: "reels", kinds: "POST,QUOTE" }, signal });
       const page = await api("feedReels", { query: { cursor: pageParam, session: pageParam ? undefined : sessionRef.current, limit: 15, rewatch: cycle.rewatch }, signal });
@@ -457,7 +458,11 @@ export default function Reels() {
       return page;
     },
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: (page) => (page.hasMore ? (page.nextCursor ?? undefined) : undefined),
+    // Discovery continues across cycles; stop only on a genuine end, an empty page or a cursor that did not advance.
+    getNextPageParam: (page, _pages, lastParam) =>
+      page.hasMore && page.items.length && page.nextCursor && page.nextCursor !== lastParam ? page.nextCursor : undefined,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
   const restart = async (rewatch = false) => {
     await flushReelWatches();
@@ -485,8 +490,17 @@ export default function Reels() {
     try {
       await api("postsRemove", { params: { id: deleting.id } });
       const removedId = deleting.id;
-      cache.setQueriesData<{ pages: { items: Post[] }[]; pageParams: unknown[] }>({ queryKey: ["posts", "reels"] }, (data) =>
-        data ? { ...data, pages: data.pages.map((page) => ({ ...page, items: page.items.filter((item) => item.id !== removedId) })) } : data,
+      cache.setQueriesData<{ pages: { items: Post[]; entries?: Models["ReelEntryDto"][] }[]; pageParams: unknown[] }>({ queryKey: ["posts", "reels"] }, (data) =>
+        data
+          ? {
+              ...data,
+              pages: data.pages.map((page) => ({
+                ...page,
+                items: page.items.filter((item) => item.id !== removedId),
+                entries: page.entries?.filter((entry) => entry.postId !== removedId),
+              })),
+            }
+          : data,
       );
       cache.removeQueries({ queryKey: ["post", removedId] });
       void cache.invalidateQueries({ predicate: (q) => (q.queryKey[0] === "posts" && q.queryKey[1] !== "reels") || q.queryKey[0] === "profile" });
@@ -510,13 +524,18 @@ export default function Reels() {
   const reels = useMemo(() => {
     // Wait for an explicitly requested post before anchoring the selection to a feed item.
     if (startId && (start.isPending || start.isError || (start.data && !toReel(start.data, startMedia)))) return [];
-    const posts = [...(start.data ? [start.data] : []), ...(feed.data?.pages.flatMap((p) => p.items) ?? [])];
+    // Queue identity is `cycle:postId` (from the server's entries); a Reel can legitimately come back in a
+    // later discovery cycle, but never twice within one. Profile lists have no cycles.
+    const queue: { post: Post; key: string }[] = [
+      ...(start.data ? [{ post: start.data, key: `1:${start.data.id}` }] : []),
+      ...(feed.data?.pages.flatMap((page) => page.items.map((post, i) => ({ post, key: page.entries?.[i]?.postId === post.id ? page.entries[i].key : `1:${post.id}` }))) ?? []),
+    ];
     const seen = new Set<string>();
     const list: Reel[] = [];
-    for (const post of posts) {
-      const reel = toReel(post, post.id === startId ? startMedia : undefined);
-      if (reel && !seen.has(reel.post.id)) {
-        seen.add(reel.post.id);
+    for (const { post, key } of queue) {
+      const reel = toReel(post, post.id === startId ? startMedia : undefined, key);
+      if (reel && !seen.has(reel.key)) {
+        seen.add(reel.key);
         list.push(reel);
       }
     }
@@ -528,7 +547,7 @@ export default function Reels() {
     : null;
   const atEnd = !feed.hasNextPage && !feed.isPending;
   const slideCount = reels.length + (atEnd && reels.length ? 1 : 0);
-  const selectedIndex = selection.id === "end" ? reels.length : reels.findIndex((reel) => reel.post.id === selection.id);
+  const selectedIndex = selection.id === "end" ? reels.length : reels.findIndex((reel) => reel.key === selection.id);
   const index = Math.min(selectedIndex >= 0 ? selectedIndex : selection.index, Math.max(0, slideCount - 1));
   const current = reels[index];
   const sourceRatio = current ? ratios[current.video.id] ?? (current.video.width && current.video.height ? current.video.width / current.video.height : 16 / 9) : 16 / 9;
@@ -540,7 +559,7 @@ export default function Reels() {
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  if (current && requestedStart === target && selection.id !== current.post.id) setSelection({ id: current.post.id, index });
+  if (current && requestedStart === target && selection.id !== current.key) setSelection({ id: current.key, index });
 
   useEffect(() => {
     // Immersive page: no document scrolling (and no pull-to-refresh) underneath the player.
@@ -589,10 +608,10 @@ export default function Reels() {
       locked.current = true;
       lockTimer.current = window.setTimeout(() => (locked.current = false), reducedMotion ? 120 : TRANSITION_MS + 80);
       setSelection((previous) => {
-        const found = previous.id === "end" ? reels.length : reels.findIndex((reel) => reel.post.id === previous.id);
+        const found = previous.id === "end" ? reels.length : reels.findIndex((reel) => reel.key === previous.id);
         const from = found >= 0 ? found : Math.min(previous.index, Math.max(0, slideCount - 1));
         const next = Math.min(Math.max(from + delta, 0), Math.max(slideCount - 1, 0));
-        return { id: reels[next]?.post.id ?? "end", index: next };
+        return { id: reels[next]?.key ?? "end", index: next };
       });
     },
     [slideCount, reducedMotion, reels],
@@ -786,7 +805,7 @@ export default function Reels() {
                   const source = reel.post;
                   return (
                     <section
-                      key={reel.post.id}
+                      key={reel.key}
                       className="reel-slide"
                       style={style}
                       aria-hidden={i !== index}

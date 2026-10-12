@@ -14,6 +14,7 @@ import { MediaUploadSessions1760190600000 } from './1760190600000-MediaUploadSes
 import { PostCountExcludesReposts1760190700000 } from './1760190700000-PostCountExcludesReposts.js';
 import { VerifiedBadge1760190800000 } from './1760190800000-VerifiedBadge.js';
 import { PinnedPosts1760190900000 } from './1760190900000-PinnedPosts.js';
+import { ReelDiscoveryCycles1760191000000 } from './1760191000000-ReelDiscoveryCycles.js';
 
 /** Ordered list of migrations. Append new migrations here; never edit applied ones. */
 export const migrations = [
@@ -33,4 +34,5 @@ export const migrations = [
   PostCountExcludesReposts1760190700000,
   VerifiedBadge1760190800000,
   PinnedPosts1760190900000,
+  ReelDiscoveryCycles1760191000000,
 ];

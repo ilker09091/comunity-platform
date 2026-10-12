@@ -1015,7 +1015,7 @@ export interface paths {
         };
         /**
          * Persistent personalized Reels discovery
-         * @description Bounded PostgreSQL ranking, 48-hour sessions, signed stable cursors, creator diversity and persistent meaningful-watch exclusions. Reposts are resolved to their original, not duplicated. Privacy, blocks, reports and moderation are checked on every page. Exhaustion never silently recycles; omit session/cursor to refresh, or explicitly request rewatch=true for a new discovery cycle.
+         * @description Continuous discovery in cycles. Cycle 1 serves Reels the viewer has not meaningfully watched; when it is exhausted the next cycle starts automatically with every eligible Reel in a new, relevance-weighted shuffled order (never opening with the Reel just shown). A Reel appears at most once per cycle; use `entries[].key` as queue identity. Bounded PostgreSQL ranking, 48-hour sessions, signed keyset cursors, creator diversity. `hasMore` is false only when nothing eligible remains (0 Reels, or a single Reel that simply loops). Privacy, blocks, reports and moderation are checked on every page; persistent watch history is never reset.
          */
         get: operations["feedReels"];
         put?: never;
@@ -3287,8 +3287,21 @@ export interface components {
              */
             repostId: string | null;
         };
+        ReelEntryDto: {
+            /**
+             * @description Unique queue identity of this recommendation (`cycle:postId`). The same Reel may return in a later discovery cycle.
+             * @example 2:9b2f3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d
+             */
+            key: string;
+            /** Format: uuid */
+            postId: string;
+            /** @description Discovery cycle: 1 = unwatched Reels, 2+ = the eligible library again in a new order */
+            cycle: number;
+        };
         ReelsPageDto: {
             items: components["schemas"]["PostDto"][];
+            /** @description One entry per item, in the same order. */
+            entries: components["schemas"]["ReelEntryDto"][];
             nextCursor: string | null;
             hasMore: boolean;
             /** Format: uuid */
@@ -8763,7 +8776,7 @@ export interface operations {
                 limit?: number;
                 /** @description Existing session for idempotent page refresh. Cursors already identify the session. */
                 session?: string;
-                /** @description Explicit Watch again: new cycle, retaining previous watch history. */
+                /** @description Start the first cycle with already watched Reels too (history is kept). Not needed for continuous scrolling: later cycles begin automatically. */
                 rewatch?: boolean;
             };
             header?: never;

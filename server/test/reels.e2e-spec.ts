@@ -63,7 +63,13 @@ describe('Reels feed (e2e)', () => {
     for (let i = 0; i < 5; i++) ids.push((await videoPost(alice, `reel ${i}`)).id);
     const first = await api.get('/feed/reels?limit=3').expect(200);
     const second = await api.get(`/feed/reels?limit=3&cursor=${first.body.nextCursor}`).expect(200);
-    expect([...first.body.items, ...second.body.items].map((p: { id: string }) => p.id)).toEqual([...ids].reverse());
-    expect(second.body).toMatchObject({ hasMore: false, nextCursor: null });
+    const entries = [...first.body.entries, ...second.body.entries] as { postId: string; cycle: number }[];
+    // Cycle 1 serves all five once; the feed then continues with cycle 2 instead of stopping.
+    expect(new Set(entries.filter((e) => e.cycle === 1).map((e) => e.postId))).toEqual(new Set(ids));
+    expect(entries.filter((e) => e.cycle === 1)).toHaveLength(5);
+    expect(entries[5]).toMatchObject({ cycle: 2 });
+    expect(entries[5].postId).not.toBe(entries[4].postId);
+    expect(second.body.hasMore).toBe(true);
+    expect(second.body.items.map((p: { id: string }) => p.id)).toEqual(second.body.entries.map((e: { postId: string }) => e.postId));
   });
 });

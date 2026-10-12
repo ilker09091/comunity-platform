@@ -44,7 +44,7 @@ export class FeedController {
   @ApiOptionalAuth()
   @ApiOperation({
     summary: 'Persistent personalized Reels discovery',
-    description: 'Bounded PostgreSQL ranking, 48-hour sessions, signed stable cursors, creator diversity and persistent meaningful-watch exclusions. Reposts are resolved to their original, not duplicated. Privacy, blocks, reports and moderation are checked on every page. Exhaustion never silently recycles; omit session/cursor to refresh, or explicitly request rewatch=true for a new discovery cycle.',
+    description: 'Continuous discovery in cycles. Cycle 1 serves Reels the viewer has not meaningfully watched; when it is exhausted the next cycle starts automatically with every eligible Reel in a new, relevance-weighted shuffled order (never opening with the Reel just shown). A Reel appears at most once per cycle; use `entries[].key` as queue identity. Bounded PostgreSQL ranking, 48-hour sessions, signed keyset cursors, creator diversity. `hasMore` is false only when nothing eligible remains (0 Reels, or a single Reel that simply loops). Privacy, blocks, reports and moderation are checked on every page; persistent watch history is never reset.',
   })
   @ApiOkResponse({ type: ReelsPageDto })
   @ApiErrors(400)

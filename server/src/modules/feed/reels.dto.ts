@@ -7,11 +7,17 @@ import { PostDto } from '../posts/dto/post.dto.js';
 export class ReelsQueryDto extends CursorQueryDto {
   @ApiPropertyOptional({format:'uuid',description:'Existing session for idempotent page refresh. Cursors already identify the session.'})
   @IsOptional() @IsUUID() session?:string;
-  @ApiPropertyOptional({type:Boolean,default:false,description:'Explicit Watch again: new cycle, retaining previous watch history.'})
+  @ApiPropertyOptional({type:Boolean,default:false,description:'Start the first cycle with already watched Reels too (history is kept). Not needed for continuous scrolling: later cycles begin automatically.'})
   @IsOptional() @Transform(({value})=>value==='true'?true:value==='false'?false:value) @IsBoolean() rewatch?:boolean;
+}
+export class ReelEntryDto {
+  @ApiProperty({description:'Unique queue identity of this recommendation (`cycle:postId`). The same Reel may return in a later discovery cycle.',example:'2:9b2f3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d'}) key:string;
+  @ApiProperty({format:'uuid'}) postId:string;
+  @ApiProperty({minimum:1,description:'Discovery cycle: 1 = unwatched Reels, 2+ = the eligible library again in a new order'}) cycle:number;
 }
 export class ReelsPageDto {
   @ApiProperty({type:[PostDto]}) items:PostDto[];
+  @ApiProperty({type:[ReelEntryDto],description:'One entry per item, in the same order.'}) entries:ReelEntryDto[];
   @ApiProperty({type:String,nullable:true}) nextCursor:string|null;
   @ApiProperty() hasMore:boolean;
   @ApiProperty({format:'uuid'}) sessionId:string;
