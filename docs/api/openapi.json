@@ -3076,6 +3076,169 @@
         ]
       }
     },
+    "/api/posts/{id}/interaction": {
+      "get": {
+        "description": "404 when the post has no interactive widget.",
+        "operationId": "postInteractionsGet",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InteractionSummaryDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A bearer token was supplied but is invalid or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Real results of a post’s poll, quiz or slider",
+        "tags": [
+          "Posts"
+        ]
+      },
+      "post": {
+        "operationId": "postInteractionsRespond",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RespondInteractionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InteractionSummaryDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Vote in a poll, answer a quiz or rate a slider (once per person)",
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
     "/api/posts/{id}/like": {
       "post": {
         "operationId": "likesLikePost",
@@ -13471,6 +13634,68 @@
           "nextCursor",
           "hasMore"
         ]
+      },
+      "InteractionSummaryDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "POLL",
+              "QUIZ",
+              "SLIDER"
+            ]
+          },
+          "counts": {
+            "description": "Responses per option (poll/quiz; empty for sliders)",
+            "example": [
+              3,
+              1
+            ],
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "total": {
+            "type": "number",
+            "description": "Number of people who responded",
+            "example": 4
+          },
+          "myResponse": {
+            "type": "number",
+            "nullable": true,
+            "description": "Your option index (poll/quiz) or value 0–100 (slider); null if you have not responded or are signed out"
+          },
+          "average": {
+            "type": "number",
+            "nullable": true,
+            "description": "Sliders: average of all responses (0–100); null when nobody responded"
+          },
+          "correctCount": {
+            "type": "number",
+            "nullable": true,
+            "description": "Quizzes: how many answered correctly"
+          }
+        },
+        "required": [
+          "kind",
+          "counts",
+          "total",
+          "myResponse",
+          "average",
+          "correctCount"
+        ]
+      },
+      "RespondInteractionDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "number",
+            "description": "Option index for polls/quizzes, or 0–100 for sliders",
+            "example": 1
+          }
+        }
       },
       "LikeResultDto": {
         "type": "object",

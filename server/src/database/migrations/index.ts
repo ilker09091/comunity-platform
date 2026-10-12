@@ -9,6 +9,7 @@ import { AdminControlCenter1760190100000 } from './1760190100000-AdminControlCen
 import { PermanentMediaDeletion1760190200000 } from './1760190200000-PermanentMediaDeletion.js';
 import { EraseDeletedComments1760190300000 } from './1760190300000-EraseDeletedComments.js';
 import { ReelRecommendations1760190400000 } from './1760190400000-ReelRecommendations.js';
+import { PostInteractionResponses1760190500000 } from './1760190500000-PostInteractionResponses.js';
 
 /** Ordered list of migrations. Append new migrations here; never edit applied ones. */
 export const migrations = [
@@ -23,4 +24,5 @@ export const migrations = [
   PermanentMediaDeletion1760190200000,
   EraseDeletedComments1760190300000,
   ReelRecommendations1760190400000,
+  PostInteractionResponses1760190500000,
 ];

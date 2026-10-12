@@ -23,12 +23,13 @@ import {
   EyeOff, Ban,
   X,
   Home, Compass, Users, Bell, Search, PlusSquare, Settings,
+  Trash2,
 } from "lucide-react";
 import { api, type Models, type Post } from "@/lib/api/client";
 import { sharePath, usePostEngagement } from "@/lib/use-post-engagement";
 import { useDoubleTap } from "@/lib/use-double-tap";
 import { useSession, useToast } from "./providers";
-import { Avatar, Dropdown, relativeTime } from "./ui";
+import { Avatar, ConfirmDialog, Dropdown, relativeTime } from "./ui";
 import FollowButton from "./follow-button";
 import CommentList, { CommentInput } from "./comments";
 import ReportDialog from "./report-dialog";
@@ -138,12 +139,14 @@ function ReelActions({
   onComments,
   onReport,
   onNotInterested, onBlock,
+  onDelete,
 }: {
   post: ReelPost;
   commentsOpen: boolean;
   onComments: () => void;
   onReport: () => void;
   onNotInterested: () => void; onBlock: () => void;
+  onDelete: () => void;
 }) {
   const toast = useToast();
   const { user } = useSession();
@@ -256,6 +259,11 @@ function ReelActions({
         {user && user.id !== post.author.id && on("reporting") && (
           <button type="button" className="danger-text" onClick={onReport}>
             <Flag size={16} /> Report
+          </button>
+        )}
+        {user && user.id === post.author.id && (
+          <button type="button" className="danger-text" onClick={onDelete}>
+            <Trash2 size={16} /> Delete Reel
           </button>
         )}
       </Dropdown>
@@ -416,6 +424,8 @@ export default function Reels() {
   if (requestedStart !== target) { setRequestedStart(target); setSelection({ id: null, index: 0 }); }
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [reporting, setReporting] = useState<ReelPost | null>(null);
+  const [deleting, setDeleting] = useState<ReelPost | null>(null);
+  const [deletePending, setDeletePending] = useState(false);
   const [creating, setCreating] = useState(params.get("create") === "1");
   const [ratios, setRatios] = useState<Record<string, number>>({});
   const [stageSize, setStageSize] = useState({ width: 960, height: 760 });
@@ -463,6 +473,28 @@ export default function Reels() {
       toast(block ? 'Creator blocked.' : 'We will show fewer reels like this.');
       if (startId) router.replace('/reels');
     } catch (error) { toast(error instanceof Error ? error.message : 'Unable to update recommendations.', true); }
+  };
+  /** Permanently deletes the viewer's own Reel and moves on to the next one without restarting the feed. */
+  const deleteReel = async () => {
+    if (!deleting) return;
+    setDeletePending(true);
+    try {
+      await api("postsRemove", { params: { id: deleting.id } });
+      const removedId = deleting.id;
+      cache.setQueriesData<{ pages: { items: Post[] }[]; pageParams: unknown[] }>({ queryKey: ["posts", "reels"] }, (data) =>
+        data ? { ...data, pages: data.pages.map((page) => ({ ...page, items: page.items.filter((item) => item.id !== removedId) })) } : data,
+      );
+      cache.removeQueries({ queryKey: ["post", removedId] });
+      void cache.invalidateQueries({ predicate: (q) => (q.queryKey[0] === "posts" && q.queryKey[1] !== "reels") || q.queryKey[0] === "profile" });
+      setCommentsOpen(false);
+      setDeleting(null);
+      toast("Reel deleted.");
+      if (startId === removedId) router.replace("/reels");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Unable to delete this Reel.", true);
+    } finally {
+      setDeletePending(false);
+    }
   };
   const start = useQuery({
     queryKey: ["post", startId],
@@ -778,6 +810,7 @@ export default function Reels() {
             onReport={() => setReporting(current.post)}
             onNotInterested={() => void hideCurrent()}
             onBlock={() => void hideCurrent(true)}
+            onDelete={() => setDeleting(current.post)}
           />
         )}
 
@@ -804,6 +837,16 @@ export default function Reels() {
 
       <MobileNav variant="reels" onCreate={() => setCreating(true)} />
       <PostComposer mode="reel" modalOpen={creating} onModalClose={() => setCreating(false)} />
+      {deleting && (
+        <ConfirmDialog
+          title="Delete this Reel?"
+          description="The video, its likes and comments are removed permanently. This can’t be undone."
+          confirmLabel="Delete"
+          pending={deletePending}
+          onConfirm={() => void deleteReel()}
+          onClose={() => !deletePending && setDeleting(null)}
+        />
+      )}
       {reporting && (
         <ReportDialog
           targetType="POST"

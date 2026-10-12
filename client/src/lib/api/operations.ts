@@ -205,6 +205,16 @@ export const endpoints = {
     "method": "GET",
     "authenticated": true
   },
+  "postInteractionsGet": {
+    "path": "/api/posts/{id}/interaction",
+    "method": "GET",
+    "authenticated": true
+  },
+  "postInteractionsRespond": {
+    "path": "/api/posts/{id}/interaction",
+    "method": "POST",
+    "authenticated": true
+  },
   "likesLikePost": {
     "path": "/api/posts/{id}/like",
     "method": "POST",

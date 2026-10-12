@@ -1,16 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clock, BarChart3, HelpCircle, Sliders, MessageCircleQuestion, Send } from "lucide-react";
 import { haptic } from "@/lib/haptics";
 import { api } from "@/lib/api/client";
-import { useToast } from "./providers";
+import { useSession, useToast } from "./providers";
 
 /**
  * Content-tag powered interactive post widgets. Posts whose body contains
  * `[poll:...]`, `[countdown:...]`, `[quiz:...]`, `[slider:...]` or `[ask:...]`
- * render an interactive widget inline. Votes/responses live in localStorage
- * for now (per-post, per-browser). Server persistence lands in a follow-up.
+ * render an interactive widget inline. Poll votes, quiz answers and slider ratings are stored on the
+ * server (one per person) and every count shown is real.
  */
 
 type ParsedPoll = { kind: "poll"; question: string; options: string[] };
@@ -65,23 +65,41 @@ export function parseInteractive(text: string | null | undefined): { before: str
   }
 }
 
-function store<T>(key: string, read: T): T {
-  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) as T : read; } catch { return read; }
+/** Real results from the server (one response per person). Signed-out viewers can see but not vote. */
+function useInteraction(postId: string) {
+  const { user } = useSession();
+  const toast = useToast();
+  const client = useQueryClient();
+  const query = useQuery({
+    queryKey: ["interaction", postId],
+    queryFn: ({ signal }) => api("postInteractionsGet", { params: { id: postId }, signal }),
+    staleTime: 15_000,
+  });
+  const mutation = useMutation({
+    mutationFn: (value: number) => api("postInteractionsRespond", { params: { id: postId }, body: { value } }),
+    onSuccess: (data) => client.setQueryData(["interaction", postId], data),
+    onError: (error) => toast(error.message, true),
+  });
+  const respond = (value: number) => {
+    if (!user) {
+      toast("Katılmak için giriş yap.");
+      return false;
+    }
+    mutation.mutate(value);
+    return true;
+  };
+  const mine = query.data?.myResponse ?? null;
+  return { data: query.data, mine, respond, pending: mutation.isPending, pendingValue: mutation.isPending ? mutation.variables : null };
 }
-function save(key: string, value: unknown) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* quota or private mode */ } }
 
 export function PollWidget({ postId, data }: { postId: string; data: ParsedPoll }) {
-  const key = `poll:${postId}`;
-  const [state, setState] = useState<{ picked: number | null; counts: number[] }>(() =>
-    store(key, { picked: null, counts: data.options.map(() => Math.floor(Math.random() * 40) + 5) }),
-  );
-  const total = state.counts.reduce((a, b) => a + b, 0);
+  const { data: result, mine, respond, pending, pendingValue } = useInteraction(postId);
+  const counts = result?.counts ?? data.options.map(() => 0);
+  const total = result?.total ?? 0;
+  const voted = mine !== null;
   const pick = (i: number) => {
-    if (state.picked !== null) return;
-    haptic("tap");
-    const counts = state.counts.map((c, j) => (j === i ? c + 1 : c));
-    const next = { picked: i, counts };
-    setState(next); save(key, next);
+    if (voted || pending) return;
+    if (respond(i)) haptic("tap");
   };
   return (
     <div className="ipost ipost-poll">
@@ -89,11 +107,10 @@ export function PollWidget({ postId, data }: { postId: string; data: ParsedPoll 
       <h4>{data.question}</h4>
       <div className="ipost-options">
         {data.options.map((opt, i) => {
-          const pct = total ? Math.round((state.counts[i] / total) * 100) : 0;
-          const picked = state.picked === i;
-          const voted = state.picked !== null;
+          const pct = total ? Math.round(((counts[i] ?? 0) / total) * 100) : 0;
+          const picked = mine === i || pendingValue === i;
           return (
-            <button key={i} type="button" className={`ipost-option ${picked ? "picked" : ""} ${voted ? "voted" : ""}`} onClick={() => pick(i)} disabled={voted}>
+            <button key={i} type="button" className={`ipost-option ${picked ? "picked" : ""} ${voted ? "voted" : ""}`} onClick={() => pick(i)} disabled={voted || pending}>
               <span className="ipost-fill" style={{ width: voted ? `${pct}%` : "0%" }} />
               <span className="ipost-label">{opt}</span>
               {voted && <span className="ipost-pct">{pct}%</span>}
@@ -135,45 +152,48 @@ export function CountdownWidget({ data }: { data: ParsedCountdown }) {
 }
 
 export function QuizWidget({ postId, data }: { postId: string; data: ParsedQuiz }) {
-  const key = `quiz:${postId}`;
-  const [picked, setPicked] = useState<number | null>(() => store(key, null as number | null));
+  const { data: result, mine, respond, pending } = useInteraction(postId);
+  const answered = mine !== null;
   const pick = (i: number) => {
-    if (picked !== null) return;
-    setPicked(i); save(key, i);
-    haptic(i === data.correct ? "success" : "warn");
+    if (answered || pending) return;
+    if (respond(i)) haptic(i === data.correct ? "success" : "warn");
   };
+  const total = result?.total ?? 0;
+  const correctRate = total ? Math.round(((result?.correctCount ?? 0) / total) * 100) : 0;
   return (
     <div className="ipost ipost-quiz">
       <header><HelpCircle size={16} /><span>Quiz</span></header>
       <h4>{data.question}</h4>
       <div className="ipost-options">
         {data.options.map((opt, i) => {
-          const chosen = picked === i;
-          const isAnswer = picked !== null && i === data.correct;
+          const chosen = mine === i;
+          const isAnswer = answered && i === data.correct;
           const wrong = chosen && i !== data.correct;
           return (
-            <button key={i} type="button" className={`ipost-option ${isAnswer ? "correct" : ""} ${wrong ? "wrong" : ""}`} onClick={() => pick(i)} disabled={picked !== null}>
+            <button key={i} type="button" className={`ipost-option ${isAnswer ? "correct" : ""} ${wrong ? "wrong" : ""}`} onClick={() => pick(i)} disabled={answered || pending}>
               <span className="ipost-label">{opt}</span>
             </button>
           );
         })}
       </div>
-      {picked !== null && (
-        <footer className={picked === data.correct ? "right" : "wrong"}>
-          {picked === data.correct ? "✓ Doğru!" : "✗ Yanlış"}
+      {answered ? (
+        <footer className={mine === data.correct ? "right" : "wrong"}>
+          {mine === data.correct ? "✓ Doğru!" : "✗ Yanlış"} · {total} kişinin %{correctRate}&apos;i doğru bildi
         </footer>
+      ) : (
+        <footer>{total} kişi cevapladı</footer>
       )}
     </div>
   );
 }
 
 export function SliderWidget({ postId, data }: { postId: string; data: ParsedSlider }) {
-  const key = `slider:${postId}`;
-  const [value, setValue] = useState<number>(() => store(key, 50));
-  const [locked, setLocked] = useState<boolean>(() => store(`${key}:locked`, false));
-  const average = 50 + Math.sin((postId.length * 7) % 100) * 20;
+  const { data: result, mine, respond, pending } = useInteraction(postId);
+  const [value, setValue] = useState(50);
+  const locked = mine !== null;
   const commit = () => {
-    setLocked(true); save(key, value); save(`${key}:locked`, true); haptic("success");
+    if (locked || pending) return;
+    if (respond(value)) haptic("success");
   };
   return (
     <div className="ipost ipost-slider">
@@ -182,18 +202,22 @@ export function SliderWidget({ postId, data }: { postId: string; data: ParsedSli
       <div className="ipost-slider-row">
         <span className="ipost-emoji">{data.leftEmoji}</span>
         <input
-          type="range" min={0} max={100} value={value}
+          type="range" min={0} max={100} value={locked ? mine : value}
           onChange={(e) => setValue(Number(e.target.value))}
-          onPointerUp={() => !locked && commit()}
-          disabled={locked}
+          onPointerUp={commit}
+          onKeyUp={(e) => { if (e.key === "Enter") commit(); }}
+          disabled={locked || pending}
+          aria-label={data.question}
         />
         <span className="ipost-emoji">{data.rightEmoji}</span>
       </div>
-      {locked && (
-        <footer>
-          Sen: <strong>{value}</strong> · Ortalama: <strong>{Math.round(average)}</strong>
-        </footer>
-      )}
+      <footer>
+        {locked ? (
+          <>Sen: <strong>{mine}</strong> · Ortalama: <strong>{result?.average ?? mine}</strong> · {result?.total ?? 1} kişi</>
+        ) : (
+          <>{result?.total ? <>Ortalama gizli · {result.total} kişi değerlendirdi</> : "İlk değerlendiren sen ol"}</>
+        )}
+      </footer>
     </div>
   );
 }

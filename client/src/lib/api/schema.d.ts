@@ -613,6 +613,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/posts/{id}/interaction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Real results of a post’s poll, quiz or slider
+         * @description 404 when the post has no interactive widget.
+         */
+        get: operations["postInteractionsGet"];
+        put?: never;
+        /** Vote in a poll, answer a quiz or rate a slider (once per person) */
+        post: operations["postInteractionsRespond"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/posts/{id}/like": {
         parameters: {
             query?: never;
@@ -2877,6 +2898,36 @@ export interface components {
             nextCursor: string | null;
             /** @example false */
             hasMore: boolean;
+        };
+        InteractionSummaryDto: {
+            /** @enum {string} */
+            kind: "POLL" | "QUIZ" | "SLIDER";
+            /**
+             * @description Responses per option (poll/quiz; empty for sliders)
+             * @example [
+             *       3,
+             *       1
+             *     ]
+             */
+            counts: number[];
+            /**
+             * @description Number of people who responded
+             * @example 4
+             */
+            total: number;
+            /** @description Your option index (poll/quiz) or value 0–100 (slider); null if you have not responded or are signed out */
+            myResponse: number | null;
+            /** @description Sliders: average of all responses (0–100); null when nobody responded */
+            average: number | null;
+            /** @description Quizzes: how many answered correctly */
+            correctCount: number | null;
+        };
+        RespondInteractionDto: {
+            /**
+             * @description Option index for polls/quizzes, or 0–100 for sliders
+             * @example 1
+             */
+            value?: number;
         };
         LikeResultDto: {
             /**
@@ -6485,6 +6536,128 @@ export interface operations {
                 };
             };
             /** @description Rate limit exceeded (`RATE_LIMITED`) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    postInteractionsGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InteractionSummaryDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description A bearer token was supplied but is invalid or expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Rate limit exceeded (`RATE_LIMITED`) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    postInteractionsRespond: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RespondInteractionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InteractionSummaryDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
             429: {
                 headers: {
                     [name: string]: unknown;
