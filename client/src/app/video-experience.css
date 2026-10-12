@@ -269,3 +269,7 @@
   .video-playback-dock, .video-controls button, .video-controls a, .reel-follow-badge, .reels-icon-button, .reels-tooltip, .reel-action-icon, .reel-actions, .reel-viewport, .reel-slide { transition: none !important; }
   .reel-action.pop .reel-action-icon svg { animation: none !important; }
 }
+
+/* Profile Reels: title shows the profile, with a way back to everyone's Reels. */
+.reels-all-link { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.14); color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; transition: background 150ms ease; }
+.reels-all-link:hover { background: rgba(255, 255, 255, 0.24); }

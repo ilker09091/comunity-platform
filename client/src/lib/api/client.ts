@@ -123,6 +123,64 @@ export async function api<K extends keyof operations>(
   }
   return response.status === 204 ? (undefined as Result<K>) : response.json();
 }
+/** Readable message when a proxy/CDN answers with an HTML page instead of the API's JSON. */
+function nonJsonUploadError(status: number) {
+  if (status === 413)
+    return new ApiError(413, "FILE_TOO_LARGE", "This file is larger than the server accepts in one request.");
+  if (status === 0) return new ApiError(0, "NETWORK_ERROR", "Upload failed. Check your connection and try again.");
+  return new ApiError(status, "UPLOAD_FAILED", `Upload failed (server responded ${status}). Please try again.`);
+}
+
+const CHUNKED_THRESHOLD = 4 * 1024 * 1024;
+const MIN_CHUNK = 256 * 1024;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Large files (phone videos) go up in pieces: no single request can hit a reverse proxy's body
+ * limit (a 413 halves the piece size), a dropped connection retries just one piece, and the
+ * server's `received` offset is the source of truth for resuming.
+ */
+async function chunkedUpload(file: File, onProgress: (percent: number) => void): Promise<Models["MediaDto"]> {
+  const session = await api("mediaUploadsStart", { body: { size: file.size, fileName: file.name || "upload" } });
+  let offset = session.received;
+  let size = session.chunkSize;
+  let failures = 0;
+  while (offset < file.size) {
+    const url = operationUrl("mediaUploadsChunk", { params: { id: session.id }, query: { offset } });
+    enforceRateLimit(url);
+    const response = await fetch(url, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "X-Social-Client": "web", "Content-Type": "application/octet-stream" },
+      body: file.slice(offset, offset + size),
+    }).catch(() => null);
+    if (response?.ok) {
+      offset = (await response.json()).received;
+      failures = 0;
+      onProgress(Math.min(99, Math.round((offset / file.size) * 100)));
+      continue;
+    }
+    if (response?.status === 413 && size > MIN_CHUNK) {
+      size = Math.max(MIN_CHUNK, Math.floor(size / 2));
+      continue;
+    }
+    if (response?.status === 401) window.dispatchEvent(new Event("session-expired"));
+    const retryable = !response || response.status >= 500 || response.status === 408 || response.status === 409 || response.status === 429;
+    if (!retryable || ++failures > 6) {
+      const error = response ? await response.json().catch(() => null) : null;
+      throw error?.code
+        ? new ApiError(response!.status, error.code, error.message ?? "Upload failed.", error.details)
+        : nonJsonUploadError(response?.status ?? 0);
+    }
+    if (response?.status === 429) recordRateLimit(url, response.headers.get("Retry-After"));
+    await sleep(Math.min(8000, 700 * failures));
+    // Re-sync with what the server actually stored before retrying.
+    offset = (await api("mediaUploadsStatus", { params: { id: session.id } })).received;
+  }
+  onProgress(100);
+  return api("mediaUploadsComplete", { params: { id: session.id } });
+}
+
 export async function upload(
   file: File,
   onProgress: (percent: number) => void,
@@ -130,6 +188,7 @@ export async function upload(
 ): Promise<Models["MediaDto"] | Models["MeDto"]> {
   // Prime/refresh the session before sending a potentially large, non-replayable upload.
   await api("usersGetMe");
+  if (kind === "mediaUpload" && file.size > CHUNKED_THRESHOLD) return chunkedUpload(file, onProgress);
   const url = operationUrl(kind);
   enforceRateLimit(url);
   return new Promise((resolve, reject) => {
@@ -163,7 +222,7 @@ export async function upload(
       try {
         data = JSON.parse(xhr.responseText);
       } catch {
-        reject(new Error("Invalid upload response."));
+        reject(nonJsonUploadError(xhr.status));
         return;
       }
       if (xhr.status >= 200 && xhr.status < 300) resolve(data);

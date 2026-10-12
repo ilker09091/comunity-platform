@@ -445,9 +445,13 @@ export default function Reels() {
     stage.current?.querySelector<HTMLButtonElement>('section[aria-hidden="false"] .video-sound')?.click();
   }, []);
 
+  // Opened from a profile: only that person's Reels, newest first. Otherwise: everyone's recommended Reels.
+  const profileUserId = params.get("user");
   const feed = useInfiniteQuery({
-    queryKey: ["posts", "reels", user?.id ?? "guest", cycle.id, cycle.rewatch],
-    queryFn: async ({ pageParam, signal }) => {
+    queryKey: ["posts", "reels", profileUserId ? `user:${profileUserId}` : (user?.id ?? "guest"), cycle.id, cycle.rewatch],
+    queryFn: async ({ pageParam, signal }): Promise<{ items: Post[]; nextCursor?: string | null; hasMore: boolean; sessionId?: string }> => {
+      if (profileUserId)
+        return api("postsByUser", { params: { id: profileUserId }, query: { cursor: pageParam, limit: 15, content: "reels", kinds: "POST,QUOTE" }, signal });
       const page = await api("feedReels", { query: { cursor: pageParam, session: pageParam ? undefined : sessionRef.current, limit: 15, rewatch: cycle.rewatch }, signal });
       sessionRef.current = page.sessionId;
       return page;
@@ -460,7 +464,7 @@ export default function Reels() {
     sessionRef.current = undefined;
     setSelection({ id: null, index: 0 }); setCommentsOpen(false);
     setCycle(previous => ({ id: previous.id + 1, rewatch }));
-    if (startId) router.replace('/reels');
+    if (startId || profileUserId) router.replace('/reels');
   };
   const hideCurrent = async (block = false) => {
     if (!current) return;
@@ -519,6 +523,9 @@ export default function Reels() {
     return list;
   }, [feed.data, start.data, startId, startMedia, start.isPending, start.isError]);
 
+  const profileOwner = profileUserId
+    ? (reels.find((r) => r.post.author.id === profileUserId)?.post.author.username ?? (start.data?.author.id === profileUserId ? start.data.author.username : null))
+    : null;
   const atEnd = !feed.hasNextPage && !feed.isPending;
   const slideCount = reels.length + (atEnd && reels.length ? 1 : 0);
   const selectedIndex = selection.id === "end" ? reels.length : reels.findIndex((reel) => reel.post.id === selection.id);
@@ -705,8 +712,13 @@ export default function Reels() {
           <ArrowLeft size={20} />
         </button>
         <span className="reels-title">
-          <Clapperboard size={18} aria-hidden="true" /> Reels
+          <Clapperboard size={18} aria-hidden="true" /> {profileOwner ? <>@{profileOwner}</> : "Reels"}
         </span>
+        {profileUserId && (
+          <Link href="/reels" className="reels-all-link" replace>
+            All Reels
+          </Link>
+        )}
         <button type="button" className="reels-icon-button reels-create" aria-label="Create Reel" onClick={() => setCreating(true)}><PlusSquare size={23} /></button>
       </div>
 
@@ -741,8 +753,8 @@ export default function Reels() {
           ) : empty ? (
             <div className="reel-state">
               <Clapperboard size={34} />
-              <h2>You're all caught up</h2>
-              <p>No unseen reels are available right now.</p>
+              <h2>{profileUserId ? (profileOwner ? `That's all from @${profileOwner}` : "No Reels here yet") : "You're all caught up"}</h2>
+              <p>{profileUserId ? "You've seen every Reel on this profile." : "No unseen reels are available right now."}</p>
               <button type="button" className="button small" onClick={() => restart()}>Refresh for new content</button>
               <button type="button" className="button secondary small" onClick={() => restart(true)}>Watch again</button>
               <Link href="/" className="button secondary small">Return to Home</Link>

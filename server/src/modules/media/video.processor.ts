@@ -124,8 +124,19 @@ export class FfmpegVideoProcessor implements VideoProcessor {
   }
 
   async compress(input: string, output: string, probe: VideoProbe, onProgress?: (percent: number) => void): Promise<'remuxed' | 'transcoded'> {
+    try {
+      return await this.encode(input, output, probe, true, onProgress);
+    } catch (error) {
+      if (probe.audioCodec === null) throw error;
+      // Some phones add audio tracks ffmpeg cannot decode (e.g. Apple spatial audio): keep the video, drop the sound.
+      this.logger.warn({ message: 'Compression with audio failed; retrying without audio', error: (error as Error).message });
+      return this.encode(input, output, { ...probe, audioCodec: null }, false, onProgress);
+    }
+  }
+
+  private async encode(input: string, output: string, probe: VideoProbe, withAudio: boolean, onProgress?: (percent: number) => void): Promise<'remuxed' | 'transcoded'> {
     const v = this.config.media.video;
-    const common = ['-hide_banner', '-nostdin', '-y', '-i', input, '-map', '0:v:0', '-map', '0:a:0?', '-sn', '-dn', '-map_metadata', '-1', '-movflags', '+faststart'];
+    const common = ['-hide_banner', '-nostdin', '-y', '-i', input, '-map', '0:v:0', ...(withAudio ? ['-map', '0:a:0?'] : ['-an']), '-sn', '-dn', '-map_metadata', '-1', '-movflags', '+faststart'];
     const progress = ['-progress', 'pipe:1', '-nostats'];
     if (this.canRemux(probe)) {
       await this.run(this.ffmpeg, [...common, '-c', 'copy', ...progress, '-f', 'mp4', output], this.timeout(probe), this.progressParser(probe, onProgress));
@@ -145,10 +156,7 @@ export class FfmpegVideoProcessor implements VideoProcessor {
         '-maxrate', `${v.maxBitrateKbps}k`,
         '-bufsize', `${v.maxBitrateKbps * 2}k`,
         '-profile:v', 'high',
-        '-c:a', 'aac',
-        '-b:a', `${v.audioBitrateKbps}k`,
-        '-ac', '2',
-        '-ar', '48000',
+        ...(withAudio ? ['-c:a', 'aac', '-b:a', `${v.audioBitrateKbps}k`, '-ac', '2', '-ar', '48000'] : []),
         ...progress,
         '-f', 'mp4',
         output,

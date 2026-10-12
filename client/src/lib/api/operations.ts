@@ -5,6 +5,26 @@ export const endpoints = {
     "method": "GET",
     "authenticated": false
   },
+  "mediaUploadsStart": {
+    "path": "/api/media/uploads",
+    "method": "POST",
+    "authenticated": true
+  },
+  "mediaUploadsStatus": {
+    "path": "/api/media/uploads/{id}",
+    "method": "GET",
+    "authenticated": true
+  },
+  "mediaUploadsChunk": {
+    "path": "/api/media/uploads/{id}/chunks",
+    "method": "POST",
+    "authenticated": true
+  },
+  "mediaUploadsComplete": {
+    "path": "/api/media/uploads/{id}/complete",
+    "method": "POST",
+    "authenticated": true
+  },
   "mediaUpload": {
     "path": "/api/media",
     "method": "POST",

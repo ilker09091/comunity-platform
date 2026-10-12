@@ -9,10 +9,11 @@ import { UploadsMulterModule } from './multer.options.js';
 import { LocalStorageDriver, STORAGE_DRIVER } from './storage/storage.driver.js';
 import { FfmpegVideoProcessor, VIDEO_PROCESSOR } from './video.processor.js';
 import { VideoTranscodeQueue } from './video-transcode.queue.js';
+import { MediaUploadSessionsService, MediaUploadsController } from './media-uploads.js';
 
 @Module({
   imports: [UploadsMulterModule],
-  controllers: [MediaController],
+  controllers: [MediaUploadsController, MediaController],
   providers: [
     MediaService,
     ContentDeletionService,
@@ -34,6 +35,7 @@ import { VideoTranscodeQueue } from './video-transcode.queue.js';
     },
     { provide: VIDEO_PROCESSOR, useClass: FfmpegVideoProcessor },
     VideoTranscodeQueue,
+    MediaUploadSessionsService,
   ],
   exports: [MediaService, MediaUrlService, ContentDeletionService],
 })

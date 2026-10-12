@@ -132,7 +132,7 @@ export default function Feed({
         </div>
       ) : items.length ? (
         <PullToRefresh onRefresh={() => query.refetch()}>
-          {layout === 'grid' ? <ProfileGrid posts={items}/> : <div className="post-list">
+          {layout === 'grid' ? <ProfileGrid posts={items} reelsUserId={userId}/> : <div className="post-list">
             {items.map((post) => (
               <PostCard key={post.id} post={post} />
             ))}

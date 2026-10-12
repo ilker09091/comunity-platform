@@ -16,9 +16,16 @@ const DEFAULT_IMAGE_TYPES = "image/jpeg,image/png,image/webp,image/gif";
  * Any video is accepted and compressed to MP4 on the server. Extensions cover files whose type the
  * browser can't name (MKV, AVI, WMV, camera MTS…).
  */
-const VIDEO_ACCEPT = "video/*,.mp4,.mov,.m4v,.webm,.mkv,.avi,.wmv,.flv,.3gp,.3g2,.mts,.m2ts,.ts,.mpg,.mpeg,.ogv,.hevc";
+// Plain `video/*` opens the photo/video gallery on iOS and Android (extension lists can force a file browser).
+const VIDEO_ACCEPT = "video/*";
 const VIDEO_EXTENSION = /\.(mp4|mov|m4v|webm|mkv|avi|wmv|flv|3gp|3g2|mts|m2ts|ts|mpe?g|ogv|hevc)$/i;
 const isVideoFile = (file: File) => file.type.startsWith("video/") || (!file.type.startsWith("image/") && VIDEO_EXTENSION.test(file.name));
+/**
+ * Mobile galleries sometimes hand over videos with an empty or generic type and no extension; let
+ * the server (which inspects the contents) decide instead of rejecting them here.
+ */
+const mightBeVideo = (file: File) =>
+  isVideoFile(file) || file.type === "" || file.type === "application/octet-stream";
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const TYPE_NAMES: Record<string, string> = {
   "image/jpeg": "JPEG",
@@ -290,7 +297,7 @@ export default function PostComposer({
         toast(`You can attach up to ${MAX_ATTACHMENTS} images or videos.`, true);
         break;
       }
-      const video = !!VIDEO_TYPES && isVideoFile(file);
+      const video = !!VIDEO_TYPES && mightBeVideo(file);
       if (!video && !(IMAGE_TYPES && IMAGE_TYPES.split(",").includes(file.type))) {
         if (VIDEO_TYPES) toast("Choose a video file.", true);
         else {
@@ -394,7 +401,7 @@ export default function PostComposer({
         <div className={`attachment-grid count-${attachments.length}`}>
           {attachments.map((item) => (
             <div className="attachment" key={item.key}>
-              {isVideoFile(item.file) ? (
+              {mode === 'reel' || isVideoFile(item.file) ? (
                 item.previewFailed && item.media?.status !== "READY" ? (
                   <div className="attachment-placeholder">
                     <Film size={26} aria-hidden="true" />

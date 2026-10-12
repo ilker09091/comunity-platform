@@ -21,12 +21,13 @@ function ReelCover({video,caption}:{video:Models['MediaDto'];caption:string|null
   </>;
 }
 
-export default function ProfileGrid({posts}:{posts:Post[]}) {
+/** `reelsUserId`: open videos in a Reels viewer limited to this profile's Reels. */
+export default function ProfileGrid({posts,reelsUserId}:{posts:Post[];reelsUserId?:string}) {
   return <div className="profile-social-grid">{posts.map(post=>{
     const source=post.kind==='REPOST' && post.referencedPost?post.referencedPost:post;
     const video=source.media.find(m=>m.type==='VIDEO') ?? (post.kind==='QUOTE' ? post.referencedPost?.media.find(m=>m.type==='VIDEO') : undefined);
     const image=source.media.find(m=>m.type==='IMAGE' && m.status==='READY');
-    const href=video?`/reels?start=${source.id}&media=${video.id}`:`/post/${source.id}`;
+    const href=video?`/reels?start=${source.id}&media=${video.id}${reelsUserId?`&user=${encodeURIComponent(reelsUserId)}`:''}`:`/post/${source.id}`;
     return <Link key={post.id} href={href} className={`profile-tile ${!image?'text-tile':''}`} aria-label={`${video?'Reel':image?'Photo post':'Text post'} by @${source.author.username}${post.kind==='REPOST'?`, reposted by @${post.author.username}`:''}`}>
       {image?<img src={image.url} alt="" loading="lazy" decoding="async"/>:video?<ReelCover video={video} caption={source.content}/>:<div className="grid-text-preview"><AlignLeft size={16}/><p>{source.content?.slice(0,180)||'Attachment unavailable'}</p></div>}
       <span className="grid-media-badge">{video?<Clapperboard size={14}/>:source.media.length>1?<Images size={14}/>:source.media.length&&!image?<ImageOff size={14}/>:null}</span>
