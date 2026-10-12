@@ -55,8 +55,8 @@ services:
       # Media (photos/videos) is served through the website (same origin), so it works without a public API domain.
       MEDIA_PUBLIC_URL: ${MEDIA_PUBLIC_URL:-/api/backend}
       # Video uploads: any format is accepted and compressed to MP4 in the background.
-      MEDIA_MAX_VIDEO_UPLOAD_BYTES: ${MEDIA_MAX_VIDEO_UPLOAD_BYTES:-2147483648}
-      MEDIA_VIDEO_MAX_DURATION_SECONDS: ${MEDIA_VIDEO_MAX_DURATION_SECONDS:-900}
+      MEDIA_MAX_VIDEO_UPLOAD_BYTES: ${MEDIA_MAX_VIDEO_UPLOAD_BYTES:-4294967296}
+      MEDIA_VIDEO_MAX_DURATION_SECONDS: ${MEDIA_VIDEO_MAX_DURATION_SECONDS:-0}
       MEDIA_VIDEO_CRF: ${MEDIA_VIDEO_CRF:-26}
       MEDIA_TRANSCODE_CONCURRENCY: ${MEDIA_TRANSCODE_CONCURRENCY:-1}
     ports:

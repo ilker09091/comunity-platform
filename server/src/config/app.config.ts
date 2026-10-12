@@ -101,7 +101,7 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env) {
       maxImageBytes: int(env.MEDIA_MAX_IMAGE_BYTES, 10 * 1024 * 1024),
       // Raw video upload limit. Every video is compressed to MP4 afterwards, so the original's size
       // and format no longer matter. (The old MEDIA_MAX_VIDEO_BYTES capped stored originals and is ignored.)
-      maxVideoBytes: int(env.MEDIA_MAX_VIDEO_UPLOAD_BYTES, 2 * 1024 * 1024 * 1024),
+      maxVideoBytes: int(env.MEDIA_MAX_VIDEO_UPLOAD_BYTES, 4 * 1024 * 1024 * 1024),
       maxImageDimension: int(env.MEDIA_MAX_IMAGE_DIMENSION, 2048),
       video: {
         // Binaries: env path → bundled dev binaries (ffmpeg-static/ffprobe-static) → `ffmpeg`/`ffprobe` on PATH.
@@ -112,12 +112,13 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env) {
         maxLongSide: int(env.MEDIA_VIDEO_MAX_LONG_SIDE, 1920),
         /** x264 quality (lower = better/larger). 26 is visually clean for phone screens. */
         crf: int(env.MEDIA_VIDEO_CRF, 26),
-        preset: env.MEDIA_VIDEO_PRESET ?? 'veryfast',
+        // superfast: roughly 2× quicker than veryfast for ~15% larger files.
+        preset: env.MEDIA_VIDEO_PRESET ?? 'superfast',
         maxBitrateKbps: int(env.MEDIA_VIDEO_MAX_BITRATE_KBPS, 4500),
         audioBitrateKbps: int(env.MEDIA_VIDEO_AUDIO_BITRATE_KBPS, 128),
         maxFps: int(env.MEDIA_VIDEO_MAX_FPS, 60),
         /** 0 = unlimited. Long videos cost CPU time to compress. */
-        maxDurationSeconds: int(env.MEDIA_VIDEO_MAX_DURATION_SECONDS, 900),
+        maxDurationSeconds: int(env.MEDIA_VIDEO_MAX_DURATION_SECONDS, 0),
         /** Videos compressed at the same time (each uses several CPU cores). */
         concurrency: Math.max(1, int(env.MEDIA_TRANSCODE_CONCURRENCY, 1)),
       },

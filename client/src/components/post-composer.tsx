@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { Film, ImageIcon, Video, Globe2, Users, X, Loader2, RotateCcw, BarChart3, Clock, HelpCircle, Sliders, MessageCircleQuestion, EyeOff } from "lucide-react";
+import { Camera, Film, ImageIcon, Video, Globe2, Users, X, Loader2, RotateCcw, BarChart3, Clock, HelpCircle, Sliders, MessageCircleQuestion, EyeOff } from "lucide-react";
 import { api, upload, type Models } from "@/lib/api/client";
 import { useSession, useToast } from "./providers";
 import { useFeatures } from "@/lib/platform-config";
@@ -27,6 +27,24 @@ const isVideoFile = (file: File) => file.type.startsWith("video/") || (!file.typ
 const mightBeVideo = (file: File) =>
   isVideoFile(file) || file.type === "" || file.type === "application/octet-stream";
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * A post published while its video is still compressing stays hidden until the video is ready.
+ * Watch for it in the background (survives closing the composer) and refresh feeds when it goes live.
+ */
+async function announceWhenLive(postId: string, onLive: () => void) {
+  const deadline = Date.now() + 30 * 60_000;
+  while (Date.now() < deadline) {
+    await sleep(2500);
+    try {
+      await api("postsGet", { params: { id: postId } });
+      onLive();
+      return;
+    } catch {
+      /* still compressing (404) or a transient error: keep waiting */
+    }
+  }
+}
 const TYPE_NAMES: Record<string, string> = {
   "image/jpeg": "JPEG",
   "image/png": "PNG",
@@ -254,6 +272,8 @@ export default function PostComposer({
   const cardInput = useRef<HTMLInputElement>(null);
   const editorInput = useRef<HTMLInputElement>(null);
   const urls = useRef(new Set<string>());
+  /** Attachments still in the composer; status polling stops for the rest. */
+  const live = useRef(new Set<string>());
 
   useEffect(() => {
     const values = urls.current;
@@ -275,7 +295,7 @@ export default function PostComposer({
       }
       update(item.key, { media, progress: 100 });
       // Videos are compressed on the server; wait until the optimized MP4 is ready to publish.
-      while (media.status === "PROCESSING") {
+      while (media.status === "PROCESSING" && live.current.has(item.key)) {
         await sleep(1500);
         media = await api("mediaGet", { params: { id: media.id } });
         update(item.key, { media });
@@ -313,7 +333,9 @@ export default function PostComposer({
       }
       const preview = URL.createObjectURL(file);
       urls.current.add(preview);
-      selected.push({ key: crypto.randomUUID(), file, preview, progress: 0 });
+      const key = crypto.randomUUID();
+      live.current.add(key);
+      selected.push({ key, file, preview, progress: 0 });
     }
     setAttachments((prev) => [...prev, ...selected]);
     selected.forEach((item) => void sendAttachment(item));
@@ -321,14 +343,18 @@ export default function PostComposer({
     if (selected.length) setOpen(true);
   };
 
-  const pick = (accept: string, inEditor: boolean) => {
+  /** `camera`: open the phone camera directly (the browser asks for camera permission). */
+  const pick = (accept: string, inEditor: boolean, camera = false) => {
     const target = (inEditor ? editorInput : cardInput).current;
     if (!target) return;
     target.accept = accept;
+    if (camera) target.setAttribute("capture", "environment");
+    else target.removeAttribute("capture");
     target.click();
   };
 
   const remove = (item: Attachment) => {
+    live.current.delete(item.key);
     setAttachments((prev) => prev.filter((a) => a.key !== item.key));
     URL.revokeObjectURL(item.preview);
     urls.current.delete(item.preview);
@@ -344,7 +370,9 @@ export default function PostComposer({
       };
       return quoteId ? api("repostsQuote", { params: { id: quoteId }, body }) : api("postsCreate", { body });
     },
-    onSuccess: () => {
+    onSuccess: (post) => {
+      const stillCompressing = attachments.some((a) => a.media?.status === "PROCESSING");
+      live.current.clear();
       setContent("");
       for (const item of attachments) {
         URL.revokeObjectURL(item.preview);
@@ -352,15 +380,21 @@ export default function PostComposer({
       }
       setAttachments([]);
       void client.invalidateQueries({ predicate: (q) => q.queryKey[0] !== "suggestions" });
-      toast(quoteId ? "Your quote has been shared." : "Your post is live.");
+      if (stillCompressing) {
+        toast(mode === "reel" ? "Reel'in hazırlanıyor, birkaç saniye içinde yayında olacak." : "Gönderin hazırlanıyor, birkaç saniye içinde yayında olacak.");
+        void announceWhenLive(post.id, () => {
+          void client.invalidateQueries({ predicate: (q) => q.queryKey[0] !== "suggestions" });
+          toast(mode === "reel" ? "Reel'in yayında 🎉" : "Gönderin yayında 🎉");
+        });
+      } else toast(quoteId ? "Your quote has been shared." : "Your post is live.");
       setOpen(false);
       onModalClose?.();
       onDone?.();
     },
   });
 
-  const uploading = attachments.some((a) => !a.error && a.media?.status !== "READY");
-  const optimizing = attachments.some((a) => a.media?.status === "PROCESSING");
+  // Publishing only waits for the upload itself; compression continues on the server.
+  const uploading = attachments.some((a) => !a.error && !a.media);
   const failed = attachments.some((a) => a.error);
   const tooLong = content.length > MAX_LENGTH;
   const ready =
@@ -483,6 +517,15 @@ export default function PostComposer({
               <Video size={17} className="tool-video" aria-hidden="true" /> Video
             </button>
           )}
+          {VIDEO_TYPES && (
+            <button
+              type="button"
+              onClick={() => pick("video/*", true, true)}
+              disabled={busy || attachments.length >= MAX_ATTACHMENTS}
+            >
+              <Camera size={17} className="tool-video" aria-hidden="true" /> Kamera
+            </button>
+          )}
           <InteractivePicker disabled={busy} onInsert={(tag) => setContent((c) => (c ? `${c}\n${tag}` : tag))} />
           <button type="button" onClick={() => setContent((c) => (c ? `${c} #spoiler` : "#spoiler "))} disabled={busy} title="Spoiler">
             <EyeOff size={17} aria-hidden="true" /> Spoiler
@@ -493,7 +536,7 @@ export default function PostComposer({
         </span>
         <button className="button" disabled={!ready}>
           {busy && <Loader2 size={15} className="spin" />}
-          {busy ? "Posting…" : optimizing ? "Optimizing video…" : uploading ? "Uploading…" : quoteId ? "Quote" : mode==='reel'?'Publish Reel':"Post"}
+          {busy ? "Posting…" : uploading ? "Uploading…" : quoteId ? "Quote" : mode==='reel'?'Publish Reel':"Post"}
         </button>
       </div>
       <input
@@ -559,6 +602,11 @@ export default function PostComposer({
             {VIDEO_TYPES && (
               <button type="button" onClick={() => pick(VIDEO_TYPES, false)}>
                 <Video size={17} className="tool-video" aria-hidden="true" /> Video
+              </button>
+            )}
+            {VIDEO_TYPES && (
+              <button type="button" onClick={() => pick("video/*", false, true)}>
+                <Camera size={17} className="tool-video" aria-hidden="true" /> Kamera
               </button>
             )}
             {mode==='post' && on('reels') && <Link href="/reels?create=1" className="composer-create-reel"><Video size={17}/>Create Reel</Link>}

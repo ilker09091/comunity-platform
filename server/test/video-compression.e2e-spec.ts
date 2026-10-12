@@ -107,14 +107,38 @@ describe('Video upload and compression (e2e)', () => {
     expect((await storage.stat(new URL(res.body.url).pathname.split("/").at(-1)!)).exists).toBe(false);
   });
 
-  it('cannot be attached to a post until compression has finished', async () => {
+  it('can be published while compressing; the post appears only once the video is ready', async () => {
     const db = app.get(DataSource);
-    const [row] = await db.query(
-      `INSERT INTO media (owner_id, type, status, storage_key, mime_type, size_bytes) VALUES ($1, 'VIDEO', 'PROCESSING', 'pending-test.mp4', 'video/mp4', 10) RETURNING id`,
+    const media = async (key: string, status: string) =>
+      (
+        await db.query(
+          `INSERT INTO media (owner_id, type, status, storage_key, mime_type, size_bytes) VALUES ($1, 'VIDEO', $3, $2, 'video/mp4', 10) RETURNING id`,
+          [alice.id, key, status],
+        )
+      )[0].id as string;
+    const pending = await media('pending-test.mp4', 'PROCESSING');
+    const post = await api.createPost(alice, { content: 'publish now', mediaIds: [pending] });
+    // Hidden from everyone, including the author, while the video is still compressing.
+    await api.get(`/posts/${post.id}`, alice).expect(404);
+    await api.get(`/posts/${post.id}`).expect(404);
+    await db.query(`UPDATE media SET status = 'READY' WHERE id = $1`, [pending]);
+    await api.get(`/posts/${post.id}`).expect(200);
+
+    const failed = await media('failed-test.mp4', 'FAILED');
+    expect((await api.post('/posts', { content: 'broken', mediaIds: [failed] }, alice).expect(400)).body.code).toBe('INVALID_MEDIA');
+  });
+
+  it('removes a post published with a video that then fails to compress', async () => {
+    const db = app.get(DataSource);
+    const [{ id }] = await db.query(
+      `INSERT INTO media (owner_id, type, status, storage_key, mime_type, size_bytes) VALUES ($1, 'VIDEO', 'PROCESSING', 'doomed-test.mp4', 'video/mp4', 10) RETURNING id`,
       [alice.id],
     );
-    const res = await api.post('/posts', { content: 'too early', mediaIds: [row.id] }, alice).expect(400);
-    expect(res.body.code).toBe('INVALID_MEDIA');
+    const post = await api.createPost(alice, { content: 'will fail', mediaIds: [id] });
+    await writeFile(queue.sourcePath('doomed-test.mp4'), Buffer.from('not a video at all'));
+    queue.enqueue(id);
+    expect((await api.waitForMedia(alice, id)).status).toBe('FAILED');
+    expect(await db.query(`SELECT 1 FROM posts WHERE id = $1`, [post.id])).toEqual([]);
   });
 
   it('resumes interrupted compression after a restart and fails cleanly when the original is lost', async () => {

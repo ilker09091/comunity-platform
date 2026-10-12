@@ -229,7 +229,9 @@ export class MediaService implements OnModuleInit {
     }
     for (const row of rows) {
       if (row.in_use) throw AppException.conflict(ErrorCode.MEDIA_IN_USE, 'Media is already attached elsewhere');
-      if (row.status !== 'READY') throw AppException.badRequest(ErrorCode.INVALID_MEDIA, 'Media is not ready');
+      // A video may be published while it is still being compressed: the post stays hidden until it is ready.
+      const pendingVideo = row.status === 'PROCESSING' && row.type === 'VIDEO' && !options.imagesOnly;
+      if (row.status !== 'READY' && !pendingVideo) throw AppException.badRequest(ErrorCode.INVALID_MEDIA, 'Media is not ready');
       if (options.imagesOnly && row.type !== 'IMAGE') {
         throw AppException.badRequest(ErrorCode.INVALID_MEDIA, 'Only images are allowed here');
       }

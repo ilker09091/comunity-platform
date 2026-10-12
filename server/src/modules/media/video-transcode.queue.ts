@@ -8,6 +8,7 @@ import { DataSource } from 'typeorm';
 import { appConfig } from '../../config/app.config.js';
 import { sqlOne, sqlRows } from '../../common/utils/sql.js';
 import { JobRegistryService } from '../platform/job-registry.service.js';
+import { ContentDeletionService } from './content-deletion.service.js';
 import { STORAGE_DRIVER, type StorageDriver } from './storage/storage.driver.js';
 import { VIDEO_PROCESSOR, type VideoProbe, type VideoProcessor } from './video.processor.js';
 
@@ -32,6 +33,7 @@ export class VideoTranscodeQueue implements OnModuleInit, OnApplicationBootstrap
     @Inject(VIDEO_PROCESSOR) private readonly video: VideoProcessor,
     @Inject(appConfig.KEY) private readonly config: ConfigType<typeof appConfig>,
     private readonly jobs: JobRegistryService,
+    private readonly deletion: ContentDeletionService,
   ) {
     this.incomingDir = join(resolve(config.media.localDir), '.incoming');
   }
@@ -138,7 +140,13 @@ export class VideoTranscodeQueue implements OnModuleInit, OnApplicationBootstrap
   }
 
   private async fail(mediaId: string, reason: string) {
-    await sqlRows(this.db, `UPDATE media SET status = 'FAILED' WHERE id = $1 AND status = 'PROCESSING'`, [mediaId]);
+    const files = await this.db.transaction(async (m) => {
+      await sqlRows(m, `UPDATE media SET status = 'FAILED' WHERE id = $1 AND status = 'PROCESSING'`, [mediaId]);
+      // A post published while this video was compressing would stay invisible forever: remove it.
+      const posts = await sqlRows<{ post_id: string }>(m, `SELECT post_id FROM post_media WHERE media_id = $1`, [mediaId]);
+      return (await this.deletion.deletePosts(m, posts.map((p) => p.post_id))).pending;
+    });
+    await this.deletion.removeFiles(files);
     this.logger.warn({ message: 'Video marked FAILED', mediaId, reason: reason.slice(0, 200) });
   }
 

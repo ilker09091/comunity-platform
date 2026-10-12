@@ -48,6 +48,11 @@ export function postVisibleSql(p: string, a: string, v: string): string {
     ${p}.deleted_at IS NULL
     AND ${p}.moderation_status = 'ACTIVE'
     AND ${a}.status = 'ACTIVE'
+    -- Published while its video was still compressing: hidden (even from the author) until ready.
+    AND NOT EXISTS (
+      SELECT 1 FROM post_media pm_ready JOIN media m_ready ON m_ready.id = pm_ready.media_id
+       WHERE pm_ready.post_id = ${p}.id AND m_ready.status <> 'READY'
+    )
     AND (
       ${a}.id = ${v}::uuid
       OR (
