@@ -20,6 +20,7 @@ import { STORAGE_DRIVER } from './storage/storage.driver.js';
 import type { StorageDriver } from './storage/storage.driver.js';
 import { VIDEO_PROCESSOR } from './video.processor.js';
 import type { VideoProcessor } from './video.processor.js';
+import { VideoTranscodeQueue } from './video-transcode.queue.js';
 
 export interface MediaRow {
   id: string;
@@ -41,11 +42,6 @@ const IMAGE_TYPES: Record<string, { ext: string; format: 'jpeg' | 'png' | 'webp'
   'image/webp': { ext: 'webp', format: 'webp' },
   'image/gif': { ext: 'gif', format: 'gif' },
 };
-const VIDEO_TYPES: Record<string, string> = {
-  'video/mp4': 'mp4',
-  'video/webm': 'webm',
-  'video/quicktime': 'mov',
-};
 
 @Injectable()
 export class MediaService implements OnModuleInit {
@@ -60,6 +56,7 @@ export class MediaService implements OnModuleInit {
     private readonly settings: PlatformSettingsService,
     private readonly jobs: JobRegistryService,
     private readonly deletion: ContentDeletionService,
+    private readonly transcoder: VideoTranscodeQueue,
   ) {}
 
   toDto(row: MediaRow): MediaDto {
@@ -74,13 +71,15 @@ export class MediaService implements OnModuleInit {
       height: row.height,
       durationMs: row.duration_ms,
       createdAt: iso(row.created_at)!,
+      processingProgress: row.status === MediaStatusEnum.PROCESSING ? this.transcoder.progressOf(row.id) : null,
     };
   }
 
   /**
-   * Validates an uploaded temp file by its signature (never the client-declared MIME type),
-   * re-encodes images (strips EXIF/GPS metadata, applies orientation, bounds dimensions)
-   * and stores the result under an unpredictable key.
+   * Validates an uploaded temp file by its contents (never the client-declared MIME type).
+   * Images are re-encoded (EXIF/GPS stripped, orientation applied, dimensions bounded) and stored.
+   * Anything ffprobe recognises as a video — any container or codec — is accepted, stored as
+   * PROCESSING and compressed to MP4 in the background (see VideoTranscodeQueue).
    */
   async upload(ownerId: string, file: Express.Multer.File | undefined): Promise<MediaDto> {
     if (!file?.path) {
@@ -92,19 +91,20 @@ export class MediaService implements OnModuleInit {
       const detected = await fileTypeFromFile(file.path);
       const mime = detected?.mime ?? '';
       const image = IMAGE_TYPES[mime];
-      const videoExt = VIDEO_TYPES[mime];
-      if (!image && !videoExt) {
+      // Not one of our image formats: accept it if it contains a playable video, whatever the format.
+      const probe = image ? null : await this.video.probe(file.path);
+      if (!image && !probe) {
         throw new AppException(
           HttpStatus.UNSUPPORTED_MEDIA_TYPE,
           ErrorCode.UNSUPPORTED_MEDIA_TYPE,
-          'Only JPEG, PNG, WebP, GIF images and MP4, WebM, MOV videos are supported',
+          'This file is not a supported image (JPEG, PNG, WebP, GIF) or a playable video',
         );
       }
       // Administrator-controlled flags, formats and limits (never above the env hard limits).
       const platform = await this.settings.get();
       await this.settings.assertFeature(image ? 'imageUploads' : 'videoUploads');
-      const allowed = image ? platform.media.allowedImageTypes : platform.media.allowedVideoTypes;
-      if (!allowed.includes(mime)) {
+      if (image && !platform.media.allowedImageTypes.includes(mime)) {
+        const allowed = platform.media.allowedImageTypes;
         throw new AppException(
           HttpStatus.UNSUPPORTED_MEDIA_TYPE,
           ErrorCode.UNSUPPORTED_MEDIA_TYPE,
@@ -137,16 +137,23 @@ export class MediaService implements OnModuleInit {
         });
       }
 
-      const meta = await this.video.process(file.path, mime);
-      const key = `${id}.${videoExt}`;
-      await this.storage.put(key, { filePath: file.path }, mime);
-      return this.insert(ownerId, {
-        type: MediaTypeEnum.VIDEO,
-        key,
-        mime,
-        size: file.size,
-        ...meta,
-      });
+      const maxSeconds = this.config.media.video.maxDurationSeconds;
+      if (maxSeconds && probe!.durationMs && probe!.durationMs > maxSeconds * 1000) {
+        throw AppException.badRequest(
+          ErrorCode.INVALID_MEDIA,
+          `Videos can be at most ${maxSeconds >= 60 ? `${Math.floor(maxSeconds / 60)} minutes` : `${maxSeconds} seconds`} long`,
+        );
+      }
+      // Keep the original only until the compressed MP4 is ready; nothing is served before that.
+      const key = `${id}.mp4`;
+      await this.transcoder.stage(file.path, key);
+      const media = await this.insert(
+        ownerId,
+        { type: MediaTypeEnum.VIDEO, key, mime: 'video/mp4', size: file.size, width: probe!.width, height: probe!.height, durationMs: probe!.durationMs },
+        MediaStatusEnum.PROCESSING,
+      );
+      this.transcoder.enqueue(media.id);
+      return { ...media, processingProgress: 0 };
     } finally {
       await rm(file.path, { force: true }).catch(() => undefined);
     }
@@ -173,12 +180,13 @@ export class MediaService implements OnModuleInit {
   private async insert(
     ownerId: string,
     m: { type: MediaTypeEnum; key: string; mime: string; size: number; width: number | null; height: number | null; durationMs: number | null },
+    status: MediaStatusEnum = MediaStatusEnum.READY,
   ): Promise<MediaDto> {
     const row = await sqlOne<MediaRow>(
       this.db,
       `INSERT INTO media (owner_id, type, status, storage_key, mime_type, size_bytes, width, height, duration_ms)
-       VALUES ($1, $2, 'READY', $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [ownerId, m.type, m.key, m.mime, m.size, m.width, m.height, m.durationMs],
+       VALUES ($1, $2, $9, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [ownerId, m.type, m.key, m.mime, m.size, m.width, m.height, m.durationMs, status],
     );
     this.logger.log({ message: 'Media uploaded', mediaId: row!.id, ownerId, type: m.type, sizeBytes: m.size });
     return this.toDto(row!);
@@ -232,6 +240,19 @@ export class MediaService implements OnModuleInit {
 
   /** Deletes an unattached upload owned by the caller. */
   async deleteOwned(ownerId: string, id: string): Promise<void> {
+    // A video that is still being compressed (or failed to) can be discarded too, original included.
+    const pending = await sqlOne<MediaRow>(
+      this.db,
+      `SELECT * FROM media WHERE id = $1 AND owner_id = $2 AND status <> 'READY'
+          AND NOT EXISTS (SELECT 1 FROM post_media pm WHERE pm.media_id = media.id)`,
+      [id, ownerId],
+    );
+    if (pending) {
+      const files = await this.db.transaction((m) => this.deletion.deleteMedia(m, [pending.id]));
+      await this.deletion.removeFiles(files);
+      await rm(this.transcoder.sourcePath(pending.storage_key), { force: true }).catch(() => undefined);
+      return;
+    }
     const files = await this.db.transaction(async (m) => {
       const [row] = await this.lockAttachable(m, ownerId, [id]).catch((e) => {
         if (e instanceof AppException && e.code === ErrorCode.INVALID_MEDIA) return [] as MediaRow[];

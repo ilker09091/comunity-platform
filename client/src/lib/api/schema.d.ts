@@ -2176,7 +2176,7 @@ export interface components {
         UploadMediaDto: {
             /**
              * Format: binary
-             * @description Image (jpeg, png, webp, gif) or video (mp4, webm, mov). Type is verified from file contents.
+             * @description Image (jpeg, png, webp, gif) or a video in any common format (mp4, mov, webm, mkv, avi, 3gp, …). Type is verified from file contents. Videos are compressed to MP4 in the background.
              */
             file: string;
         };
@@ -2217,6 +2217,11 @@ export interface components {
              * @example 2026-10-11T12:00:00.000Z
              */
             createdAt: string;
+            /**
+             * @description Videos only: compression progress 0–100 while `status` is PROCESSING (null otherwise or when unknown)
+             * @example null
+             */
+            processingProgress: number | null;
         };
         /** @enum {string} */
         UserRole: "USER" | "SUPPORT" | "MODERATOR" | "ADMIN" | "SUPER_ADMIN";
@@ -3788,6 +3793,11 @@ export interface components {
              * @example 2026-10-11T12:00:00.000Z
              */
             createdAt: string;
+            /**
+             * @description Videos only: compression progress 0–100 while `status` is PROCESSING (null otherwise or when unknown)
+             * @example null
+             */
+            processingProgress: number | null;
             /** @description Object identifier in the storage driver (not a credential) */
             storageKey: string;
             owner: components["schemas"]["AdminUserRefDto"];

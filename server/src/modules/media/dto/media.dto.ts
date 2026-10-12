@@ -44,13 +44,23 @@ export class MediaDto {
 
   @ApiProperty({ format: 'date-time', example: '2026-10-11T12:00:00.000Z' })
   createdAt: string;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    example: null,
+    description: 'Videos only: compression progress 0–100 while `status` is PROCESSING (null otherwise or when unknown)',
+  })
+  processingProgress: number | null;
 }
 
 export class UploadMediaDto {
   @ApiProperty({
     type: 'string',
     format: 'binary',
-    description: 'Image (jpeg, png, webp, gif) or video (mp4, webm, mov). Type is verified from file contents.',
+    description:
+      'Image (jpeg, png, webp, gif) or a video in any common format (mp4, mov, webm, mkv, avi, 3gp, …). ' +
+      'Type is verified from file contents. Videos are compressed to MP4 in the background.',
   })
   file: unknown;
 }

@@ -10,5 +10,6 @@ const PATTERNS = {
 
 export function haptic(kind: keyof typeof PATTERNS = "tap") {
   if (typeof navigator === "undefined" || !navigator.vibrate) return;
-  try { navigator.vibrate(PATTERNS[kind]); } catch { /* iOS Safari rejects quietly */ }
+  const pattern = PATTERNS[kind];
+  try { navigator.vibrate(typeof pattern === "number" ? pattern : [...pattern]); } catch { /* iOS Safari rejects quietly */ }
 }

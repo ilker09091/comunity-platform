@@ -12071,7 +12071,7 @@
           "file": {
             "type": "string",
             "format": "binary",
-            "description": "Image (jpeg, png, webp, gif) or video (mp4, webm, mov). Type is verified from file contents."
+            "description": "Image (jpeg, png, webp, gif) or a video in any common format (mp4, mov, webm, mkv, avi, 3gp, …). Type is verified from file contents. Videos are compressed to MP4 in the background."
           }
         },
         "required": [
@@ -12150,6 +12150,12 @@
             "type": "string",
             "format": "date-time",
             "example": "2026-10-11T12:00:00.000Z"
+          },
+          "processingProgress": {
+            "type": "number",
+            "nullable": true,
+            "example": null,
+            "description": "Videos only: compression progress 0–100 while `status` is PROCESSING (null otherwise or when unknown)"
           }
         },
         "required": [
@@ -12162,7 +12168,8 @@
           "width",
           "height",
           "durationMs",
-          "createdAt"
+          "createdAt",
+          "processingProgress"
         ]
       },
       "UserRole": {
@@ -16294,6 +16301,12 @@
             "format": "date-time",
             "example": "2026-10-11T12:00:00.000Z"
           },
+          "processingProgress": {
+            "type": "number",
+            "nullable": true,
+            "example": null,
+            "description": "Videos only: compression progress 0–100 while `status` is PROCESSING (null otherwise or when unknown)"
+          },
           "storageKey": {
             "type": "string",
             "description": "Object identifier in the storage driver (not a credential)"
@@ -16316,6 +16329,7 @@
           "height",
           "durationMs",
           "createdAt",
+          "processingProgress",
           "storageKey",
           "owner",
           "usage"

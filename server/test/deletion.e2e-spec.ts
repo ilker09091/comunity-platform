@@ -11,12 +11,9 @@ describe('Permanent deletion (database and storage)', () => {
   let storage: StorageDriver;
   let alice: TestUser;
   let bob: TestUser;
-  // Minimal ISO BMFF signature: file-type recognizes this as MP4. No external video needed.
-  const video = Buffer.from('00000018667479706d703432000000006d70343269736f6d', 'hex');
   const path = (url: string) => new URL(url).pathname + new URL(url).search;
   const key = (url: string) => new URL(url).pathname.split('/').at(-1)!;
-  const upload = async () => (await api.http.post('/api/media').set(alice.auth)
-    .attach('file', video, { filename: 'video.mp4', contentType: 'video/mp4' }).expect(201)).body;
+  const upload = () => api.uploadVideo(alice);
 
   beforeAll(async () => {
     app = await createTestApp();

@@ -208,7 +208,8 @@ export default function VideoPlayerCore({ media, mode, active = true, preload = 
               type="range" min={0} max={1} step={0.01} value={muted ? 0 : prefs.volume}
               className="video-volume-slider"
               aria-label="Volume"
-              orient="vertical"
+              // Firefox-only attribute for vertical sliders (not in React's input typings).
+              {...{ orient: "vertical" }}
               onChange={(e) => { const v = Number(e.target.value); setVideoVolume(v); if (video.current) { video.current.volume = v; video.current.muted = v === 0; } }}
             />
           </span>

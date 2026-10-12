@@ -6,6 +6,7 @@ import { DataSource } from 'typeorm';
 import { AppModule } from '../../src/app.module.js';
 import { configureApp } from '../../src/setup-app.js';
 import { PlatformSettingsService } from '../../src/modules/platform/platform-settings.service.js';
+import { testVideo, type TestVideo } from './videos.js';
 
 export const API = '/api';
 
@@ -86,6 +87,26 @@ export class Api {
       refreshToken: body.refreshToken,
       auth: { Authorization: `Bearer ${body.accessToken}` },
     };
+  }
+
+  /** Uploads a real video and waits until background compression has finished. */
+  async uploadVideo(user: TestUser, video: TestVideo = testVideo()) {
+    const res = await this.http
+      .post(API + '/media')
+      .set(user.auth)
+      .attach('file', video.buffer, { filename: video.filename, contentType: video.contentType })
+      .expect(201);
+    return this.waitForMedia(user, res.body.id as string);
+  }
+
+  async waitForMedia(user: TestUser, id: string, timeoutMs = 60_000) {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const media = (await this.get(`/media/${id}`, user).expect(200)).body;
+      if (media.status !== 'PROCESSING') return media as { id: string; status: string; url: string; [k: string]: any };
+      if (Date.now() > deadline) throw new Error(`Media ${id} still PROCESSING after ${timeoutMs} ms`);
+      await new Promise((r) => setTimeout(r, 100));
+    }
   }
 
   async createPost(user: TestUser, body: Record<string, unknown> = { content: 'hello world' }) {

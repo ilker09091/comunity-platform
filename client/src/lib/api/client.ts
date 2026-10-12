@@ -135,7 +135,8 @@ export async function upload(
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", url);
-    xhr.timeout = 120000;
+    // Large videos can take a long time on slow connections (they are compressed after upload).
+    xhr.timeout = file.type.startsWith("image/") ? 120000 : 60 * 60 * 1000;
     xhr.setRequestHeader("X-Social-Client", "web");
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable)

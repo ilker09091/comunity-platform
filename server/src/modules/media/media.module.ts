@@ -7,7 +7,8 @@ import { MediaService } from './media.service.js';
 import { ContentDeletionService } from './content-deletion.service.js';
 import { UploadsMulterModule } from './multer.options.js';
 import { LocalStorageDriver, STORAGE_DRIVER } from './storage/storage.driver.js';
-import { PassthroughVideoProcessor, VIDEO_PROCESSOR } from './video.processor.js';
+import { FfmpegVideoProcessor, VIDEO_PROCESSOR } from './video.processor.js';
+import { VideoTranscodeQueue } from './video-transcode.queue.js';
 
 @Module({
   imports: [UploadsMulterModule],
@@ -31,7 +32,8 @@ import { PassthroughVideoProcessor, VIDEO_PROCESSOR } from './video.processor.js
         return new LocalStorageDriver(config.media.localDir);
       },
     },
-    { provide: VIDEO_PROCESSOR, useClass: PassthroughVideoProcessor },
+    { provide: VIDEO_PROCESSOR, useClass: FfmpegVideoProcessor },
+    VideoTranscodeQueue,
   ],
   exports: [MediaService, MediaUrlService, ContentDeletionService],
 })

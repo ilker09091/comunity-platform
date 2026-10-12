@@ -95,8 +95,28 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env) {
         createHash('sha256').update(`media-url:${jwtSecret}`).digest('hex'),
       urlTtlSeconds: parseDurationSeconds(env.MEDIA_URL_TTL, 24 * 3600),
       maxImageBytes: int(env.MEDIA_MAX_IMAGE_BYTES, 10 * 1024 * 1024),
-      maxVideoBytes: int(env.MEDIA_MAX_VIDEO_BYTES, 100 * 1024 * 1024),
+      // Raw video upload limit. Every video is compressed to MP4 afterwards, so the original's size
+      // and format no longer matter. (The old MEDIA_MAX_VIDEO_BYTES capped stored originals and is ignored.)
+      maxVideoBytes: int(env.MEDIA_MAX_VIDEO_UPLOAD_BYTES, 2 * 1024 * 1024 * 1024),
       maxImageDimension: int(env.MEDIA_MAX_IMAGE_DIMENSION, 2048),
+      video: {
+        // Binaries: env path → bundled dev binaries (ffmpeg-static/ffprobe-static) → `ffmpeg`/`ffprobe` on PATH.
+        ffmpegPath: env.FFMPEG_PATH || null,
+        ffprobePath: env.FFPROBE_PATH || null,
+        /** Output fits inside 1920×1080 (landscape) or 1080×1920 (portrait); never upscaled. */
+        maxShortSide: int(env.MEDIA_VIDEO_MAX_SHORT_SIDE, 1080),
+        maxLongSide: int(env.MEDIA_VIDEO_MAX_LONG_SIDE, 1920),
+        /** x264 quality (lower = better/larger). 26 is visually clean for phone screens. */
+        crf: int(env.MEDIA_VIDEO_CRF, 26),
+        preset: env.MEDIA_VIDEO_PRESET ?? 'veryfast',
+        maxBitrateKbps: int(env.MEDIA_VIDEO_MAX_BITRATE_KBPS, 4500),
+        audioBitrateKbps: int(env.MEDIA_VIDEO_AUDIO_BITRATE_KBPS, 128),
+        maxFps: int(env.MEDIA_VIDEO_MAX_FPS, 60),
+        /** 0 = unlimited. Long videos cost CPU time to compress. */
+        maxDurationSeconds: int(env.MEDIA_VIDEO_MAX_DURATION_SECONDS, 900),
+        /** Videos compressed at the same time (each uses several CPU cores). */
+        concurrency: Math.max(1, int(env.MEDIA_TRANSCODE_CONCURRENCY, 1)),
+      },
       orphanTtlHours: int(env.MEDIA_ORPHAN_TTL_HOURS, 24),
       cleanupEnabled: bool(env.MEDIA_CLEANUP_ENABLED, true),
     },

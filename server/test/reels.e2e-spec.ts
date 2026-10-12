@@ -1,17 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Api, createTestApp, resetDatabase, TestUser } from './setup/test-app.js';
 
-/** Minimal ISO-BMFF header: enough for signature detection as video/mp4. */
-const MP4 = Buffer.concat([
-  Buffer.from([0x00, 0x00, 0x00, 0x18]),
-  Buffer.from('ftypisom'),
-  Buffer.from([0x00, 0x00, 0x02, 0x00]),
-  Buffer.from('isomiso2'),
-  Buffer.from([0x00, 0x00, 0x00, 0x08]),
-  Buffer.from('free'),
-  Buffer.alloc(256),
-]);
-
 describe('Reels feed (e2e)', () => {
   let app: INestApplication;
   let api: Api;
@@ -32,9 +21,9 @@ describe('Reels feed (e2e)', () => {
   afterAll(() => app.close());
 
   const videoPost = async (user: TestUser, content: string, extra: Record<string, unknown> = {}) => {
-    const media = await api.http.post('/api/media').set(user.auth).attach('file', MP4, { filename: 'clip.mp4', contentType: 'video/mp4' }).expect(201);
-    expect(media.body).toMatchObject({ type: 'VIDEO', status: 'READY' });
-    return api.createPost(user, { content, mediaIds: [media.body.id], ...extra });
+    const media = await api.uploadVideo(user);
+    expect(media).toMatchObject({ type: 'VIDEO', status: 'READY', mimeType: 'video/mp4' });
+    return api.createPost(user, { content, mediaIds: [media.id], ...extra });
   };
   const reelIds = async (viewer?: TestUser, query = '') =>
     (await api.get(`/feed/reels${query}`, viewer).expect(200)).body.items.map((p: { id: string }) => p.id);

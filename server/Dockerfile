@@ -34,12 +34,15 @@ RUN npm run build \
 FROM node:24-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production \
-    PORT=3002
+    PORT=3002 \
+    FFMPEG_PATH=/usr/bin/ffmpeg \
+    FFPROBE_PATH=/usr/bin/ffprobe
 
-# Runtime libraries for sharp (libvips).
+# Runtime libraries for sharp (libvips) and ffmpeg (video compression: every upload becomes H.264/AAC MP4).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libvips \
+        ffmpeg \
         ca-certificates \
         tini \
     && rm -rf /var/lib/apt/lists/* \

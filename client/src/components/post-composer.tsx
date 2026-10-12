@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { ImageIcon, Video, Globe2, Users, X, Loader2, RotateCcw, BarChart3, Clock, HelpCircle, Sliders, MessageCircleQuestion, EyeOff } from "lucide-react";
+import { Film, ImageIcon, Video, Globe2, Users, X, Loader2, RotateCcw, BarChart3, Clock, HelpCircle, Sliders, MessageCircleQuestion, EyeOff } from "lucide-react";
 import { api, upload, type Models } from "@/lib/api/client";
 import { useSession, useToast } from "./providers";
 import { useFeatures } from "@/lib/platform-config";
@@ -12,7 +12,14 @@ import { Avatar, Modal } from "./ui";
 const DEFAULT_MAX_LENGTH = 5000;
 const DEFAULT_MAX_ATTACHMENTS = 4;
 const DEFAULT_IMAGE_TYPES = "image/jpeg,image/png,image/webp,image/gif";
-const DEFAULT_VIDEO_TYPES = "video/mp4,video/webm,video/quicktime";
+/**
+ * Any video is accepted and compressed to MP4 on the server. Extensions cover files whose type the
+ * browser can't name (MKV, AVI, WMV, camera MTS…).
+ */
+const VIDEO_ACCEPT = "video/*,.mp4,.mov,.m4v,.webm,.mkv,.avi,.wmv,.flv,.3gp,.3g2,.mts,.m2ts,.ts,.mpg,.mpeg,.ogv,.hevc";
+const VIDEO_EXTENSION = /\.(mp4|mov|m4v|webm|mkv|avi|wmv|flv|3gp|3g2|mts|m2ts|ts|mpe?g|ogv|hevc)$/i;
+const isVideoFile = (file: File) => file.type.startsWith("video/") || (!file.type.startsWith("image/") && VIDEO_EXTENSION.test(file.name));
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const TYPE_NAMES: Record<string, string> = {
   "image/jpeg": "JPEG",
   "image/png": "PNG",
@@ -31,6 +38,8 @@ type Attachment = {
   progress: number;
   media?: Models["MediaDto"];
   error?: string;
+  /** The browser can't play this format locally (e.g. AVI/MKV); preview the optimized MP4 once ready. */
+  previewFailed?: boolean;
 };
 
 function VisibilitySelect({
@@ -229,9 +238,9 @@ export default function PostComposer({
   const MAX_LENGTH = config?.postMaxLength ?? DEFAULT_MAX_LENGTH;
   const MAX_ATTACHMENTS = config?.postMaxMedia ?? DEFAULT_MAX_ATTACHMENTS;
   const IMAGE_TYPES = mode==='post' && on("imageUploads") ? (config?.allowedImageTypes.join(",") ?? DEFAULT_IMAGE_TYPES) : "";
-  const VIDEO_TYPES = mode==='reel' && on("videoUploads") ? (config?.allowedVideoTypes.join(",") ?? DEFAULT_VIDEO_TYPES) : "";
+  const VIDEO_TYPES = mode==='reel' && on("videoUploads") ? VIDEO_ACCEPT : "";
   const imageMb = Math.floor((config?.maxImageBytes ?? 10 * 1048576) / 1048576);
-  const videoMb = Math.floor((config?.maxVideoBytes ?? 100 * 1048576) / 1048576);
+  const videoMb = Math.floor((config?.maxVideoBytes ?? 2048 * 1048576) / 1048576);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [open, setOpen] = useState(false);
   // Separate inputs for the page and the modal: a modal <dialog> makes the page inert.
@@ -252,12 +261,22 @@ export default function PostComposer({
   const sendAttachment = async (item: Attachment) => {
     update(item.key, { error: undefined, progress: 0 });
     try {
-      const media = (await upload(item.file, (progress) => update(item.key, { progress }))) as Models["MediaDto"];
+      let media = (await upload(item.file, (progress) => update(item.key, { progress }))) as Models["MediaDto"];
       if (media.type !== (mode==='reel'?'VIDEO':'IMAGE')) {
         await api('mediaRemove',{params:{id:media.id}});
         throw new Error(mode==='reel'?'Choose a video for your Reel.':'Use Create Reel to publish a video.');
       }
       update(item.key, { media, progress: 100 });
+      // Videos are compressed on the server; wait until the optimized MP4 is ready to publish.
+      while (media.status === "PROCESSING") {
+        await sleep(1500);
+        media = await api("mediaGet", { params: { id: media.id } });
+        update(item.key, { media });
+      }
+      if (media.status === "FAILED") {
+        update(item.key, { media: undefined });
+        throw new Error("This video couldn’t be processed. Try another file.");
+      }
     } catch (error) {
       update(item.key, { error: error instanceof Error ? error.message : "Upload failed." });
     }
@@ -271,14 +290,18 @@ export default function PostComposer({
         toast(`You can attach up to ${MAX_ATTACHMENTS} images or videos.`, true);
         break;
       }
-      const video = !!VIDEO_TYPES && VIDEO_TYPES.split(",").includes(file.type);
+      const video = !!VIDEO_TYPES && isVideoFile(file);
       if (!video && !(IMAGE_TYPES && IMAGE_TYPES.split(",").includes(file.type))) {
-        const allowed = [IMAGE_TYPES, VIDEO_TYPES].join(",").split(",").filter(Boolean).map((t) => TYPE_NAMES[t] ?? t);
-        toast(allowed.length ? `Choose a ${allowed.join(", ")} file.` : "Uploads are currently turned off.", true);
+        if (VIDEO_TYPES) toast("Choose a video file.", true);
+        else {
+          const allowed = IMAGE_TYPES.split(",").filter(Boolean).map((t) => TYPE_NAMES[t] ?? t);
+          toast(allowed.length ? `Choose a ${allowed.join(", ")} file.` : "Uploads are currently turned off.", true);
+        }
         continue;
       }
       if (file.size > (video ? videoMb : imageMb) * 1024 * 1024) {
-        toast(`${file.name} exceeds the ${video ? videoMb : imageMb} MB limit.`, true);
+        const limit = video ? videoMb : imageMb;
+        toast(`${file.name} exceeds the ${limit >= 1024 ? `${Math.round(limit / 102.4) / 10} GB` : `${limit} MB`} limit.`, true);
         continue;
       }
       const preview = URL.createObjectURL(file);
@@ -329,7 +352,8 @@ export default function PostComposer({
     },
   });
 
-  const uploading = attachments.some((a) => !a.media && !a.error);
+  const uploading = attachments.some((a) => !a.error && a.media?.status !== "READY");
+  const optimizing = attachments.some((a) => a.media?.status === "PROCESSING");
   const failed = attachments.some((a) => a.error);
   const tooLong = content.length > MAX_LENGTH;
   const ready =
@@ -370,8 +394,22 @@ export default function PostComposer({
         <div className={`attachment-grid count-${attachments.length}`}>
           {attachments.map((item) => (
             <div className="attachment" key={item.key}>
-              {item.file.type.startsWith("video/") ? (
-                <video src={item.preview} muted playsInline preload="metadata" />
+              {isVideoFile(item.file) ? (
+                item.previewFailed && item.media?.status !== "READY" ? (
+                  <div className="attachment-placeholder">
+                    <Film size={26} aria-hidden="true" />
+                    <span>{item.file.name}</span>
+                    <small>Preview after optimizing</small>
+                  </div>
+                ) : (
+                  <video
+                    src={item.previewFailed && item.media?.status === "READY" ? item.media.url : item.preview}
+                    muted
+                    playsInline
+                    preload="metadata"
+                    onError={() => update(item.key, { previewFailed: true })}
+                  />
+                )
               ) : (
                 <img src={item.preview} alt={item.file.name} />
               )}
@@ -388,6 +426,17 @@ export default function PostComposer({
                 <div className="upload-progress" aria-live="polite">
                   <progress value={item.progress} max={100} aria-label={`Uploading ${item.file.name}`} />
                   <span>{item.progress}%</span>
+                </div>
+              )}
+              {item.media?.status === "PROCESSING" && !item.error && (
+                <div className="upload-progress optimizing" aria-live="polite">
+                  <Loader2 size={13} className="spin" aria-hidden="true" />
+                  <progress
+                    value={item.media.processingProgress ?? undefined}
+                    max={100}
+                    aria-label={`Optimizing ${item.file.name}`}
+                  />
+                  <span>{item.media.processingProgress !== null ? `Optimizing ${item.media.processingProgress}%` : "Optimizing…"}</span>
                 </div>
               )}
               {item.error && (
@@ -437,7 +486,7 @@ export default function PostComposer({
         </span>
         <button className="button" disabled={!ready}>
           {busy && <Loader2 size={15} className="spin" />}
-          {busy ? "Posting…" : uploading ? "Uploading…" : quoteId ? "Quote" : mode==='reel'?'Publish Reel':"Post"}
+          {busy ? "Posting…" : optimizing ? "Optimizing video…" : uploading ? "Uploading…" : quoteId ? "Quote" : mode==='reel'?'Publish Reel':"Post"}
         </button>
       </div>
       <input

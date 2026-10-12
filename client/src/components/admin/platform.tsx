@@ -513,7 +513,6 @@ const FEATURE_LABELS: Record<keyof Settings["features"], [string, string]> = {
   reporting: ["Reporting", "Members can report content and accounts."],
 };
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
-const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"] as const;
 
 export function SettingsPage() {
   const q = useQuery({ queryKey: ["admin", "settings"], queryFn: ({ signal }) => api("adminSettingsGet", { signal }) });
@@ -655,7 +654,7 @@ function SettingsForm({ data }: { data: Models["AdminSettingsResponseDto"] }) {
               <Field label="Maximum image size (MB)" hint={`Server limit: ${data.limits.maxImageMb} MB`}>
                 <input type="number" min={1} max={data.limits.maxImageMb} required value={s.media.maxImageMb} onChange={(e) => patch("media", { maxImageMb: Number(e.target.value) })} />
               </Field>
-              <Field label="Maximum video size (MB)" hint={`Server limit: ${data.limits.maxVideoMb} MB`}>
+              <Field label="Maximum video upload (MB)" hint={`Before compression. Server limit: ${data.limits.maxVideoMb} MB`}>
                 <input type="number" min={1} max={data.limits.maxVideoMb} required value={s.media.maxVideoMb} onChange={(e) => patch("media", { maxVideoMb: Number(e.target.value) })} />
               </Field>
               <fieldset className="check-group">
@@ -667,15 +666,10 @@ function SettingsForm({ data }: { data: Models["AdminSettingsResponseDto"] }) {
                   </label>
                 ))}
               </fieldset>
-              <fieldset className="check-group">
-                <legend>Allowed video types</legend>
-                {VIDEO_TYPES.map((t) => (
-                  <label key={t} className="check-row">
-                    <input type="checkbox" checked={s.media.allowedVideoTypes.includes(t)} onChange={(e) => patch("media", { allowedVideoTypes: toggleIn(s.media.allowedVideoTypes, t, e.target.checked) })} />
-                    {t === "video/quicktime" ? "MOV" : t.replace("video/", "").toUpperCase()}
-                  </label>
-                ))}
-              </fieldset>
+              <p className="admin-help">
+                <strong>Videos:</strong> any format (MP4, MOV, MKV, AVI, WebM, 3GP…) is accepted and automatically compressed to MP4,
+                up to 1080p. Only the compressed copy is stored.
+              </p>
             </Panel>
           </div>
           )}

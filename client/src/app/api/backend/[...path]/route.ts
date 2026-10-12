@@ -132,8 +132,17 @@ async function handler(
       rotated = await rotate(refresh);
       token = rotated.accessToken;
     }
+    // File uploads (up to several GB of video) are streamed straight through instead of being
+    // buffered in memory. A stream can't be replayed, so the client refreshes the session first.
+    const streaming =
+      request.method !== "GET" &&
+      (request.headers.get("content-type") ?? "").startsWith("multipart/form-data");
     const body =
-      request.method === "GET" ? undefined : await request.arrayBuffer();
+      request.method === "GET"
+        ? undefined
+        : streaming
+          ? request.body
+          : await request.arrayBuffer();
     const send = () =>
       fetch(origin + apiPath + request.nextUrl.search, {
         method: request.method,
@@ -150,10 +159,11 @@ async function handler(
             : {}),
         },
         body,
-        signal: AbortSignal.timeout(120000),
-      });
+        ...(streaming ? { duplex: "half" } : {}),
+        signal: AbortSignal.timeout(streaming ? 60 * 60_000 : 120000),
+      } as RequestInit);
     let upstream = await send();
-    if (upstream.status === 401 && refresh && !signingIn && !rotated) {
+    if (upstream.status === 401 && refresh && !signingIn && !rotated && !streaming) {
       const error = await upstream
         .clone()
         .json()
