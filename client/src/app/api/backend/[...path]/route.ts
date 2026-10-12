@@ -75,6 +75,51 @@ async function rotate(token: string) {
   }
   return entry.promise;
 }
+const MEDIA_FILE = /^\/api\/media\/files\/[a-f0-9]{32}\.[a-z0-9]{2,5}$/;
+const MEDIA_REQUEST_HEADERS = ["range", "if-range", "if-none-match", "if-modified-since"];
+const MEDIA_RESPONSE_HEADERS = [
+  "content-type",
+  "content-length",
+  "content-range",
+  "accept-ranges",
+  "cache-control",
+  "etag",
+  "last-modified",
+  "location",
+  "x-content-type-options",
+  "content-security-policy",
+];
+
+/**
+ * Photos and videos are served through the website (same origin) instead of a separate public API
+ * address. Signed URLs are the access check, so no cookies or tokens are forwarded. Bodies are
+ * streamed and Range requests pass through (206), which Safari/iOS needs for video playback.
+ */
+async function mediaFile(request: NextRequest, apiPath: string) {
+  const headers: Record<string, string> = {};
+  for (const name of MEDIA_REQUEST_HEADERS) {
+    const value = request.headers.get(name);
+    if (value) headers[name] = value;
+  }
+  try {
+    const upstream = await fetch(origin + apiPath + request.nextUrl.search, {
+      method: request.method,
+      headers,
+      cache: "no-store",
+      redirect: "manual",
+      signal: request.signal,
+    });
+    const out = new Headers();
+    for (const name of MEDIA_RESPONSE_HEADERS) {
+      const value = upstream.headers.get(name);
+      if (value) out.set(name, value);
+    }
+    return new NextResponse(request.method === "HEAD" ? null : upstream.body, { status: upstream.status, headers: out });
+  } catch {
+    return NextResponse.json({ code: "API_UNAVAILABLE", message: "Media is temporarily unavailable." }, { status: 502 });
+  }
+}
+
 async function handler(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> },
@@ -94,6 +139,8 @@ async function handler(
       { status: 400 },
     );
   const apiPath = "/" + path.map(encodeURIComponent).join("/");
+  if ((request.method === "GET" || request.method === "HEAD") && MEDIA_FILE.test(apiPath))
+    return mediaFile(request, apiPath);
   const operation = allowed.find(
     (e) => e.method === request.method && e.pattern.test(apiPath),
   );
@@ -222,4 +269,4 @@ async function handler(
     return response;
   }
 }
-export { handler as GET, handler as POST, handler as PUT, handler as PATCH, handler as DELETE };
+export { handler as GET, handler as HEAD, handler as POST, handler as PUT, handler as PATCH, handler as DELETE };

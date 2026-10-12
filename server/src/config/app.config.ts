@@ -94,6 +94,10 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env) {
         env.MEDIA_URL_SECRET ??
         createHash('sha256').update(`media-url:${jwtSecret}`).digest('hex'),
       urlTtlSeconds: parseDurationSeconds(env.MEDIA_URL_TTL, 24 * 3600),
+      // Base for media URLs handed to browsers. Unset → PUBLIC_BASE_URL (the API's own address).
+      // Docker sets "/api/backend" so files are served same-origin through the website's gateway
+      // and the API never needs its own public domain.
+      publicUrl: env.MEDIA_PUBLIC_URL ? env.MEDIA_PUBLIC_URL.replace(/\/+$/, '') : null,
       maxImageBytes: int(env.MEDIA_MAX_IMAGE_BYTES, 10 * 1024 * 1024),
       // Raw video upload limit. Every video is compressed to MP4 afterwards, so the original's size
       // and format no longer matter. (The old MEDIA_MAX_VIDEO_BYTES capped stored originals and is ignored.)

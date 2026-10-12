@@ -23,7 +23,8 @@ export class MediaUrlService {
     const exp = (Math.floor(now / ttl) + 2) * ttl;
     const sig = this.sign(storageKey, exp);
     const { publicBaseUrl, apiPrefix } = this.config;
-    return `${publicBaseUrl}/${apiPrefix}/media/files/${storageKey}?exp=${exp}&sig=${sig}`;
+    const base = this.config.media.publicUrl ?? publicBaseUrl;
+    return `${base}/${apiPrefix}/media/files/${storageKey}?exp=${exp}&sig=${sig}`;
   }
 
   verify(storageKey: string, exp: number, sig: string): boolean {
