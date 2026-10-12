@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { api, type Models, type Post } from "@/lib/api/client";
 import { sharePath, usePostEngagement } from "@/lib/use-post-engagement";
+import { useDoubleTap } from "@/lib/use-double-tap";
 import { useSession, useToast } from "./providers";
 import { Avatar, Dropdown, relativeTime } from "./ui";
 import FollowButton from "./follow-button";
@@ -46,7 +47,7 @@ const SWIPE_DISTANCE = 0.16; // fraction of viewport height
 const SWIPE_VELOCITY = 0.45; // px per ms
 const WHEEL_THRESHOLD = 55;
 const WHEEL_IDLE_MS = 200;
-const TRANSITION_MS = 220;
+const TRANSITION_MS = 320;
 
 export function toReel(post: Post, mediaId?: string | null): Reel | null {
   const source = post.kind === "REPOST" && post.referencedPost ? post.referencedPost : post;
@@ -80,6 +81,55 @@ function count(n: number) {
       : n >= 1000
         ? `${(n / 1000).toFixed(1).replace(/\.0$/, "")}K`
         : String(n);
+}
+
+function ReelMedia({ reel, index, selected, active, preload, sessionId, onAspectRatio, onRefreshSource }: {
+  reel: Reel;
+  index: number;
+  selected: boolean;
+  active: boolean;
+  preload: PreloadLevel;
+  sessionId?: string;
+  onAspectRatio: (ratio: number) => void;
+  onRefreshSource: () => Promise<void>;
+}) {
+  const { user } = useSession();
+  const { act } = usePostEngagement(reel.post);
+  const [burst, setBurst] = useState<{ id: number; rot: number; dx: number; dy: number } | null>(null);
+  const doubleTap = () => {
+    if (!user) return;
+    setBurst({ id: Date.now(), rot: (Math.random() - 0.5) * 40, dx: (Math.random() - 0.5) * 60, dy: (Math.random() - 0.5) * 60 });
+    if (navigator.vibrate) navigator.vibrate(15);
+    if (!reel.post.isLiked) act("like");
+  };
+  const clickHandler = useDoubleTap(doubleTap);
+  return (
+    <div className="reel-media-wrap" onClickCapture={clickHandler}>
+      <ReelPlayer
+        key={reel.video.id}
+        media={reel.video}
+        postId={reel.post.id}
+        sessionId={sessionId}
+        selected={selected}
+        active={active}
+        preload={preload}
+        onAspectRatio={onAspectRatio}
+        label={`Video by ${reel.post.author.displayName}`}
+        onRefreshSource={onRefreshSource}
+      />
+      {burst && (
+        <Heart
+          key={burst.id}
+          className="reel-double-tap-heart"
+          size={140}
+          fill="currentColor"
+          style={{ "--rot": `${burst.rot}deg`, "--dx": `${burst.dx}px`, "--dy": `${burst.dy}px` } as React.CSSProperties}
+          onAnimationEnd={() => setBurst(null)}
+          aria-hidden="true"
+        />
+      )}
+    </div>
+  );
 }
 
 function ReelActions({
@@ -699,16 +749,14 @@ export default function Reels() {
                       inert={i !== index}
                       aria-label={`Reel ${i + 1} by @${source.author.username}`}
                     >
-                      <ReelPlayer
-                        key={reel.video.id}
-                        media={reel.video}
-                        postId={reel.post.id}
-                        sessionId={feed.data?.pages[0]?.sessionId}
+                      <ReelMedia
+                        reel={reel}
+                        index={i}
                         selected={i === index}
                         active={i === index && !reporting && !creating}
                         preload={i === index ? "auto" : preload}
+                        sessionId={feed.data?.pages[0]?.sessionId}
                         onAspectRatio={ratio => setRatios(previous => previous[reel.video.id] === ratio ? previous : { ...previous, [reel.video.id]: ratio })}
-                        label={`Video by ${source.author.displayName}`}
                         onRefreshSource={async () => { await Promise.all([feed.refetch({ throwOnError: true }), ...(startId ? [start.refetch({ throwOnError: true })] : [])]); }}
                       />
                       <ReelInfo post={reel.post} active={i === index} />

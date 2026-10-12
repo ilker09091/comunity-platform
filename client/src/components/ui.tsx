@@ -33,15 +33,22 @@ export function EmptyState({
   title,
   description,
   action,
+  icon,
 }: {
   title: string;
   description: string;
   action?: ReactNode;
+  icon?: ReactNode;
 }) {
   return (
     <div className="empty-state">
-      <span className="empty-icon">
-        <Compass size={28} />
+      <span className="empty-illustration" aria-hidden="true">
+        <span className="empty-illustration-dot d1" />
+        <span className="empty-illustration-dot d2" />
+        <span className="empty-illustration-dot d3" />
+        <span className="empty-icon">
+          {icon ?? <Compass size={30} />}
+        </span>
       </span>
       <h3>{title}</h3>
       <p>{description}</p>

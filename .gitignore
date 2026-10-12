@@ -1,26 +1,26 @@
 node_modules/
-.next/
-dist/
-build/
-.env
-.env.*
-!.env.example
-*.log
-coverage/
-.DS_Store
-
-
-
-# Dependencies and builds
 **/node_modules/
+
+# Build output (produced by Dockerfile — don't commit)
+.next/
 **/.next/
-**/dist/
-**/build/
+dist/
+server/dist/
+.turbo/
 
-# Secrets
+# Local secrets (template .env.example IS committed)
 .env
-.env.*
-!.env.example
+server/.env
+client/.env
+client/.env.local
 
-# Runtime logs
-*.log
+# Runtime state (importer; recreated on start)
+.tools/
+
+# System
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

@@ -17,6 +17,7 @@ import { api, ApiError, type Models } from "@/lib/api/client";
 import VideoPlaybackBoundary from "./video-playback-boundary";
 import { X, CheckCircle2, AlertCircle } from "lucide-react";
 import { changeSession } from "@/lib/session-cache";
+import { haptic } from "@/lib/haptics";
 export { changeSession } from "@/lib/session-cache";
 
 const ToastContext = createContext<(message: string, error?: boolean) => void>(
@@ -123,7 +124,7 @@ export default function Providers({ children }: { children: ReactNode }) {
     null,
   );
   const showToast = useCallback(
-    (text: string, error = false) => setToast({ text, error }),
+    (text: string, error = false) => { haptic(error ? "error" : "success"); setToast({ text, error }); },
     [],
   );
   useEffect(() => {

@@ -70,8 +70,12 @@ export class VideoPlaybackCoordinator {
     if (entry) { entry.requested = requested; if (!requested && entry.mode === "reels") entry.manual = false; this.choose(); }
   }
   owns(video: HTMLVideoElement) { return this.owner?.video === video && !this.blocked(); }
-  applyAudioPreference(muted: boolean) {
-    for (const entry of this.entries.values()) { entry.video.muted = muted; entry.audioPreference?.(muted); }
+  applyAudioPreference(muted: boolean, volume = 1) {
+    for (const entry of this.entries.values()) {
+      entry.video.muted = muted;
+      entry.video.volume = volume;
+      entry.audioPreference?.(muted);
+    }
   }
   claim(video: HTMLVideoElement) {
     const entry = this.entries.get(video);

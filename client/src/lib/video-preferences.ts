@@ -1,33 +1,45 @@
 "use client";
 import { useSyncExternalStore } from "react";
 import { videoPlayback } from "./video-playback-coordinator";
-export type VideoPreferences = { startMuted: boolean };
+export type VideoPreferences = { startMuted: boolean; volume: number };
 export const VIDEO_PREFERENCES_KEY = "circle.video-preferences.v1";
-const defaults: VideoPreferences = { startMuted: true };
+const defaults: VideoPreferences = { startMuted: true, volume: 1 };
 let snapshot = defaults, initialized = false;
 const listeners = new Set<() => void>();
-function read() {
+function read(): VideoPreferences {
   try {
     const value = JSON.parse(window.localStorage.getItem(VIDEO_PREFERENCES_KEY) ?? "null");
-    return typeof value?.startMuted === "boolean" ? value.startMuted : true;
-  } catch { return true; }
+    const startMuted = typeof value?.startMuted === "boolean" ? value.startMuted : true;
+    const volume = typeof value?.volume === "number" && value.volume >= 0 && value.volume <= 1 ? value.volume : 1;
+    return { startMuted, volume };
+  } catch { return defaults; }
 }
 export function getVideoPreferences() {
-  if (typeof window !== "undefined" && !initialized) { initialized = true; snapshot = { startMuted: read() }; }
+  if (typeof window !== "undefined" && !initialized) { initialized = true; snapshot = read(); }
   return snapshot;
 }
-function publish(startMuted: boolean) {
-  if (snapshot.startMuted !== startMuted) snapshot = { startMuted };
-  videoPlayback.applyAudioPreference(startMuted);
+function persist(prefs: VideoPreferences) {
+  try { window.localStorage.setItem(VIDEO_PREFERENCES_KEY, JSON.stringify(prefs)); return true; }
+  catch { return false; }
+}
+function publish(prefs: VideoPreferences) {
+  snapshot = prefs;
+  videoPlayback.applyAudioPreference(prefs.startMuted, prefs.volume);
   for (const notify of listeners) notify();
 }
-/** Only explicit user choices are persisted; autoplay recovery must never call this. */
 export function setVideoStartMuted(startMuted: boolean) {
   initialized = true;
-  let persisted = true;
-  try { window.localStorage.setItem(VIDEO_PREFERENCES_KEY, JSON.stringify({ startMuted })); }
-  catch { persisted = false; }
-  publish(startMuted);
+  const next = { ...snapshot, startMuted };
+  const persisted = persist(next);
+  publish(next);
+  return persisted;
+}
+export function setVideoVolume(volume: number) {
+  initialized = true;
+  const clamped = Math.max(0, Math.min(1, volume));
+  const next = { ...snapshot, volume: clamped, startMuted: clamped === 0 };
+  const persisted = persist(next);
+  publish(next);
   return persisted;
 }
 function storageChanged(event: StorageEvent) {

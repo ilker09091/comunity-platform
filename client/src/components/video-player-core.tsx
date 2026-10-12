@@ -2,11 +2,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
-import { Clapperboard, Loader2, Maximize, Pause, Play, RotateCcw, VideoOff, Volume2, VolumeX } from "lucide-react";
+import { Clapperboard, Loader2, Maximize, Pause, Play, RotateCcw, VideoOff, Volume2, VolumeX, Volume1 } from "lucide-react";
 import type { Models } from "@/lib/api/client";
 import { prefersReducedData, videoPlayback, type PlaybackMode } from "@/lib/video-playback-coordinator";
 import { MediaVideo, videoDiagnostic } from "./media-video";
-import { getVideoPreferences, setVideoStartMuted, useVideoPreferences } from "@/lib/video-preferences";
+import { getVideoPreferences, setVideoStartMuted, setVideoVolume, useVideoPreferences } from "@/lib/video-preferences";
 
 const ERRORS: Record<number, string> = {
   1: "Playback was interrupted. Try again.", 2: "Check your connection and retry the download.",
@@ -25,11 +25,12 @@ export type VideoPlayerProps = {
 /** Shared ownership, autoplay recovery and controls; presentation stays context-specific. */
 export default function VideoPlayerCore({ media, mode, active = true, preload = "metadata", label, openInReelsHref, onRefreshSource, onAspectRatio, onPlayback }: VideoPlayerProps) {
   const route = usePathname();
-  useVideoPreferences();
+  const prefs = useVideoPreferences();
   const video = useRef<HTMLVideoElement>(null), container = useRef<HTMLDivElement>(null);
   const intentionalPause = useRef(false), finished = useRef(false), generation = useRef(0), position = useRef(0);
   const [sourceAllowed, setSourceAllowed] = useState(mode === "reels");
   const [selected, setSelected] = useState(false), [muted, setMuted] = useState(true);
+  const [volumeOpen, setVolumeOpen] = useState(false);
   const [soundBlocked, setSoundBlocked] = useState(false);
   const seekInput = useRef<HTMLInputElement>(null), timeLabel = useRef<HTMLSpanElement>(null);
   const [paused, setPaused] = useState(true), [blocked, setBlocked] = useState(false);
@@ -47,7 +48,9 @@ export default function VideoPlayerCore({ media, mode, active = true, preload = 
     const el = video.current;
     if (!el || !videoPlayback.owns(el) || intentionalPause.current || finished.current || (!manual && reducedData)) return;
     if (!manual && !el.paused) return;
-    el.muted = getVideoPreferences().startMuted;
+    const prefs = getVideoPreferences();
+    el.muted = prefs.startMuted;
+    el.volume = prefs.volume;
     setMuted(el.muted); setSoundBlocked(false);
     const run = ++generation.current;
     const failed = (reason: unknown) => {
@@ -192,7 +195,24 @@ export default function VideoPlayerCore({ media, mode, active = true, preload = 
         <button type="button" aria-label={ended ? "Replay" : paused ? "Play" : "Pause"} title={paused ? "Play" : "Pause"} onClick={toggle}>{ended ? <RotateCcw size={18} /> : paused ? <Play size={18} /> : <Pause size={18} />}</button>
         <span className="video-time" ref={timeLabel}>00:00 / --:--</span>
         {soundBlocked && <span className="video-audio-hint" role="status">Tap Unmute for sound</span>}
-        <button type="button" className="video-sound" aria-label={muted ? "Unmute" : "Mute"} title={soundBlocked ? "Browser muted autoplay; your sound preference is still saved" : muted ? "Unmute" : "Mute"} onClick={() => changeMuted(!muted)}>{muted ? <VolumeX size={20} /> : <Volume2 size={20} />}</button>
+        <span
+          className={`video-volume-wrap ${volumeOpen ? "open" : ""}`}
+          onMouseEnter={() => setVolumeOpen(true)}
+          onMouseLeave={() => setVolumeOpen(false)}
+        >
+          <button type="button" className="video-sound" aria-label={muted ? "Unmute" : "Mute"} title={soundBlocked ? "Browser muted autoplay; your sound preference is still saved" : muted ? "Unmute" : "Mute"} onClick={() => changeMuted(!muted)}>
+            {muted || prefs.volume === 0 ? <VolumeX size={20} /> : prefs.volume < 0.5 ? <Volume1 size={20} /> : <Volume2 size={20} />}
+          </button>
+          <span className="video-volume-popover" role="presentation">
+            <input
+              type="range" min={0} max={1} step={0.01} value={muted ? 0 : prefs.volume}
+              className="video-volume-slider"
+              aria-label="Volume"
+              orient="vertical"
+              onChange={(e) => { const v = Number(e.target.value); setVideoVolume(v); if (video.current) { video.current.volume = v; video.current.muted = v === 0; } }}
+            />
+          </span>
+        </span>
         {mode === "feed" && openInReelsHref && <Link href={openInReelsHref} className="video-open-reels" aria-label="Open in Reels" title="Open in Reels"><Clapperboard size={19} /></Link>}
         {fullscreenSupported && <button type="button" aria-label="Fullscreen" title="Fullscreen" onClick={() => void fullscreen()}><Maximize size={19} /></button>}
       </div>

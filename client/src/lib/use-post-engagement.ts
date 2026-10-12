@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type Models, type Post } from "@/lib/api/client";
 import { patchPost } from "@/lib/post-cache";
 import { useSession, useToast } from "@/components/providers";
+import { haptic } from "@/lib/haptics";
 
 export type EngagementAction = "like" | "bookmark" | "repost";
 type Toggle = { action: EngagementAction; active: boolean };
@@ -72,6 +73,7 @@ export function usePostEngagement(post: Post | Models["ReferencedPostDto"]) {
       return;
     }
     if (mutation.isPending) return;
+    haptic("tap");
     mutation.mutate({
       action,
       active: action === "like" ? post.isLiked : action === "bookmark" ? post.isBookmarked : post.isReposted,

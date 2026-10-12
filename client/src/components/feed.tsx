@@ -8,6 +8,7 @@ import { useSession } from "./providers";
 import PostComposer from "./post-composer";
 import PostCard from "./post-card";
 import ProfileGrid from "./profile-grid";
+import PullToRefresh from "./pull-to-refresh";
 import { EmptyState, ErrorState, LoadingSkeleton, LoadMore, PageHeader, SignInPrompt } from "./ui";
 
 export type FeedMode = "global" | "following" | "explore" | "saved";
@@ -130,11 +131,13 @@ export default function Feed({
           <ErrorState error={query.error} retry={() => void query.refetch()} />
         </div>
       ) : items.length ? (
-        layout === 'grid' ? <ProfileGrid posts={items}/> : <div className="post-list">
-          {items.map((post) => (
-            <PostCard key={post.id} post={post} />
-          ))}
-        </div>
+        <PullToRefresh onRefresh={() => query.refetch()}>
+          {layout === 'grid' ? <ProfileGrid posts={items}/> : <div className="post-list">
+            {items.map((post) => (
+              <PostCard key={post.id} post={post} />
+            ))}
+          </div>}
+        </PullToRefresh>
       ) : (
         <section className="card">
           <EmptyState

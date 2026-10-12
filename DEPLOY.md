@@ -1,0 +1,106 @@
+# Deploy
+
+Production stack: PostgreSQL + NestJS API + Next.js web, all in Docker Compose.
+
+## 1. Prepare the server
+
+Needs Docker Engine + Docker Compose plugin.
+
+```bash
+# One-time setup (Ubuntu/Debian example)
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+```
+
+## 2. Clone and configure
+
+```bash
+git clone <your-repo-url> community-platform
+cd community-platform
+cp .env.example .env
+```
+
+Edit `.env`:
+
+```bash
+# Generate strong secrets (do this three times)
+openssl rand -hex 32
+```
+
+Set at minimum:
+- `DB_PASSWORD` — strong, unique
+- `JWT_SECRET` — 32+ random hex
+- `JWT_REFRESH_SECRET` — different 32+ random hex
+- `MEDIA_URL_SECRET` — 32+ random hex
+- `PUBLIC_BASE_URL` — your API's public URL, e.g. `https://api.yourdomain.com`
+- `CORS_ORIGINS` — comma-separated frontend origins, e.g. `https://yourdomain.com`
+- `SESSION_COOKIE_SECURE=true` (if serving over HTTPS)
+
+## 3. Build and launch
+
+```bash
+docker compose up -d --build
+```
+
+First boot runs database migrations automatically.
+
+Check status:
+```bash
+docker compose ps
+docker compose logs -f api
+docker compose logs -f web
+```
+
+Services:
+- Web (Next.js): `http://host:3000`
+- API (NestJS): `http://host:3002/api`
+- Swagger: `http://host:3002/api/docs`
+- DB: localhost:5432 (for maintenance only; app connects over internal network)
+
+## 4. Put a reverse proxy in front (HTTPS)
+
+Point Nginx or Caddy at the compose services. Minimal Caddy example:
+
+```caddyfile
+yourdomain.com {
+    reverse_proxy localhost:3000
+}
+api.yourdomain.com {
+    reverse_proxy localhost:3002
+}
+```
+
+Caddy handles TLS automatically. Nginx needs certbot. Either way, with HTTPS on, flip `SESSION_COOKIE_SECURE=true` in `.env` and redeploy (`docker compose up -d`).
+
+## 5. Update deployments
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+Migrations run on every API container start — safe (TypeORM skips already-applied ones).
+
+## 6. Backups
+
+The two volumes to back up:
+- `db_data` — PostgreSQL
+- `media_data` — uploaded photos/videos
+
+```bash
+# Database dump
+docker compose exec db pg_dump -U postgres communitiy_database > backup.sql
+
+# Volume snapshot
+docker run --rm -v comunity-platform_media_data:/data -v $(pwd):/backup alpine tar czf /backup/media.tgz /data
+```
+
+## 7. Troubleshooting
+
+| Issue | Fix |
+| --- | --- |
+| `JWT_SECRET must be set` | Fill `.env` from `.env.example` |
+| Web can't reach API | Check `INTERNAL_API_ORIGIN=http://api:3002` in `.env` |
+| CORS error in browser | Set `CORS_ORIGINS` to the exact frontend URL (no trailing slash) |
+| Login fails over HTTPS | `SESSION_COOKIE_SECURE=true` must match actual HTTPS |
+| Build runs out of memory | Give the host at least 2 GB RAM, or build the images on a workstation and push to a registry |

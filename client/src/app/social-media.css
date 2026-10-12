@@ -5,22 +5,61 @@
 .photo-preview img { width:100%; height:100%; object-fit:contain; display:block; }
 .photo-expand { position:absolute; bottom:10px; right:10px; display:grid; place-items:center; width:30px; height:30px; border-radius:9px; background:#17203399; color:#fff; }
 .gallery-controls { display:flex; gap:12px; align-items:center; justify-content:center; background:#fff; padding:3px 8px; font-size:11px; color:#697589; }
-.photo-viewer.modal { width:100vw; max-width:none; height:100dvh; max-height:none; margin:0; border:0; border-radius:0; background:#0a0c11; color:#fff; padding:0; overflow:hidden; }
-.photo-viewer::backdrop { background:#05070ae8; }
-.photo-viewer>header { border-color:#ffffff14; height:calc(60px + env(safe-area-inset-top)); padding:env(safe-area-inset-top) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left)); }
-.photo-viewer .icon-button { color:#fff; background:#ffffff0e; }
-.photo-stage { position:relative; display:flex; align-items:center; justify-content:center; height:calc(100% - 124px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overflow:hidden; touch-action:none; user-select:none; padding:12px; }
+.photo-viewer.modal {
+  width:100vw; max-width:none; height:100dvh; max-height:none;
+  margin:0; border:0; border-radius:0;
+  background: transparent;
+  color:#fff; padding:0; overflow:hidden;
+}
+.photo-viewer::backdrop {
+  background: rgba(5, 7, 10, 0.75);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+}
+.photo-viewer > header {
+  position: absolute;
+  top: env(safe-area-inset-top, 0);
+  left: 0; right: 0;
+  z-index: 10;
+  background: transparent;
+  border: 0;
+  height: 56px;
+  padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
+  display: flex; align-items: center; justify-content: flex-end;
+}
+.photo-viewer > header h2 { display: none; }
+.photo-viewer .icon-button {
+  color: #fff;
+  background: rgba(255,255,255,0.12);
+  backdrop-filter: blur(10px);
+  width: 42px; height: 42px;
+  border: 1px solid rgba(255,255,255,0.15);
+  transition: background 150ms ease, transform 120ms ease;
+}
+.photo-viewer .icon-button:hover:not(:disabled) { background: rgba(255,255,255,0.22); }
+.photo-viewer .icon-button:active:not(:disabled) { transform: scale(0.92); }
+.photo-stage {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  height: calc(100dvh - 64px - env(safe-area-inset-bottom));
+  overflow: hidden; touch-action: none; user-select: none; padding: 16px;
+}
 .photo-stage img { max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain; flex-shrink:0; will-change:transform; }
 .photo-loader { position:absolute; width:28px; height:28px; }
-.photo-controls { height:calc(64px + env(safe-area-inset-bottom)); padding-bottom:env(safe-area-inset-bottom); display:flex; gap:12px; align-items:center; justify-content:center; font-size:12px; }
+.photo-controls {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: calc(64px + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  display: flex; gap: 12px; align-items: center; justify-content: center;
+  font-size: 12px; color: #fff;
+  background: linear-gradient(0deg, rgba(0,0,0,0.4) 0%, transparent 100%);
+  z-index: 5;
+}
 .photo-control-divider { width:1px; height:22px; background:#ffffff26; }
 .profile-view-switch { display:flex; width:max-content; margin:0 0 12px auto; border:1px solid #e4e9f0; border-radius:12px; padding:4px; background:#fff; }
 .profile-view-switch button { display:flex; align-items:center; gap:7px; border-radius:8px; padding:9px 12px; font-size:12px; color:#65718a; }
 .profile-view-switch button[aria-pressed=true] { background:#edf4ff; color:#2460d5; }
-.profile-grid-header .profile-hero { display:none; }
-.profile-grid-header .profile-header-top { padding-top:16px; }
-.profile-grid-header .profile-avatar { margin-top:0; }
-.profile-grid-header .profile-header-body { padding-top:20px; }
 .profile-tab-indicator { width:calc(100% / 3); }
 .profile-social-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
 .profile-tile { position:relative; aspect-ratio:4/5; border-radius:9px; overflow:hidden; background:#edf1f7; color:#223148; display:block; }

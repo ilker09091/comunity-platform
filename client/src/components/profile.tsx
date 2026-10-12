@@ -17,7 +17,7 @@ import {
   Grid3X3,
   Repeat2,
   ShieldOff,
-  Clapperboard, List,
+  Clapperboard,
 } from "lucide-react";
 import { api, type Models } from "@/lib/api/client";
 import { useSession, useToast } from "./providers";
@@ -26,7 +26,6 @@ import FollowButton from "./follow-button";
 import Feed from "./feed";
 import ReportDialog from "./report-dialog";
 import { useFeatures } from "@/lib/platform-config";
-import { useProfileLayout } from '@/lib/profile-layout';
 
 type Profile = Models["UserProfileDto"];
 
@@ -229,7 +228,7 @@ export default function Profile({ username }: { username: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user: me } = useSession();
-  const [layout,setLayout]=useProfileLayout();
+  const layout = 'grid' as const;
   const [connections, setConnections] = useState<"followers" | "following" | null>(null);
   const tab = Math.max(0, TABS.findIndex((t) => t.id === params.get("tab")));
   const editing = params.get("edit") === "1";
@@ -271,11 +270,7 @@ export default function Profile({ username }: { username: string }) {
   const joined = new Date(user.createdAt).toLocaleDateString("en", { month: "long", year: "numeric", timeZone: "UTC" });
   return (
     <>
-      <div className="profile-view-switch" role="group" aria-label="Profile layout">
-        <button type="button" aria-pressed={layout==='classic'} onClick={()=>setLayout('classic')}><List size={16}/>Classic View</button>
-        <button type="button" aria-pressed={layout==='grid'} onClick={()=>setLayout('grid')}><Grid3X3 size={16}/>Grid View</button>
-      </div>
-      <section className={`card profile-header ${layout==='grid'?'profile-grid-header':''}`}>
+      <section className="card profile-header">
         <div className="profile-hero">
           {user.coverUrl ? <img src={user.coverUrl} alt="" /> : <div className="cover-art" aria-hidden="true" />}
         </div>

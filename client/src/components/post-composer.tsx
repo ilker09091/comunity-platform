@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { ImageIcon, Video, Globe2, Users, X, Loader2, RotateCcw } from "lucide-react";
+import { ImageIcon, Video, Globe2, Users, X, Loader2, RotateCcw, BarChart3, Clock, HelpCircle, Sliders, MessageCircleQuestion, EyeOff } from "lucide-react";
 import { api, upload, type Models } from "@/lib/api/client";
 import { useSession, useToast } from "./providers";
 import { useFeatures } from "@/lib/platform-config";
@@ -54,6 +55,154 @@ function VisibilitySelect({
         <option value="FOLLOWERS">Followers</option>
       </select>
     </label>
+  );
+}
+
+type InteractiveType = "poll" | "countdown" | "quiz" | "slider" | "ask";
+
+function InteractiveBuilder({ type, onInsert, onClose }: { type: InteractiveType; onInsert: (tag: string) => void; onClose: () => void }) {
+  const [question, setQuestion] = useState("");
+  const [options, setOptions] = useState<string[]>(["", ""]);
+  const [correct, setCorrect] = useState(0);
+  const [whenDate, setWhenDate] = useState("");
+  const [whenTime, setWhenTime] = useState("12:00");
+  const [label, setLabel] = useState("");
+  const [leftEmoji, setLeftEmoji] = useState("😐");
+  const [rightEmoji, setRightEmoji] = useState("🔥");
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dlg = dialogRef.current;
+    if (!dlg) return;
+    try { dlg.showModal(); } catch { /* already open */ }
+    return () => { try { dlg.close(); } catch { /* ignore */ } };
+  }, []);
+
+  const canSubmit = (() => {
+    if (type === "countdown") return whenDate.length > 0;
+    if (type === "ask") return question.trim().length > 0;
+    if (type === "slider") return question.trim().length > 0;
+    if (type === "poll") return question.trim().length > 0 && options.filter((o) => o.trim()).length >= 2;
+    if (type === "quiz") return question.trim().length > 0 && options.filter((o) => o.trim()).length >= 2;
+    return false;
+  })();
+
+  const titles: Record<InteractiveType, string> = {
+    poll: "Anket oluştur", countdown: "Geri sayım ekle", quiz: "Quiz oluştur", slider: "Değerlendirme kaydırıcısı", ask: "Soru sor",
+  };
+
+  const submit = () => {
+    if (!canSubmit) return;
+    let tag = "";
+    if (type === "poll") {
+      const opts = options.map((o) => o.trim()).filter(Boolean);
+      tag = `[poll:${question.trim()}|${opts.join("|")}]`;
+    } else if (type === "countdown") {
+      const iso = new Date(`${whenDate}T${whenTime}`).toISOString();
+      tag = label.trim() ? `[countdown:${iso}|${label.trim()}]` : `[countdown:${iso}]`;
+    } else if (type === "quiz") {
+      const opts = options.map((o) => o.trim()).filter(Boolean);
+      tag = `[quiz:${question.trim()}|${correct}|${opts.join("|")}]`;
+    } else if (type === "slider") {
+      tag = `[slider:${question.trim()}|${leftEmoji}|${rightEmoji}]`;
+    } else if (type === "ask") {
+      tag = `[ask:${question.trim()}]`;
+    }
+    onInsert(tag);
+    onClose();
+  };
+
+  const content = (
+    <dialog
+      ref={dialogRef}
+      className="ibuilder-dialog"
+      aria-label={titles[type]}
+      onCancel={(e) => { e.preventDefault(); onClose(); }}
+      onClick={(e) => { if (e.target === dialogRef.current) onClose(); }}
+    >
+      <div className="ibuilder-sheet">
+        <header className="ibuilder-header">
+          <h2>{titles[type]}</h2>
+          <button type="button" className="icon-button" aria-label="Kapat" onClick={onClose}><X size={20} /></button>
+        </header>
+        <div className="ibuilder">
+          {type !== "countdown" && (
+            <label className="ibuilder-field">
+              <span>{type === "ask" ? "Prompt" : "Soru"}</span>
+              <input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={type === "ask" ? "Bana sor…" : "Sorunu yaz…"} maxLength={200} autoFocus />
+            </label>
+          )}
+          {(type === "poll" || type === "quiz") && (
+            <div className="ibuilder-options">
+              {options.map((opt, i) => (
+                <div key={i} className="ibuilder-option">
+                  {type === "quiz" && (
+                    <label className="ibuilder-radio" title="Doğru cevap">
+                      <input type="radio" name="correct" checked={correct === i} onChange={() => setCorrect(i)} />
+                    </label>
+                  )}
+                  <input value={opt} onChange={(e) => setOptions(options.map((o, j) => (j === i ? e.target.value : o)))} placeholder={`Seçenek ${i + 1}`} maxLength={100} />
+                  {options.length > 2 && (
+                    <button type="button" className="icon-button" onClick={() => setOptions(options.filter((_, j) => j !== i))}><X size={16} /></button>
+                  )}
+                </div>
+              ))}
+              {options.length < 4 && (
+                <button type="button" className="text-button" onClick={() => setOptions([...options, ""])}>+ Seçenek ekle</button>
+              )}
+            </div>
+          )}
+          {type === "countdown" && (
+            <>
+              <label className="ibuilder-field"><span>Tarih</span>
+                <input type="date" value={whenDate} onChange={(e) => setWhenDate(e.target.value)} autoFocus />
+              </label>
+              <label className="ibuilder-field"><span>Saat</span>
+                <input type="time" value={whenTime} onChange={(e) => setWhenTime(e.target.value)} />
+              </label>
+              <label className="ibuilder-field"><span>Etiket (opsiyonel)</span>
+                <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Albüm çıkıyor" maxLength={60} />
+              </label>
+            </>
+          )}
+          {type === "slider" && (
+            <div className="ibuilder-emoji-row">
+              <label className="ibuilder-field"><span>Sol emoji</span>
+                <input value={leftEmoji} onChange={(e) => setLeftEmoji(e.target.value)} maxLength={4} />
+              </label>
+              <label className="ibuilder-field"><span>Sağ emoji</span>
+                <input value={rightEmoji} onChange={(e) => setRightEmoji(e.target.value)} maxLength={4} />
+              </label>
+            </div>
+          )}
+          <div className="ibuilder-actions">
+            <button type="button" className="button secondary" onClick={onClose}>İptal</button>
+            <button type="button" className="button" disabled={!canSubmit} onClick={submit}>Ekle</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+  );
+  return createPortal(content, document.body);
+}
+
+function InteractivePicker({ onInsert, disabled }: { onInsert: (tag: string) => void; disabled?: boolean }) {
+  const [active, setActive] = useState<InteractiveType | null>(null);
+  const types: { id: InteractiveType; icon: typeof BarChart3; label: string }[] = [
+    { id: "poll", icon: BarChart3, label: "Anket" },
+    { id: "countdown", icon: Clock, label: "Geri sayım" },
+    { id: "quiz", icon: HelpCircle, label: "Quiz" },
+    { id: "slider", icon: Sliders, label: "Değerlendir" },
+    { id: "ask", icon: MessageCircleQuestion, label: "Soru sor" },
+  ];
+  return (
+    <>
+      {types.map((t) => (
+        <button key={t.id} type="button" onClick={() => setActive(t.id)} disabled={disabled} title={t.label}>
+          <t.icon size={17} aria-hidden="true" /> {t.label}
+        </button>
+      ))}
+      {active && <InteractiveBuilder type={active} onInsert={onInsert} onClose={() => setActive(null)} />}
+    </>
   );
 }
 
@@ -278,6 +427,10 @@ export default function PostComposer({
               <Video size={17} className="tool-video" aria-hidden="true" /> Video
             </button>
           )}
+          <InteractivePicker disabled={busy} onInsert={(tag) => setContent((c) => (c ? `${c}\n${tag}` : tag))} />
+          <button type="button" onClick={() => setContent((c) => (c ? `${c} #spoiler` : "#spoiler "))} disabled={busy} title="Spoiler">
+            <EyeOff size={17} aria-hidden="true" /> Spoiler
+          </button>
         </div>
         <span id="composer-count" className={`character-count ${tooLong ? "over" : ""}`}>
           {content.length > 0 && `${content.length.toLocaleString("en")} / ${MAX_LENGTH.toLocaleString("en")}`}

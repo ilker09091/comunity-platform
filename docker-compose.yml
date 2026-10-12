@@ -1,0 +1,82 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: community-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-communitiy_database}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-communitiy_database}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: community-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3002
+      API_PREFIX: ${API_PREFIX:-api}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
+      SWAGGER_PATH: ${SWAGGER_PATH:-docs}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3002}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-communitiy_database}
+      DB_SSL: "false"
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET must be set}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+
+      MEDIA_URL_SECRET: ${MEDIA_URL_SECRET:-}
+      MEDIA_LOCAL_DIR: /app/storage/media
+    ports:
+      - "${API_PORT:-3002}:3002"
+    volumes:
+      - media_data:/app/storage/media
+    # Run pending migrations on startup, then boot the server.
+    command: sh -c "node dist/database/migrate.js run && node dist/main.js"
+
+  web:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: community-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      # Server-side fetch target. In the compose network the API is reachable at http://api:3002.
+      API_ORIGIN: ${INTERNAL_API_ORIGIN:-http://api:3002}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+
+volumes:
+  db_data:
+  media_data:

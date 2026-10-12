@@ -26,14 +26,21 @@ import ReportDialog from "./report-dialog";
 import { useFeatures } from "@/lib/platform-config";
 import { api, type Post, type Models } from "@/lib/api/client";
 import { sharePath, usePostEngagement } from "@/lib/use-post-engagement";
+import { useDoubleTap } from "@/lib/use-double-tap";
 import { useSession, useToast } from "./providers";
 import { Avatar, ConfirmDialog, Dropdown, Modal, relativeTime } from "./ui";
 import CommentList, { CommentInput } from "./comments";
 import PostComposer from "./post-composer";
 import VideoPlayerCore from "./video-player-core";
 import PhotoGallery from "./photo-gallery";
+import { parseInteractive, InteractiveWidget } from "./interactive-post";
 
 const HASHTAG = /(#[\p{L}\p{N}_]{1,60})/gu;
+const SPOILER_RE = /#spoiler\b/iu;
+
+export function hasSpoiler(text: string | null | undefined) {
+  return !!text && SPOILER_RE.test(text);
+}
 
 /** Plain-text post content with hashtags linked to search. Never renders HTML. */
 export function RichText({ text, className = "post-content" }: { text: string; className?: string }) {
@@ -59,39 +66,64 @@ function mediaAspect(item: Models["MediaDto"]): CSSProperties | undefined {
   return { aspectRatio: String(ratio) };
 }
 
-export function PostMedia({ media, postId }: { media: Models["MediaDto"][]; postId?: string }) {
+export function PostMedia({ media, postId, spoiler = false }: { media: Models["MediaDto"][]; postId?: string; spoiler?: boolean }) {
   const client = useQueryClient();
+  const [revealed, setRevealed] = useState(false);
   const refresh = postId ? async () => {
     const post = await api("postsGet", { params: { id: postId } });
     client.setQueryData(["post", postId], post);
     await client.invalidateQueries({ predicate: query => query.queryKey[0] === "posts" || query.queryKey[0] === "discovery" });
   } : undefined;
   const single = media.length === 1;
-  if (media.length && media.every(item => item.type==='IMAGE' && item.status==='READY')) return <PhotoGallery photos={media}/>;
+  const showSpoilerCover = spoiler && !revealed;
+  const inner = media.length && media.every(item => item.type==='IMAGE' && item.status==='READY')
+    ? <PhotoGallery photos={media}/>
+    : null;
+  if (inner) {
+    return (
+      <div className={`post-media-spoiler-wrap ${showSpoilerCover ? "spoilered" : ""}`}>
+        {inner}
+        {showSpoilerCover && (
+          <button type="button" className="media-spoiler-cover" onClick={() => setRevealed(true)}>
+            <span className="media-spoiler-label">👁 Spoiler</span>
+            <span className="media-spoiler-hint">Dokunarak göster</span>
+          </button>
+        )}
+      </div>
+    );
+  }
   return (
-    <div className={`post-media count-${Math.min(media.length, 4)}`}>
-      {media.slice(0, 4).map((item) => (
-        <div key={item.id} className={`post-media-item ${item.type === "VIDEO" ? "has-video" : ""}`} style={single && item.type !== "VIDEO" ? mediaAspect(item) : undefined}>
-          {item.status === "FAILED" ? (
-            <p className="media-status">This attachment couldn’t be processed.</p>
-          ) : item.status === "PROCESSING" ? (
-            <p className="media-status">
-              <Loader2 size={18} className="spin" /> Processing media…
-            </p>
-          ) : item.type === "VIDEO" ? (
-            <VideoPlayerCore media={item} mode="feed" label="Post video" openInReelsHref={postId ? `/reels?start=${encodeURIComponent(postId)}&media=${encodeURIComponent(item.id)}` : undefined} onRefreshSource={refresh} />
-          ) : (
-            <img
-              src={item.url}
-              alt="Image shared in this post"
-              loading="lazy"
-              decoding="async"
-              width={item.width ?? undefined}
-              height={item.height ?? undefined}
-            />
-          )}
-        </div>
-      ))}
+    <div className={`post-media-spoiler-wrap ${showSpoilerCover ? "spoilered" : ""}`}>
+      <div className={`post-media count-${Math.min(media.length, 4)}`}>
+        {media.slice(0, 4).map((item) => (
+          <div key={item.id} className={`post-media-item ${item.type === "VIDEO" ? "has-video" : ""}`} style={single && item.type !== "VIDEO" ? mediaAspect(item) : undefined}>
+            {item.status === "FAILED" ? (
+              <p className="media-status">This attachment couldn’t be processed.</p>
+            ) : item.status === "PROCESSING" ? (
+              <p className="media-status">
+                <Loader2 size={18} className="spin" /> Processing media…
+              </p>
+            ) : item.type === "VIDEO" ? (
+              <VideoPlayerCore media={item} mode="feed" label="Post video" openInReelsHref={postId ? `/reels?start=${encodeURIComponent(postId)}&media=${encodeURIComponent(item.id)}` : undefined} onRefreshSource={refresh} />
+            ) : (
+              <img
+                src={item.url}
+                alt="Image shared in this post"
+                loading="lazy"
+                decoding="async"
+                width={item.width ?? undefined}
+                height={item.height ?? undefined}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+      {showSpoilerCover && (
+        <button type="button" className="media-spoiler-cover" onClick={() => setRevealed(true)}>
+          <span className="media-spoiler-label">👁 Spoiler</span>
+          <span className="media-spoiler-hint">Dokunarak göster</span>
+        </button>
+      )}
     </div>
   );
 }
@@ -289,6 +321,7 @@ export default function PostCard({ post, detail = false }: { post: Post; detail?
   const [edit, setEdit] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [content, setContent] = useState(post.content ?? "");
+  const [heartBurst, setHeartBurst] = useState<{ id: number; rot: number; dx: number; dy: number } | null>(null);
   const mutation = useMutation({
     mutationFn: async (action: "edit" | "delete") =>
       action === "delete"
@@ -304,6 +337,14 @@ export default function PostCard({ post, detail = false }: { post: Post; detail?
   });
   const visible = post.kind === "REPOST" && post.referencedPost ? post.referencedPost : post;
   const quoted = post.kind === "QUOTE" ? post.referencedPost : null;
+  const engagement = usePostEngagement(visible);
+  const doubleTapLike = () => {
+    if (!user || !visible.media.length) return;
+    setHeartBurst({ id: Date.now(), rot: (Math.random() - 0.5) * 40, dx: (Math.random() - 0.5) * 40, dy: (Math.random() - 0.5) * 40 });
+    if (navigator.vibrate) navigator.vibrate(15);
+    if (!visible.isLiked) engagement.act("like");
+  };
+  const mediaClickHandler = useDoubleTap(doubleTapLike);
 
   return (
     <article className="card post-card" aria-labelledby={`post-${post.id}-author`}>
@@ -353,8 +394,30 @@ export default function PostCard({ post, detail = false }: { post: Post; detail?
         <div className="quoted-post unavailable">This post is unavailable.</div>
       ) : (
         <>
-          {visible.content && <RichText text={visible.content} />}
-          {visible.media.length > 0 && <PostMedia media={visible.media} postId={visible.id} />}
+          {visible.content && (() => {
+            const parsed = parseInteractive(visible.content);
+            return <>
+              {parsed.before && <RichText text={parsed.before} />}
+              {parsed.widget && <InteractiveWidget postId={visible.id} widget={parsed.widget} />}
+              {parsed.after && <RichText text={parsed.after} />}
+            </>;
+          })()}
+          {visible.media.length > 0 && (
+            <div className="post-media-wrap" onClickCapture={mediaClickHandler}>
+              <PostMedia media={visible.media} postId={visible.id} spoiler={hasSpoiler(visible.content)} />
+              {heartBurst && (
+                <Heart
+                  key={heartBurst.id}
+                  className="post-double-tap-heart"
+                  size={96}
+                  fill="currentColor"
+                  style={{ "--rot": `${heartBurst.rot}deg`, "--dx": `${heartBurst.dx}px`, "--dy": `${heartBurst.dy}px` } as React.CSSProperties}
+                  onAnimationEnd={() => setHeartBurst(null)}
+                  aria-hidden="true"
+                />
+              )}
+            </div>
+          )}
         </>
       )}
       {post.kind === "QUOTE" &&
