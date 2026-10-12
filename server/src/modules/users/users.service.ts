@@ -143,7 +143,7 @@ export class UsersService {
               av.storage_key AS avatar_key, cv.storage_key AS cover_key,
               (SELECT count(*)::int FROM follow_requests fr WHERE fr.target_id = u.id) AS pending_requests,
               (SELECT count(*)::int FROM posts p WHERE p.author_id = u.id
-                AND p.deleted_at IS NULL AND p.moderation_status = 'ACTIVE') AS actual_post_count
+                AND p.kind <> 'REPOST' AND p.deleted_at IS NULL AND p.moderation_status = 'ACTIVE') AS actual_post_count
          FROM users u
          LEFT JOIN media av ON av.id = u.avatar_media_id
          LEFT JOIN media cv ON cv.id = u.cover_media_id
@@ -178,7 +178,7 @@ export class UsersService {
       this.db,
       `SELECT u.*, u.username::text AS username, av.storage_key AS avatar_key, cv.storage_key AS cover_key,
               (SELECT count(*)::int FROM posts p WHERE p.author_id = u.id
-                AND p.deleted_at IS NULL AND p.moderation_status = 'ACTIVE') AS actual_post_count
+                AND p.kind <> 'REPOST' AND p.deleted_at IS NULL AND p.moderation_status = 'ACTIVE') AS actual_post_count
          FROM users u
          LEFT JOIN media av ON av.id = u.avatar_media_id
          LEFT JOIN media cv ON cv.id = u.cover_media_id
@@ -268,6 +268,12 @@ export class UsersService {
 
   async setProfileImage(userId: string, kind: 'avatar' | 'cover', file: Express.Multer.File): Promise<MeDto> {
     const uploaded = await this.media.upload(userId, file);
+    return this.setProfileImageFromMedia(userId, kind, uploaded.id);
+  }
+
+  /** Uses an image already uploaded (e.g. in pieces via /media/uploads) as the avatar or cover. */
+  async setProfileImageFromMedia(userId: string, kind: 'avatar' | 'cover', mediaId: string): Promise<MeDto> {
+    const uploaded = { id: mediaId };
     const files = await this.db.transaction(async (m) => {
       await this.media.lockAttachable(m, userId, [uploaded.id], { imagesOnly: true });
       const column = kind === 'avatar' ? 'avatar_media_id' : 'cover_media_id';

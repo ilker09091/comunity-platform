@@ -131,8 +131,24 @@ function nonJsonUploadError(status: number) {
   return new ApiError(status, "UPLOAD_FAILED", `Upload failed (server responded ${status}). Please try again.`);
 }
 
-const CHUNKED_THRESHOLD = 4 * 1024 * 1024;
 const MIN_CHUNK = 256 * 1024;
+const CHUNK_KEY = "upload-chunk-bytes";
+/** Largest piece the server path accepted after a 413, remembered so later uploads start there. */
+function rememberedChunk(): number | null {
+  try {
+    const value = Number(localStorage.getItem(CHUNK_KEY));
+    return value >= MIN_CHUNK ? value : null;
+  } catch {
+    return null;
+  }
+}
+function rememberChunk(bytes: number) {
+  try {
+    localStorage.setItem(CHUNK_KEY, String(bytes));
+  } catch {
+    /* private mode */
+  }
+}
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
@@ -143,7 +159,8 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 async function chunkedUpload(file: File, onProgress: (percent: number) => void): Promise<Models["MediaDto"]> {
   const session = await api("mediaUploadsStart", { body: { size: file.size, fileName: file.name || "upload" } });
   let offset = session.received;
-  let size = session.chunkSize;
+  let size = Math.min(session.chunkSize, rememberedChunk() ?? session.chunkSize);
+  let shrunk = false;
   let failures = 0;
   while (offset < file.size) {
     const url = operationUrl("mediaUploadsChunk", { params: { id: session.id }, query: { offset } });
@@ -155,6 +172,10 @@ async function chunkedUpload(file: File, onProgress: (percent: number) => void):
       body: file.slice(offset, offset + size),
     }).catch(() => null);
     if (response?.ok) {
+      if (shrunk) {
+        rememberChunk(size);
+        shrunk = false;
+      }
       offset = (await response.json()).received;
       failures = 0;
       onProgress(Math.min(99, Math.round((offset / file.size) * 100)));
@@ -162,8 +183,11 @@ async function chunkedUpload(file: File, onProgress: (percent: number) => void):
     }
     if (response?.status === 413 && size > MIN_CHUNK) {
       size = Math.max(MIN_CHUNK, Math.floor(size / 2));
+      shrunk = true;
       continue;
     }
+    if (response?.status === 413)
+      throw new ApiError(413, "FILE_TOO_LARGE", "The server rejects even very small upload pieces. Its upload limit (reverse proxy) needs to be raised.");
     if (response?.status === 401) window.dispatchEvent(new Event("session-expired"));
     const retryable = !response || response.status >= 500 || response.status === 408 || response.status === 409 || response.status === 429;
     if (!retryable || ++failures > 6) {
@@ -181,6 +205,11 @@ async function chunkedUpload(file: File, onProgress: (percent: number) => void):
   return api("mediaUploadsComplete", { params: { id: session.id } });
 }
 
+/**
+ * Uploads any file (post media, Reels, avatar, cover). Everything goes up in pieces through
+ * /media/uploads, whatever its size: a reverse proxy with a small body limit (nginx defaults to
+ * 1 MB) can never reject the upload, and a dropped connection only resends one piece.
+ */
 export async function upload(
   file: File,
   onProgress: (percent: number) => void,
@@ -188,61 +217,7 @@ export async function upload(
 ): Promise<Models["MediaDto"] | Models["MeDto"]> {
   // Prime/refresh the session before sending a potentially large, non-replayable upload.
   await api("usersGetMe");
-  if (kind === "mediaUpload" && file.size > CHUNKED_THRESHOLD) return chunkedUpload(file, onProgress);
-  const url = operationUrl(kind);
-  enforceRateLimit(url);
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", url);
-    // Large videos can take a long time on slow connections (they are compressed after upload).
-    xhr.timeout = file.type.startsWith("image/") ? 120000 : 60 * 60 * 1000;
-    xhr.setRequestHeader("X-Social-Client", "web");
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable)
-        onProgress(Math.round((e.loaded / e.total) * 100));
-    };
-    xhr.onerror = () =>
-      reject(
-        new ApiError(
-          0,
-          "NETWORK_ERROR",
-          "Upload failed. Check your connection and try again.",
-        ),
-      );
-    xhr.ontimeout = () =>
-      reject(
-        new ApiError(
-          0,
-          "NETWORK_ERROR",
-          "The upload timed out. Please try again.",
-        ),
-      );
-    xhr.onload = () => {
-      let data;
-      try {
-        data = JSON.parse(xhr.responseText);
-      } catch {
-        reject(nonJsonUploadError(xhr.status));
-        return;
-      }
-      if (xhr.status >= 200 && xhr.status < 300) resolve(data);
-      else {
-        if (xhr.status === 429)
-          recordRateLimit(url, xhr.getResponseHeader("Retry-After"));
-        if (xhr.status === 401)
-          window.dispatchEvent(new Event("session-expired"));
-        reject(
-          new ApiError(
-            xhr.status,
-            data.code,
-            data.message ?? "Upload failed.",
-            data.details,
-          ),
-        );
-      }
-    };
-    const body = new FormData();
-    body.set("file", file);
-    xhr.send(body);
-  });
+  const media = await chunkedUpload(file, onProgress);
+  if (kind === "mediaUpload") return media;
+  return api(kind === "usersSetAvatar" ? "usersSetAvatarMedia" : "usersSetCoverMedia", { body: { mediaId: media.id } });
 }

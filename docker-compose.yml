@@ -1,3 +1,4 @@
+
 services:
   db:
     image: postgres:16-alpine
@@ -5,14 +6,16 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USERNAME:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
       POSTGRES_DB: ${DB_NAME:-communitiy_database}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-communitiy_database}"]
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-communitiy_database}
       interval: 5s
       timeout: 5s
       retries: 10
@@ -27,20 +30,21 @@ services:
       db:
         condition: service_healthy
     environment:
-      NODE_ENV: ${NODE_ENV:-production}
+      NODE_ENV: production
       PORT: 3002
       API_PREFIX: ${API_PREFIX:-api}
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
       SWAGGER_PATH: ${SWAGGER_PATH:-docs}
-      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3002}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://api.rosefly.store}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://rosefly.store,https://www.rosefly.store}
       LOG_FORMAT: ${LOG_FORMAT:-json}
       TRUST_PROXY: ${TRUST_PROXY:-1}
 
       DB_HOST: db
       DB_PORT: 5432
       DB_USERNAME: ${DB_USERNAME:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
       DB_NAME: ${DB_NAME:-communitiy_database}
       DB_SSL: "false"
       DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
@@ -52,19 +56,21 @@ services:
 
       MEDIA_URL_SECRET: ${MEDIA_URL_SECRET:-}
       MEDIA_LOCAL_DIR: /app/storage/media
-      # Media (photos/videos) is served through the website (same origin), so it works without a public API domain.
       MEDIA_PUBLIC_URL: ${MEDIA_PUBLIC_URL:-/api/backend}
-      # Video uploads: any format is accepted and compressed to MP4 in the background.
       MEDIA_MAX_VIDEO_UPLOAD_BYTES: ${MEDIA_MAX_VIDEO_UPLOAD_BYTES:-4294967296}
       MEDIA_VIDEO_MAX_DURATION_SECONDS: ${MEDIA_VIDEO_MAX_DURATION_SECONDS:-0}
       MEDIA_VIDEO_CRF: ${MEDIA_VIDEO_CRF:-26}
       MEDIA_TRANSCODE_CONCURRENCY: ${MEDIA_TRANSCODE_CONCURRENCY:-1}
+
     ports:
-      - "${API_PORT:-3002}:3002"
+      - "127.0.0.1:3101:3002"
+
     volumes:
       - media_data:/app/storage/media
-    # Run pending migrations on startup, then boot the server.
-    command: sh -c "node dist/database/migrate.js run && node dist/main.js"
+
+    command: >
+      sh -c "node dist/database/migrate.js run &&
+             node dist/main.js"
 
   web:
     build:
@@ -78,11 +84,12 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0
-      # Server-side fetch target. In the compose network the API is reachable at http://api:3002.
+
       API_ORIGIN: ${INTERNAL_API_ORIGIN:-http://api:3002}
-      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
+
     ports:
-      - "${WEB_PORT:-3000}:3000"
+      - "127.0.0.1:3100:3000"
 
 volumes:
   db_data:

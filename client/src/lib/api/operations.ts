@@ -65,6 +65,11 @@ export const endpoints = {
     "method": "DELETE",
     "authenticated": true
   },
+  "usersSetAvatarMedia": {
+    "path": "/api/users/me/avatar/media",
+    "method": "POST",
+    "authenticated": true
+  },
   "usersSetCover": {
     "path": "/api/users/me/cover",
     "method": "POST",
@@ -73,6 +78,11 @@ export const endpoints = {
   "usersRemoveCover": {
     "path": "/api/users/me/cover",
     "method": "DELETE",
+    "authenticated": true
+  },
+  "usersSetCoverMedia": {
+    "path": "/api/users/me/cover/media",
+    "method": "POST",
     "authenticated": true
   },
   "usersGetProfile": {

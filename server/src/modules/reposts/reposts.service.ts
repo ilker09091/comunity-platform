@@ -71,7 +71,7 @@ export class RepostsService {
       );
       if (inserted.length) {
         await sqlRows(m, `UPDATE posts SET repost_count = repost_count + 1 WHERE id = $1`, [original.id]);
-        await sqlRows(m, `UPDATE users SET post_count = post_count + 1 WHERE id = $1`, [viewerId]);
+        // A plain repost is not one of the user's own posts (quotes are, and are counted on creation).
         await this.notifications.notify(m, {
           type: NotificationTypeEnum.REPOST,
           recipientId: original.author_id,

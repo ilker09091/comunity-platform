@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight, AlertCircle, Compass, X, Loader2 } from "lucide-react";
+import { ArrowRight, AlertCircle, Compass, X, Loader2, AlertTriangle } from "lucide-react";
 import type { Models } from "@/lib/api/client";
 
 export function Avatar({
@@ -194,7 +194,14 @@ export function ConfirmDialog({
 }) {
   return (
     <Modal title={title} onClose={onClose} className="confirm-dialog">
-      <div className="confirm-body">{description}</div>
+      <div className="confirm-body">
+        {tone === "danger" && (
+          <span className="confirm-icon" aria-hidden="true">
+            <AlertTriangle size={20} />
+          </span>
+        )}
+        <div>{description}</div>
+      </div>
       <div className="dialog-actions">
         <button className="button secondary" onClick={onClose} disabled={pending}>
           Cancel

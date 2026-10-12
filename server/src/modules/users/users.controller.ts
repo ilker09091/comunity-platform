@@ -17,7 +17,7 @@ import { CurrentUser, Public, Viewer } from '../../common/decorators/auth.decora
 import type { AuthUser } from '../../common/decorators/auth.decorators.js';
 import { ApiAuth, ApiErrors, ApiOptionalAuth } from '../../common/swagger/api-docs.decorators.js';
 import { UploadMediaDto } from '../media/dto/media.dto.js';
-import { MeDto, UpdateProfileDto, UserProfileDto } from './dto/user.dto.js';
+import { MeDto, ProfileImageMediaDto, UpdateProfileDto, UserProfileDto } from './dto/user.dto.js';
 import { UsersService } from './users.service.js';
 
 @ApiTags('Users')
@@ -57,6 +57,16 @@ export class UsersController {
     return this.users.setProfileImage(user.id, 'avatar', file);
   }
 
+  @Post('me/avatar/media')
+  @HttpCode(HttpStatus.OK)
+  @ApiAuth()
+  @ApiOperation({ summary: 'Set avatar from an uploaded image (`mediaId` from POST /media or /media/uploads)' })
+  @ApiOkResponse({ type: MeDto })
+  @ApiErrors(400, 404, 409)
+  setAvatarMedia(@CurrentUser() user: AuthUser, @Body() dto: ProfileImageMediaDto): Promise<MeDto> {
+    return this.users.setProfileImageFromMedia(user.id, 'avatar', dto.mediaId);
+  }
+
   @Delete('me/avatar')
   @ApiAuth()
   @ApiOperation({ summary: 'Remove avatar' })
@@ -76,6 +86,16 @@ export class UsersController {
   @ApiErrors(400, 413, 415)
   setCover(@CurrentUser() user: AuthUser, @UploadedFile() file: Express.Multer.File): Promise<MeDto> {
     return this.users.setProfileImage(user.id, 'cover', file);
+  }
+
+  @Post('me/cover/media')
+  @HttpCode(HttpStatus.OK)
+  @ApiAuth()
+  @ApiOperation({ summary: 'Set cover photo from an uploaded image (`mediaId` from POST /media or /media/uploads)' })
+  @ApiOkResponse({ type: MeDto })
+  @ApiErrors(400, 404, 409)
+  setCoverMedia(@CurrentUser() user: AuthUser, @Body() dto: ProfileImageMediaDto): Promise<MeDto> {
+    return this.users.setProfileImageFromMedia(user.id, 'cover', dto.mediaId);
   }
 
   @Delete('me/cover')

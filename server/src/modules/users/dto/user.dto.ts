@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  IsUUID,
   Matches,
   MaxLength,
   MinLength,
@@ -212,4 +213,10 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsBoolean()
   isPrivate?: boolean;
+}
+
+export class ProfileImageMediaDto {
+  @ApiProperty({ format: 'uuid', description: 'An unattached image you uploaded' })
+  @IsUUID('all')
+  mediaId: string;
 }

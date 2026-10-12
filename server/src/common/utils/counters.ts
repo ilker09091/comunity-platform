@@ -14,7 +14,7 @@ export async function recountUserPosts(m: EntityManager | DataSource, userIds: s
   await sqlRows(
     m,
     `UPDATE users u SET post_count = (
-        SELECT count(*)::int FROM posts p WHERE p.author_id = u.id AND p.deleted_at IS NULL AND p.moderation_status = 'ACTIVE')
+        SELECT count(*)::int FROM posts p WHERE p.author_id = u.id AND p.kind <> 'REPOST' AND p.deleted_at IS NULL AND p.moderation_status = 'ACTIVE')
       WHERE u.id = ANY($1::uuid[])`,
     [userIds],
   );

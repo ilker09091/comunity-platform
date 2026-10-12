@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Camera, Film, ImageIcon, Video, Globe2, Users, X, Loader2, RotateCcw, BarChart3, Clock, HelpCircle, Sliders, MessageCircleQuestion, EyeOff } from "lucide-react";
 import { api, upload, type Models } from "@/lib/api/client";
 import { useSession, useToast } from "./providers";
@@ -562,7 +563,7 @@ export default function PostComposer({
       </Modal>
     );
 
-  if (modalOpen !== undefined) return modalOpen ? <Modal title={mode==='reel'?'Create Reel':'Create post'} onClose={() => !busy && onModalClose?.()}><div className="composer-modal-body">{user ? editor : <Link href="/login" className="button">Sign in to publish</Link>}</div></Modal> : null;
+  if (modalOpen !== undefined) return modalOpen ? <Modal title={mode==='reel'?'Create Reel':'Create post'} className={user ? "" : "auth-prompt-dialog"} onClose={() => !busy && onModalClose?.()}><div className="composer-modal-body">{user ? editor : <GuestPrompt reel={mode === 'reel'} />}</div></Modal> : null;
 
   if (quoteId)
     return (
@@ -628,5 +629,29 @@ export default function PostComposer({
         </Modal>
       )}
     </>
+  );
+}
+
+/** Shown instead of the editor to visitors without an account. */
+function GuestPrompt({ reel }: { reel: boolean }) {
+  const pathname = usePathname();
+  const query = useSearchParams().toString();
+  const next = query ? `${pathname}?${query}` : pathname;
+  return (
+    <div className="auth-prompt">
+      <span className="auth-prompt-icon" aria-hidden="true">
+        {reel ? <Video size={26} /> : <ImageIcon size={26} />}
+      </span>
+      <h3>{reel ? "Share your Reels on Circle" : "Share your moments on Circle"}</h3>
+      <p>Sign in or create a free account to publish {reel ? "videos" : "posts"}, follow people and join the conversation.</p>
+      <div className="auth-prompt-actions">
+        <Link href={`/login?next=${encodeURIComponent(next)}`} className="button">
+          Sign in
+        </Link>
+        <Link href="/register" className="button secondary">
+          Create account
+        </Link>
+      </div>
+    </div>
   );
 }

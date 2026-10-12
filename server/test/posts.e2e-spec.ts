@@ -142,6 +142,16 @@ describe('Posts, likes, bookmarks and reposts (e2e)', () => {
       expect((await api.get(`/posts/${original.id}`, bob)).body.isReposted).toBe(false);
     });
 
+    it('counts quotes as posts but not plain reposts', async () => {
+      const original = await api.createPost(alice, { content: 'original' });
+      await api.post(`/posts/${original.id}/repost`, undefined, bob).expect(200);
+      expect((await api.get('/users/me', bob)).body.postCount).toBe(0);
+      expect((await api.get(`/users/${bob.username}`)).body.postCount).toBe(0);
+      await api.post(`/posts/${original.id}/quote`, { content: 'my take' }, bob).expect(201);
+      expect((await api.get('/users/me', bob)).body.postCount).toBe(1);
+      expect((await api.get('/users/me', alice)).body.postCount).toBe(1);
+    });
+
     it('quote reposts embed the original and handle deleted originals', async () => {
       const original = await api.createPost(alice, { content: 'original' });
       const quote = await api.post(`/posts/${original.id}/quote`, { content: 'my take' }, bob).expect(201);
