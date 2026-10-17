@@ -1,0 +1,211 @@
+"""Browser checks for messages and stories against isolated API fixtures."""
+import base64, json, os, subprocess, tempfile, time
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+from urllib.request import urlopen
+from playwright.sync_api import sync_playwright
+
+ROOT = Path(__file__).resolve().parents[1]
+BASE = 'http://127.0.0.1:3017'
+ME = dict(id='10000000-0000-4000-8000-000000000001', username='qa_me', displayName='QA Me', avatarUrl=None, role='USER', isPrivate=False, isVerified=False, postCount=1, followerCount=1, followingCount=1)
+PEER = {**ME, 'id': '10000000-0000-4000-8000-000000000002', 'username': 'qa_friend', 'displayName': 'QA Friend', 'isFollowing': True, 'isFollowRequested': False, 'isBlocking': False, 'isSelf': False, 'canViewContent': True}
+STRANGER = {**PEER, 'id': '10000000-0000-4000-8000-000000000003', 'username': 'qa_stranger', 'displayName': 'QA Stranger', 'isFollowing': False}
+def now(): return datetime.now(timezone.utc).isoformat()
+MEDIA = dict(id='20000000-0000-4000-8000-000000000001', type='VIDEO', status='READY', url=BASE+'/qa/video.mp4', mimeType='video/mp4', sizeBytes=1000, width=180, height=320, durationMs=1000, createdAt=now(), processingProgress=None)
+PHOTO = {**MEDIA, 'id': '20000000-0000-4000-8000-000000000002', 'type': 'IMAGE', 'url': BASE+'/qa/photo.png', 'mimeType': 'image/png'}
+POST = dict(id='30000000-0000-4000-8000-000000000001', kind='POST', author=PEER, content='A video from your circle', media=[MEDIA], visibility='PUBLIC', createdAt=now(), updatedAt=now(), editedAt=None, likeCount=0, commentCount=0, repostCount=0, quoteCount=0, bookmarkCount=0, isLiked=False, isBookmarked=False, isReposted=False, isFollowingAuthor=True, referencedPost=None, referencedPostUnavailable=False)
+messages = [dict(id='40000000-0000-4000-8000-000000000001', senderId=PEER['id'], recipientId=ME['id'], content='Hello from your friend', media=MEDIA, post=None, createdAt=now(), readAt=None)]
+stories = [dict(id='50000000-0000-4000-8000-000000000001', author=PEER, media=PHOTO, post=None, caption='A quiet moment', createdAt=now(), expiresAt=(datetime.now(timezone.utc)+timedelta(hours=24)).isoformat(), isViewed=False, viewCount=0)]
+calls=[]; errors=[]; upload_media=MEDIA
+def page(items): return dict(items=items, hasMore=False, nextCursor=None)
+def api(route):
+ global upload_media
+ request=route.request; path=urlparse(request.url).path.removeprefix('/api/backend/api/'); method=request.method
+ data=request.post_data_json if method=='POST' and request.headers.get('content-type','').startswith('application/json') else {}
+ calls.append((method,path,data))
+ status=200
+ if path=='users/me': body=ME
+ elif path=='platform/config': body=dict(features=dict(registration=True, postCreation=True, imageUploads=True, videoUploads=True, reels=True, comments=True, reposts=True, search=True, reporting=True), posts=dict(maxLength=5000,maxMedia=10,defaultVisibility='PUBLIC'),readOnlyMode=False,platformName='Circle',postMaxLength=5000,postMaxMedia=4,defaultVisibility='PUBLIC',allowedImageTypes=['image/jpeg','image/png','image/webp'],allowedVideoTypes=['video/mp4'],allowedReportReasons=['SPAM'])
+ elif path=='messages/unread-count': body={'count':sum(not m['readAt'] and m['recipientId']==ME['id'] for m in messages)}
+ elif path=='messages' and parse_qs(urlparse(request.url).query).get('folder')==['requests']: body=page([dict(user=STRANGER,lastMessage=dict(messages[0],id='40000000-0000-4000-8000-000000000099',senderId=STRANGER['id'],content='Hi, can we talk?',media=None,readAt=now()),unreadCount=0,isRequest=True)])
+ elif path=='messages': body=page([dict(user=PEER,lastMessage=messages[-1],unreadCount=sum(not m['readAt'] and m['recipientId']==ME['id'] for m in messages),isRequest=False)])
+ elif path.startswith('messages/') and path.endswith('/read'):
+  for m in messages: m['readAt']=now()
+  return route.fulfill(status=204)
+ elif path.startswith('messages/') and method=='POST':
+  body=dict(id='40000000-0000-4000-8000-'+str(len(messages)+1).zfill(12),senderId=ME['id'],recipientId=PEER['id'],content=data.get('content'),media=MEDIA if data.get('mediaId') else None,post=POST if data.get('postId') else None,createdAt=now(),readAt=None)
+  messages.append(body);status=201
+ elif path.startswith('messages/'): body=page(list(reversed(messages)))
+ elif path=='search/users': body=page([PEER])
+ elif path.startswith('users/') and path.endswith('/posts'): body=page([POST])
+ elif path=='users/'+PEER['username']: body=PEER
+ elif path=='stories' and method=='POST':
+  body=dict(id='50000000-0000-4000-8000-'+str(len(stories)+1).zfill(12),author=ME,media=MEDIA if data.get('postId') else upload_media,post=POST if data.get('postId') else None,caption=data.get('caption'),createdAt=now(),expiresAt=(datetime.now(timezone.utc)+timedelta(hours=24)).isoformat(),isViewed=False,viewCount=0)
+  stories.insert(0,body);status=201
+ elif path=='stories': body=page(stories)
+ elif path.startswith('stories/') and method=='DELETE':
+  stories[:]=[s for s in stories if s['id']!=path.split('/')[1]]
+  return route.fulfill(status=204)
+ elif path.startswith('stories/') and path.endswith('/view'):
+  for s in stories:
+   if s['id']==path.split('/')[1]:s['isViewed']=True
+  return route.fulfill(status=204)
+ elif path=='media/uploads' and method=='POST':
+  upload_media=PHOTO if data['fileName'].endswith('.png') else MEDIA
+  body=dict(id='60000000-0000-4000-8000-000000000001',received=0,chunkSize=1024*1024,size=data['size']);status=201
+ elif path.endswith('/chunks'):body=dict(received=len(request.post_data_buffer))
+ elif path.endswith('/complete'):body=upload_media;status=201
+ elif path.startswith('media/'):body=upload_media
+ elif path.startswith('feed/'):body=page([POST])
+ elif path.startswith('posts/'):body=POST
+ else:body={**page([]),'count':0,'unreadCount':0}
+ route.fulfill(status=status,content_type='application/json',body=json.dumps(body))
+
+out=ROOT/'.tools/messages-stories-qa';out.mkdir(parents=True,exist_ok=True)
+with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
+ temp=Path(temp);video=temp/'video.mp4';photo=temp/'photo.png'
+ photo.write_bytes(base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6r1cAAAAASUVORK5CYII='))
+ subprocess.run([str(ROOT/'server/node_modules/ffmpeg-static/ffmpeg.exe'),'-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=royalblue:s=180x320:r=10','-t','1','-c:v','libx264','-pix_fmt','yuv420p','-y',str(video)],check=True,capture_output=True,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+ log=(out/'server.log').open('wb')
+ server=subprocess.Popen(['node','node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port','3017'],cwd=ROOT/'client',stdout=log,stderr=log,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+ try:
+  for _ in range(120):
+   if server.poll() is not None:raise RuntimeError('Next server stopped; see '+str(out/'server.log'))
+   try:
+    if urlopen(BASE+'/messages',timeout=1).status==200:break
+   except Exception: time.sleep(.25)
+  with sync_playwright() as p:
+   browser=p.chromium.launch(channel='chrome',headless=True)
+   context=browser.new_context(viewport=dict(width=1440,height=1000))
+   context.route('https://566dev.com/**',lambda r:r.fulfill(status=200,content_type='image/svg+xml',body='<svg xmlns="http://www.w3.org/2000/svg"/>'))
+   context.route('**/api/backend/api/**',api)
+   context.route('**/qa/video.mp4',lambda r:r.fulfill(status=200,content_type='video/mp4',body=video.read_bytes()))
+   context.route('**/qa/photo.png',lambda r:r.fulfill(status=200,content_type='image/png',body=photo.read_bytes()))
+   tab=context.new_page();tab.on('pageerror',lambda e:errors.append(str(e)))
+   tab.on("console",lambda m: errors.append(m.text) if m.type=="error" else None)
+   tab.on("requestfailed",lambda r: errors.append(r.url+" "+str(r.failure)) if r.failure!="net::ERR_ABORTED" else None)
+   tab.goto(BASE+'/messages',wait_until='networkidle')
+   tab.locator('.dm-empty').get_by_text('Your messages',exact=True).wait_for()
+   side=tab.locator('.dm-sidebar').bounding_box();main=tab.locator('.dm-main').bounding_box()
+   assert side['width']>=230 and main['x']>=side['x']+side['width']-1 and abs(side['height']-main['height'])<2,(side,main)
+   assert not tab.locator('.left-sidebar').is_visible() and not tab.locator('.right-sidebar').is_visible()
+   shell=tab.locator('.dm-shell').bounding_box();header=tab.locator('.header-inner').bounding_box()
+   assert abs(shell['width']-header['width'])<2 and abs(shell['x']-header['x'])<2,(shell,header)
+   tab.screenshot(path=str(out/'initial.png'),full_page=True)
+   tab.get_by_role('tab',name='Requests').click()
+   tab.get_by_text('Hi, can we talk?').wait_for()
+   tab.get_by_role('tab',name='Primary').click()
+   tab.get_by_label('Search conversations').fill('nobody')
+   tab.get_by_text('No conversations match your search.').wait_for()
+   tab.get_by_label('Search conversations').fill('friend')
+   print('PASS two-pane inbox, empty state, Primary/Requests folders and conversation search')
+   tab.locator('.dm-row').first.click()
+   tab.locator('.dm-row.active').wait_for()
+   tab.get_by_role('button',name='Choose an emoji').click()
+   tab.locator('.dm-emoji-panel button').nth(17).click()
+   assert tab.get_by_label('Message',exact=True).input_value()=='\U0001F525'
+   tab.get_by_label('Message',exact=True).fill('A new message from the browser')
+   tab.get_by_label('Message',exact=True).press('Enter')
+   tab.get_by_text('A new message from the browser',exact=True).wait_for()
+   tab.locator('.dm-message.own .dm-meta').get_by_text('Sent').wait_for()
+   assert tab.locator('.dm-message.own .dm-bubble').last.evaluate('e=>getComputedStyle(e).backgroundColor')=='rgb(37, 140, 244)'
+   assert any(path.endswith('/read') for method,path,data in calls)
+   print('PASS conversation selection, emoji, Enter-to-send, blue own bubbles, Sent status and read acknowledgement')
+   tab.locator('.dm-composer input[type=file]').set_input_files(str(video))
+   tab.get_by_text('Video ready to send',exact=True).wait_for()
+   tab.get_by_role('button',name='Send message',exact=True).click()
+   tab.wait_for_function('document.querySelectorAll(".dm-media").length===2')
+   tab.locator('.dm-media').last.evaluate('(v)=>v.play()')
+   tab.wait_for_function('Array.from(document.querySelectorAll(".dm-media")).at(-1).currentTime>0')
+   assert any(data.get('mediaId')==MEDIA['id'] for method,path,data in calls if isinstance(data,dict))
+   tab.wait_for_function('document.querySelector(".dm-messages li:last-child").getBoundingClientRect().bottom <= document.querySelector(".dm-scroll").getBoundingClientRect().bottom+1')
+   assert tab.evaluate('document.documentElement.scrollHeight<=innerHeight+1'),'inbox should fit the viewport'
+   tab.screenshot(path=str(out/'messages-desktop.png'),full_page=True)
+   print('PASS video upload through chunks, attachment send, real H264 playback and independent message scrolling')
+   tab.set_viewport_size(dict(width=390,height=844));tab.wait_for_timeout(300)
+   shell=tab.locator('.dm-shell').bounding_box()
+   assert shell['x']==0 and shell['y']==0 and shell['width']==390 and abs(shell['height']-844)<2,shell
+   assert tab.evaluate('document.elementFromPoint(195,830).closest(".dm-shell")!==null'),'chat must cover the bottom navigation'
+   assert tab.evaluate('document.documentElement.scrollWidth<=innerWidth')
+   tab.screenshot(path=str(out/'messages-mobile-chat.png'))
+   tab.get_by_role('link',name='Back to conversations').click()
+   tab.locator('.dm-row').first.wait_for()
+   assert not tab.locator('.dm-main').is_visible()
+   nav=tab.locator('.mobile-nav > a')
+   boxes=[a.bounding_box() for a in nav.all()]
+   assert len(boxes)==6 and max(b['y'] for b in boxes)-min(b['y'] for b in boxes)<2,boxes
+   assert tab.evaluate('document.documentElement.scrollWidth<=innerWidth')
+   shell=tab.locator('.dm-shell').bounding_box();navbox=tab.locator('.mobile-nav').bounding_box()
+   assert abs(shell['y']+shell['height']-navbox['y'])<2 and tab.evaluate('document.documentElement.scrollHeight<=innerHeight+1'),(shell,navbox)
+   tab.screenshot(path=str(out/'messages-mobile.png'),full_page=True)
+   print('PASS mobile: full-screen chat over header/navigation, back to list, nav without wrapping or overflow')
+   tab.goto(BASE+'/',wait_until='networkidle')
+   tab.locator('.story-tile').filter(has_text='QA Friend').click()
+   tab.locator('.story-overlay[open]').wait_for()
+   tab.get_by_role('button',name='Pause story',exact=True).click()
+   tab.wait_for_function('document.querySelector(".story-stage img")?.complete')
+   frame=tab.locator('.story-frame').bounding_box()
+   assert frame['x']==0 and frame['y']==0 and frame['width']==390 and abs(frame['height']-844)<2,frame
+   assert any(path.endswith('/view') for method,path,data in calls)
+   tab.wait_for_timeout(5600)
+   assert tab.locator('.story-overlay[open]').count()==1,'paused story must not advance'
+   tab.screenshot(path=str(out/'story-mobile.png'))
+   tab.get_by_role('button',name='Close story',exact=True).click();tab.wait_for_function('!document.querySelector("dialog[open]")')
+   tab.set_viewport_size(dict(width=1440,height=1000));tab.wait_for_timeout(200)
+   tab.locator('.story-tile').filter(has_text='QA Friend').click()
+   tab.locator('.story-overlay[open]').wait_for()
+   assert 'blur' in tab.evaluate('getComputedStyle(document.querySelector(".story-overlay"),"::backdrop").backdropFilter')
+   frame=tab.locator('.story-frame').bounding_box()
+   assert frame['width']<frame['height'] and abs(frame['x']+frame['width']/2-720)<2,frame
+   tab.wait_for_timeout(400);tab.screenshot(path=str(out/'story-desktop.png'))
+   tab.wait_for_function('!document.querySelector("dialog[open]")',timeout=8000)
+   print('PASS story viewing: full screen on mobile, blurred page on desktop, pause holds, auto-advance closes after the last story')
+   tab.get_by_role('button',name='Add story',exact=True).click()
+   tab.locator('.story-create-form input[type=file]').set_input_files(str(photo))
+   tab.locator('.story-preview img').wait_for()
+   tab.get_by_label('Story caption').fill('My browser story')
+   tab.get_by_role('button',name='Share story',exact=True).click()
+   tab.locator('.story-tile').filter(has_text='Your story').wait_for()
+   tab.locator('.story-tile').filter(has_text='Your story').click()
+   tab.get_by_role('button',name='Delete story',exact=True).click()
+   tab.get_by_role('dialog',name='Delete this story?',exact=True).get_by_role('button',name='Delete story',exact=True).click()
+   tab.wait_for_function('!document.querySelector("dialog[open]")')
+   print('PASS photo upload, caption publishing and own-story deletion')
+   tab.get_by_role('button',name='Add story',exact=True).click()
+   tab.locator('.story-create-form input[type=file]').set_input_files(str(video))
+   tab.locator('.story-preview video').wait_for()
+   tab.get_by_role('button',name='Share story',exact=True).click()
+   tab.locator('.story-tile').filter(has_text='Your story').click()
+   tab.wait_for_function('document.querySelector(".story-stage video")?.currentTime>0')
+   tab.get_by_role('button',name='Delete story',exact=True).click()
+   tab.get_by_role('dialog',name='Delete this story?',exact=True).get_by_role('button',name='Delete story',exact=True).click()
+   tab.wait_for_function('!document.querySelector("dialog[open]")')
+   print('PASS video-story upload, real playback and deletion')
+   tab.get_by_role('button',name='Send to a user',exact=True).first.click()
+   tab.get_by_role('button',name='Add to your story').click()
+   tab.wait_for_function('!document.querySelector("dialog[open]")')
+   assert any(method=='POST' and path=='stories' and data.get('postId')==POST['id'] for method,path,data in calls if isinstance(data,dict))
+   tab.locator('.story-tile').filter(has_text='Your story').click()
+   tab.locator('.story-reel-chip').get_by_text('@qa_friend').wait_for()
+   tab.wait_for_function('document.querySelector(".story-stage video")?.currentTime>0')
+   tab.wait_for_timeout(400);tab.screenshot(path=str(out/'story-reel.png'))
+   tab.get_by_role('button',name='Close story',exact=True).first.click();tab.wait_for_function('!document.querySelector("dialog[open]")')
+   print('PASS sharing a video post/Reel to the story and playing it with its Reel link')
+   tab.get_by_role('button',name='Send to a user',exact=True).first.click()
+   with tab.expect_response(lambda r:'/search/users' in r.url):
+    tab.get_by_label('Search recipients').fill('qa_friend')
+   tab.locator('.recipient-row').first.click()
+   tab.wait_for_function('!document.querySelector("dialog[open]")')
+   assert any(path.startswith('messages/') and data.get('postId')==POST['id'] for method,path,data in calls if isinstance(data,dict))
+   assert not errors,errors
+   print('PASS recipient search and existing video-post sharing; no browser runtime errors')
+   browser.close()
+ except Exception:
+  print("DIAGNOSTICS",json.dumps(dict(calls=calls,errors=errors)))
+  raise
+ finally:
+  server.terminate()
+  try: server.wait(timeout=10)
+  except subprocess.TimeoutExpired:server.kill()
+  log.close()

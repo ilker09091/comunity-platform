@@ -455,6 +455,51 @@ export const endpoints = {
     "method": "POST",
     "authenticated": true
   },
+  "messagesConversations": {
+    "path": "/api/messages",
+    "method": "GET",
+    "authenticated": true
+  },
+  "messagesUnread": {
+    "path": "/api/messages/unread-count",
+    "method": "GET",
+    "authenticated": true
+  },
+  "messagesList": {
+    "path": "/api/messages/{id}",
+    "method": "GET",
+    "authenticated": true
+  },
+  "messagesSend": {
+    "path": "/api/messages/{id}",
+    "method": "POST",
+    "authenticated": true
+  },
+  "messagesRead": {
+    "path": "/api/messages/{id}/read",
+    "method": "POST",
+    "authenticated": true
+  },
+  "storiesList": {
+    "path": "/api/stories",
+    "method": "GET",
+    "authenticated": true
+  },
+  "storiesCreate": {
+    "path": "/api/stories",
+    "method": "POST",
+    "authenticated": true
+  },
+  "storiesView": {
+    "path": "/api/stories/{id}/view",
+    "method": "POST",
+    "authenticated": true
+  },
+  "storiesDelete": {
+    "path": "/api/stories/{id}",
+    "method": "DELETE",
+    "authenticated": true
+  },
   "adminImporterRequest": {
     "path": "/api/admin/importer/request",
     "method": "POST",

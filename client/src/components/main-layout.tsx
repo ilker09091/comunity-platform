@@ -6,6 +6,7 @@ import { Fragment, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Home,
+  MessageCircle,
   Compass,
   Bookmark,
   Users,
@@ -24,6 +25,7 @@ import { api } from "@/lib/api/client";
 import { useFeatures } from "@/lib/platform-config";
 import { useSession } from "./providers";
 import { Avatar, Dropdown, ErrorState, VerifiedBadge } from "./ui";
+import { useMessageUnread } from "./social-controls";
 import FollowButton from "./follow-button";
 import { ActivityWidget, useUnreadTotal, WidgetSkeleton } from "./notifications";
 
@@ -45,6 +47,7 @@ export function AppHeader() {
   const router = useRouter();
   const { user, logout } = useSession();
   const unreadTotal = useUnreadTotal();
+  const messageUnread = useMessageUnread().data?.count ?? 0;
   const { on } = useFeatures();
   const [search, setSearch] = useState("");
   const staff = !!user && user.role !== "USER";
@@ -52,6 +55,7 @@ export function AppHeader() {
     { href: "/", label: "Home", icon: Home },
     { href: "/explore", label: "Explore", icon: Compass },
     { href: "/reels", label: "Reels", icon: Clapperboard },
+    { href: "/messages", label: "Messages", icon: MessageCircle, badge: messageUnread },
     { href: "/notifications", label: "Notifications", icon: Bell, badge: unreadTotal },
     { href: "/following", label: "Following", icon: Users },
   ].filter((item) => item.href !== "/reels" || on("reels"));
@@ -248,6 +252,7 @@ export function Shortcuts() {
     { href: "/", label: "Home", icon: Home },
     { href: "/explore", label: "Explore", icon: Compass },
     { href: "/reels", label: "Reels", icon: Clapperboard },
+    { href: "/messages", label: "Messages", icon: MessageCircle },
     { href: "/saved", label: "Saved Posts", icon: Bookmark },
     { href: "/following", label: "Following", icon: Users },
     { href: user ? `/profile/${user.username}` : "/login", label: "My Profile", icon: UserRound },
@@ -354,11 +359,13 @@ export function MobileNav({ variant = "default", onCreate }: { variant?: "defaul
   const pathname = usePathname();
   const { user } = useSession();
   const unreadTotal = useUnreadTotal();
+  const messageUnread = useMessageUnread().data?.count ?? 0;
   const { on } = useFeatures();
   const items = [
     { href: "/", label: "Home", icon: Home },
     { href: "/explore", label: "Explore", icon: Compass },
     { href: "/reels", label: "Reels", icon: Clapperboard },
+    { href: "/messages", label: "Messages", icon: MessageCircle, badge: messageUnread },
     { href: "/notifications", label: "Activity", icon: Bell, badge: unreadTotal },
     { href: user ? `/profile/${user.username}` : "/login", label: "Profile", icon: UserRound },
   ].filter((item) => item.href !== "/reels" || on("reels"));

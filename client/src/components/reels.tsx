@@ -33,6 +33,7 @@ import { useDoubleTap } from "@/lib/use-double-tap";
 import { useSession, useToast } from "./providers";
 import { Avatar, ConfirmDialog, Dropdown, relativeTime, VerifiedBadge } from "./ui";
 import FollowButton from "./follow-button";
+import { SendPostButton } from "./social-controls";
 import CommentList, { CommentInput } from "./comments";
 import ReportDialog from "./report-dialog";
 import { useFeatures } from "@/lib/platform-config";
@@ -227,6 +228,7 @@ function ReelActions({
         </span>
         <span>Save</span>
       </button>
+      <SendPostButton postId={post.id} reel story />
       <button type="button" className="reel-action share" aria-label="Share" onClick={() => void sharePath(`/post/${post.id}`, toast)}>
         <span className="reel-action-icon">
           <Share2 size={22} />

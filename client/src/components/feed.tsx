@@ -6,6 +6,7 @@ import { ArrowUpRight, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { useSession } from "./providers";
 import PostComposer from "./post-composer";
+import Stories from "./stories";
 import PostCard from "./post-card";
 import ProfileGrid from "./profile-grid";
 import PullToRefresh from "./pull-to-refresh";
@@ -46,6 +47,7 @@ export function HomeFeed() {
   return (
     <>
       <h1 className="sr-only">Home</h1>
+      <Stories />
       <PostComposer />
       <FeedToolbar
         value={sort.value}

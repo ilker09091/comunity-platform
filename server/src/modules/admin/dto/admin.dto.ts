@@ -512,6 +512,8 @@ export class DeletionResultDto {
 
 // ---------------------------------------------------------------- media
 export enum MediaUsageEnum {
+  MESSAGE = 'MESSAGE',
+  STORY = 'STORY',
   POST = 'POST',
   AVATAR = 'AVATAR',
   COVER = 'COVER',

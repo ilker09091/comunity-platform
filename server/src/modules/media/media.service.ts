@@ -212,11 +212,15 @@ export class MediaService implements OnModuleInit {
     if (new Set(ids).size !== ids.length) {
       throw AppException.badRequest(ErrorCode.INVALID_MEDIA, 'The same media cannot be attached twice');
     }
+    // Acquire locks before evaluating references so competing attachments see the committed winner.
+    await sqlRows(manager, 'SELECT id FROM media WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [ids]);
     const rows = await sqlRows<MediaRow & { in_use: boolean }>(
       manager,
       `SELECT m.*,
               (EXISTS (SELECT 1 FROM post_media pm WHERE pm.media_id = m.id AND pm.post_id IS DISTINCT FROM $3::uuid)
-               OR EXISTS (SELECT 1 FROM users u WHERE u.avatar_media_id = m.id OR u.cover_media_id = m.id)) AS in_use
+               OR EXISTS (SELECT 1 FROM users u WHERE u.avatar_media_id = m.id OR u.cover_media_id = m.id)
+               OR EXISTS (SELECT 1 FROM direct_messages dm WHERE dm.media_id = m.id)
+               OR EXISTS (SELECT 1 FROM stories st WHERE st.media_id = m.id)) AS in_use
          FROM media m
         WHERE m.id = ANY($1::uuid[]) AND m.owner_id = $2
         ORDER BY m.id
@@ -245,7 +249,9 @@ export class MediaService implements OnModuleInit {
     const pending = await sqlOne<MediaRow>(
       this.db,
       `SELECT * FROM media WHERE id = $1 AND owner_id = $2 AND status <> 'READY'
-          AND NOT EXISTS (SELECT 1 FROM post_media pm WHERE pm.media_id = media.id)`,
+          AND NOT EXISTS (SELECT 1 FROM post_media pm WHERE pm.media_id = media.id)
+          AND NOT EXISTS (SELECT 1 FROM direct_messages dm WHERE dm.media_id = media.id)
+          AND NOT EXISTS (SELECT 1 FROM stories st WHERE st.media_id = media.id)`,
       [id, ownerId],
     );
     if (pending) {
@@ -267,7 +273,7 @@ export class MediaService implements OnModuleInit {
 
   async resolveFile(storageKey: string) {
     // Old signed URLs must stop working immediately, even during a storage outage.
-    const row = await sqlOne(this.db, `SELECT 1 FROM media WHERE storage_key = $1`, [storageKey]);
+    const row = await sqlOne(this.db, `SELECT 1 FROM media m WHERE storage_key = $1 AND NOT EXISTS (SELECT 1 FROM stories s WHERE s.media_id = m.id AND s.expires_at <= now())`, [storageKey]);
     if (!row) return null;
     return this.storage.resolve(storageKey);
   }
@@ -317,6 +323,8 @@ export class MediaService implements OnModuleInit {
             WHERE m.created_at < now() - make_interval(hours => $1)
               AND NOT EXISTS (SELECT 1 FROM post_media pm WHERE pm.media_id = m.id)
               AND NOT EXISTS (SELECT 1 FROM users u WHERE u.avatar_media_id = m.id OR u.cover_media_id = m.id)
+              AND NOT EXISTS (SELECT 1 FROM direct_messages dm WHERE dm.media_id = m.id)
+              AND NOT EXISTS (SELECT 1 FROM stories st WHERE st.media_id = m.id)
             ORDER BY m.created_at
             LIMIT 200
             FOR UPDATE SKIP LOCKED)

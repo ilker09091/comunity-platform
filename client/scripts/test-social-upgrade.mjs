@@ -36,6 +36,7 @@ try {
     export const useQuery = ({queryKey}) => queryKey.includes('reel-access') ? {isPending:false,data:globalThis.reelsFixture.data?.pages[0]?.items[0]} : queryKey[0] === "profile" ? globalThis.reelProfileQuery ?? {isPending:false,data:{isFollowing:false,isFollowRequested:false,isBlocking:false}} : globalThis.reelStartQuery ?? {isPending:true};
     export const api = async () => {};
     export const sharePath = async () => {};
+    export const SendPostButton = () => null;
     export const usePostEngagement = () => ({act(){},pending:false,repostable:true});
     export const useSession = () => ({user:{id:"me",username:"me",displayName:"Me"}});
     export const useToast = () => () => {};
@@ -63,7 +64,7 @@ try {
       source=source.replace('from "@/lib/use-double-tap"','from "./use-double-tap.mjs"');
       source=source.replace("from '@/lib/reel-gestures'",'from "./reel-gestures.mjs"').replace("from '@/lib/reel-queue'",'from "./reel-queue.mjs"');
       source = source.replace('from "@/lib/reel-watch-transport"','from "./reel-watch-transport.mjs"').replace('import PostComposer from "./post-composer";', 'import { PostComposer } from "./shims.mjs";').replace('from "@/lib/video-playback-coordinator"', 'from "./video-playback-coordinator.mjs"');
-      for (const dependency of ["next/navigation", "@tanstack/react-query", "@/lib/api/client", "@/lib/use-post-engagement", "./providers", "./ui", "./main-layout", "./post-card", "@/lib/platform-config"]) source = source.replace(`from "${dependency}"`, 'from "./shims.mjs"');
+      for (const dependency of ["next/navigation", "@tanstack/react-query", "@/lib/api/client", "@/lib/use-post-engagement", "./social-controls", "./providers", "./ui", "./main-layout", "./post-card", "@/lib/platform-config"]) source = source.replace(`from "${dependency}"`, 'from "./shims.mjs"');
       source = source.replace('from "./reel-player"', 'from "./reel-player.mjs"').replace('from "@/lib/reel-watch-transport"', 'from "./reel-watch-transport.mjs"');
     }
     const output = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText.replace('"./media-video"', '"./media-video.mjs"');

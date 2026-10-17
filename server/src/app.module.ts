@@ -1,3 +1,4 @@
+import { SocialModule } from './modules/social/social.module.js';
 import { Logger, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigType } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
@@ -73,6 +74,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     SearchModule,
     ReportsModule,
     InboxModule,
+    SocialModule,
     AdminModule,
   ],
   controllers: [AppController],

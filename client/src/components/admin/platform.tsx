@@ -210,7 +210,7 @@ export function MediaLibrary() {
 
       <Toolbar>
         <Select label="Type" value={f.get("type")} onChange={(v) => f.set({ type: v })} options={[["", "Images & videos"], ["IMAGE", "Images"], ["VIDEO", "Videos"]]} />
-        <Select label="Usage" value={f.get("usage")} onChange={(v) => f.set({ usage: v })} options={[["", "Any usage"], ["POST", "In posts"], ["AVATAR", "Avatars"], ["COVER", "Covers"], ["UNATTACHED", "Unattached"]]} />
+        <Select label="Usage" value={f.get("usage")} onChange={(v) => f.set({ usage: v })} options={[["", "Any usage"], ["POST", "In posts"], ["AVATAR", "Avatars"], ["COVER", "Covers"], ["MESSAGE", "Messages"], ["STORY", "Stories"], ["UNATTACHED", "Unattached"]]} />
         <Select label="Status" value={f.get("status")} onChange={(v) => f.set({ status: v })} options={[["", "Any status"], ["READY", "Ready"], ["PROCESSING", "Processing"], ["FAILED", "Failed"]]} />
         <Select
           label="Sort by"

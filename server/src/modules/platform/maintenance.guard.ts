@@ -27,7 +27,7 @@ export class MaintenanceGuard implements CanActivate {
     if (!general.readOnlyMode) return true;
     if (req.user && isStaff(req.user.role)) return true;
     const path = req.path.replace(new RegExp(`^/${this.config.apiPrefix}`), '');
-    if (/^\/(auth|admin)\//.test(path) || /^\/notifications\/(read-all|[^/]+\/read)$/.test(path) || path === '/users/me/inbox/read')
+    if (/^\/(auth|admin)\//.test(path) || /^\/notifications\/(read-all|[^/]+\/read)$/.test(path) || path === '/users/me/inbox/read' || /^\/messages\/[^/]+\/read$/.test(path) || /^\/stories\/[^/]+\/view$/.test(path))
       return true;
     throw new AppException(
       HttpStatus.SERVICE_UNAVAILABLE,

@@ -41,6 +41,7 @@ try {
     export const useFollowRequestDecision = () => {};
     export const followRequestErrorMessage = () => "Error";
     export const sharePath = () => {};
+    export const SendPostButton = () => null;
     export const usePostEngagement = () => ({});
     export const relativeTime = () => "now";
     export const useFeatures = () => ({ config: undefined, on: () => true, readOnly: false, canWrite: () => true });
@@ -53,7 +54,7 @@ try {
     source = source.replace("from './photo-gallery'", 'from "./polish-shims.mjs"').replace('from "next/link"','from "./video-link.mjs"')
       .replace('from "@/lib/video-preferences"','from "./video-preferences.mjs"')
       .replace('from "./video-player-core"','from "./video-player-core.mjs"');
-    for (const dependency of ["@/lib/api/client","@/lib/follow-requests","@/lib/use-post-engagement","./providers","./ui","./report-dialog","./comments","./post-composer","./photo-gallery","@/lib/platform-config"])
+    for (const dependency of ["@/lib/api/client","@/lib/follow-requests","@/lib/use-post-engagement","./social-controls","./providers","./ui","./report-dialog","./comments","./post-composer","./photo-gallery","@/lib/platform-config"])
       source = source.replace(`from "${dependency}"`,'from "./polish-shims.mjs"');
     await writeFile(join(temp,component+".mjs"),ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText);
   }

@@ -291,6 +291,7 @@ export default function Profile({ username }: { username: string }) {
               ) : (
                 <FollowButton id={user.id} following={user.isFollowing} requested={user.isFollowRequested} />
               )}
+              {!user.isSelf && !user.isBlocking && <Link className="button secondary" href={`/messages?to=${encodeURIComponent(user.username)}`}>Message</Link>}
               <ProfileMenu profile={user} />
             </div>
           </div>

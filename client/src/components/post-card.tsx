@@ -26,6 +26,7 @@ import {
   PinOff,
 } from "lucide-react";
 import ReportDialog from "./report-dialog";
+import { SendPostButton } from "./social-controls";
 import { useFeatures } from "@/lib/platform-config";
 import { api, type Post, type Models } from "@/lib/api/client";
 import { sharePath, usePostEngagement } from "@/lib/use-post-engagement";
@@ -241,6 +242,10 @@ export function PostActions({
       >
         <Bookmark size={18} fill={post.isBookmarked ? "currentColor" : "none"} />
       </button>
+      <SendPostButton
+        postId={post.id}
+        story={post.media.some((m) => m.type === "VIDEO")}
+      />
       <button type="button" className="action" aria-label="Share" onClick={() => void share()}>
         <Share2 size={17} />
       </button>
