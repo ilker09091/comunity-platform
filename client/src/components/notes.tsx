@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Music2, Pause, Play, Plus, Send, Trash2, X } from "lucide-react";
-import { api, type Models } from "@/lib/api/client";
+import { api, ApiError, type Models } from "@/lib/api/client";
 import { haptic } from "@/lib/haptics";
+import { clipToWav } from "@/lib/audio-clip";
 import { useSession, useToast } from "./providers";
 import { Avatar, Modal, relativeTime } from "./ui";
 
@@ -155,11 +156,7 @@ function NoteSheet({
     onError: (e) => toast(e.message, true),
   });
   const send = useMutation({
-    mutationFn: () =>
-      api("messagesSend", {
-        params: { id: note.author.id },
-        body: { content: `Replied to your note "${note.text || note.songTitle}": ${reply.trim()}` },
-      }),
+    mutationFn: () => api("notesReply", { params: { id: note.id }, body: { content: reply.trim() } }),
     onSuccess: () => {
       haptic("success");
       toast(`Sent to ${note.author.username}.`);
@@ -263,10 +260,26 @@ function NoteComposer({ onClose }: { onClose: () => void }) {
     mutationFn: async () => {
       let audioId: string | undefined;
       if (song) {
+        // Cut the chosen 15 s in the browser so only a small file is uploaded (whole songs can hit
+        // upload proxies' size limits). Browsers that can't decode it send the original instead.
+        let file: File = song.file;
+        let startMs = Math.round(start * 1000);
+        try {
+          file = await clipToWav(song.file, start, clip);
+          startMs = 0;
+        } catch {
+          /* fall back to the original file */
+        }
         const form = new FormData();
-        form.append("startMs", String(Math.round(start * 1000)));
-        form.append("file", song.file);
-        audioId = (await api("notesUploadAudio", { body: form as never })).id;
+        form.append("startMs", String(startMs));
+        form.append("file", file);
+        try {
+          audioId = (await api("notesUploadAudio", { body: form as never })).id;
+        } catch (e) {
+          if (e instanceof ApiError && e.status === 413)
+            throw new Error("This song is too large to upload. Try a shorter file or an MP3.");
+          throw e;
+        }
       }
       return api("notesCreate", {
         body: { text: text.trim() || undefined, audioId, songTitle: song ? title.trim() || undefined : undefined },

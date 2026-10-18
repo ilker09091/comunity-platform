@@ -372,6 +372,19 @@ export class NotesController {
   async remove(@CurrentUser() u: AuthUser) {
     await this.notes.remove(u.id);
   }
+  @Post(':id/reply')
+  @ApiOperation({
+    operationId: 'notesReply',
+    summary: "Reply to someone's note with a direct message",
+  })
+  @ApiCreatedResponse({ type: DirectMessageDto })
+  reply(
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: StoryReplyDto,
+  ) {
+    return this.notes.reply(u.id, id, dto.content);
+  }
   @Post('audio')
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({

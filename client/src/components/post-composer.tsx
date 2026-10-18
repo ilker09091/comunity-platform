@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Camera, Film, ImageIcon, Video, Globe2, Users, X, Loader2, RotateCcw, BarChart3, Clock, HelpCircle, Sliders, MessageCircleQuestion, EyeOff } from "lucide-react";
+import { Camera, Film, ImageIcon, Video, Globe2, Users, X, Loader2, RotateCcw, BarChart3, Clock, HelpCircle, Sliders, MessageCircleQuestion, EyeOff, Hash, AtSign, Upload, RefreshCw } from "lucide-react";
 import { api, upload, type Models } from "@/lib/api/client";
 import { useSession, useToast } from "./providers";
 import { useFeatures } from "@/lib/platform-config";
@@ -536,7 +536,7 @@ export default function PostComposer({
               onClick={() => pick("video/*", true, true)}
               disabled={busy || attachments.length >= MAX_ATTACHMENTS}
             >
-              <Camera size={17} className="tool-video" aria-hidden="true" /> Kamera
+              <Camera size={17} className="tool-video" aria-hidden="true" /> Camera
             </button>
           )}
           <InteractivePicker disabled={busy} onInsert={(tag) => setContent((c) => (c ? `${c}\n${tag}` : tag))} />
@@ -563,6 +563,158 @@ export default function PostComposer({
     </form>
   );
 
+  /**
+   * TikTok-style Reel flow: pick a video first, then a "Post" screen with the caption on the left and
+   * the cover on the right. Nothing is focused automatically, so the phone keyboard stays closed.
+   */
+  const reel = attachments[0];
+  const insert = (text: string) => setContent((c) => (c && !/\s$/.test(c) ? `${c} ${text}` : `${c}${text}`));
+  const reelEditor = (
+    <form
+      className={`reel-composer ${reel ? "has-video" : ""}`}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (ready) mutation.mutate();
+      }}
+    >
+      {!reel ? (
+        <div className="reel-pick">
+          <span className="reel-pick-icon" aria-hidden="true">
+            <Upload size={34} />
+          </span>
+          <h3>Upload a video</h3>
+          <p>Share a Reel with your followers. Any video format works, up to {videoMb >= 1024 ? `${Math.floor(videoMb / 1024)} GB` : `${videoMb} MB`}.</p>
+          <button type="button" className="reel-primary" onClick={() => pick(VIDEO_TYPES || "video/*", true)} disabled={!VIDEO_TYPES}>
+            Select video
+          </button>
+          <button type="button" className="reel-secondary" onClick={() => pick("video/*", true, true)} disabled={!VIDEO_TYPES}>
+            <Camera size={18} aria-hidden="true" /> Record
+          </button>
+          {!VIDEO_TYPES && <p className="inline-error">Video uploads are turned off right now.</p>}
+        </div>
+      ) : (
+        <>
+          <div className="reel-post-top">
+            <div className="rc-caption">
+              <label className="sr-only" htmlFor="reel-caption">
+                Caption
+              </label>
+              <textarea
+                id="reel-caption"
+                placeholder="Describe your Reel… add #hashtags and @mentions"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                rows={5}
+                disabled={busy}
+                aria-invalid={tooLong}
+              />
+              <div className="reel-chips">
+                <button type="button" onClick={() => insert("#")} disabled={busy}>
+                  <Hash size={15} aria-hidden="true" /> Hashtags
+                </button>
+                <button type="button" onClick={() => insert("@")} disabled={busy}>
+                  <AtSign size={15} aria-hidden="true" /> Mention
+                </button>
+              </div>
+            </div>
+            <div className="reel-cover">
+              {reel.previewFailed && reel.media?.status !== "READY" ? (
+                <div className="attachment-placeholder">
+                  <Film size={26} aria-hidden="true" />
+                  <small>Preview after optimizing</small>
+                </div>
+              ) : (
+                <video
+                  src={reel.previewFailed && reel.media?.status === "READY" ? reel.media.url : reel.preview}
+                  muted
+                  playsInline
+                  autoPlay
+                  loop
+                  preload="metadata"
+                  onError={() => update(reel.key, { previewFailed: true })}
+                />
+              )}
+              {!reel.media && !reel.error && (
+                <span className="reel-cover-status" aria-live="polite">
+                  <Loader2 size={14} className="spin" aria-hidden="true" /> {reel.progress}%
+                </span>
+              )}
+              {reel.media?.status === "PROCESSING" && !reel.error && (
+                <span className="reel-cover-status" aria-live="polite">
+                  <Loader2 size={14} className="spin" aria-hidden="true" />
+                  {reel.media.processingProgress !== null ? `${reel.media.processingProgress}%` : "Optimizing"}
+                </span>
+              )}
+              <button
+                type="button"
+                className="reel-cover-change"
+                onClick={() => {
+                  remove(reel);
+                  pick(VIDEO_TYPES || "video/*", true);
+                }}
+                disabled={busy}
+              >
+                <RefreshCw size={13} aria-hidden="true" /> Change
+              </button>
+            </div>
+          </div>
+          {reel.error && (
+            <div className="upload-error rc-error" role="alert">
+              <span>{reel.error}</span>
+              <button type="button" onClick={() => void sendAttachment(reel)}>
+                <RotateCcw size={13} /> Retry
+              </button>
+            </div>
+          )}
+          <div className="reel-settings">
+            <div className="reel-setting">
+              <span>Who can watch</span>
+              <VisibilitySelect value={visibility} onChange={setVisibility} disabled={busy} />
+            </div>
+            <button
+              type="button"
+              className="reel-setting"
+              aria-pressed={/#spoiler\b/i.test(content)}
+              onClick={() => setContent((c) => (/#spoiler\b/i.test(c) ? c.replace(/\s*#spoiler\b/gi, "") : c ? `${c} #spoiler` : "#spoiler"))}
+              disabled={busy}
+            >
+              <span>
+                <EyeOff size={16} aria-hidden="true" /> Spoiler cover
+              </span>
+              <span className={`reel-switch ${/#spoiler\b/i.test(content) ? "on" : ""}`} aria-hidden="true" />
+            </button>
+            {content.length > 0 && (
+              <span className={`character-count ${tooLong ? "over" : ""}`}>
+                {content.length.toLocaleString("en")} / {MAX_LENGTH.toLocaleString("en")}
+              </span>
+            )}
+          </div>
+          {mutation.isError && (
+            <p className="inline-error" role="alert">
+              {mutation.error.message}
+            </p>
+          )}
+          <div className="rc-actions">
+            <button type="button" className="reel-secondary" onClick={() => remove(reel)} disabled={busy}>
+              Discard
+            </button>
+            <button type="submit" className="reel-primary" disabled={!ready}>
+              {busy && <Loader2 size={15} className="spin" />}
+              {busy ? "Posting…" : uploading ? "Uploading…" : "Post"}
+            </button>
+          </div>
+        </>
+      )}
+      <input
+        type="file"
+        ref={editorInput}
+        hidden
+        tabIndex={-1}
+        onChange={(e) => select(e.target.files)}
+      />
+    </form>
+  );
+
   const unavailable = !canWrite("postCreation") ? (
     <p className="composer-disabled" role="status">
       {config?.readOnlyMode ? config.maintenanceMessage || "Circle is in read-only mode right now." : "Posting is temporarily unavailable."}
@@ -575,7 +727,16 @@ export default function PostComposer({
       </Modal>
     );
 
-  if (modalOpen !== undefined) return modalOpen ? <Modal title={mode==='reel'?'Create Reel':'Create post'} className={user ? "" : "auth-prompt-dialog"} onClose={() => !busy && onModalClose?.()}><div className="composer-modal-body">{user ? editor : <GuestPrompt reel={mode === 'reel'} />}</div></Modal> : null;
+  if (modalOpen !== undefined)
+    return modalOpen ? (
+      <Modal
+        title={mode === "reel" ? "New Reel" : "Create post"}
+        className={!user ? "auth-prompt-dialog" : mode === "reel" ? "reel-composer-modal" : ""}
+        onClose={() => !busy && onModalClose?.()}
+      >
+        <div className="composer-modal-body">{user ? (mode === "reel" ? reelEditor : editor) : <GuestPrompt reel={mode === "reel"} />}</div>
+      </Modal>
+    ) : null;
 
   if (quoteId)
     return (

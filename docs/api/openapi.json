@@ -9627,6 +9627,112 @@
         ]
       }
     },
+    "/api/notes/{id}/reply": {
+      "post": {
+        "operationId": "notesReply",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoryReplyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectMessageDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type (`UNSUPPORTED_MEDIA_TYPE`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Reply to someone's note with a direct message",
+        "tags": [
+          "Notes"
+        ]
+      }
+    },
     "/api/notes/audio": {
       "post": {
         "operationId": "notesUploadAudio",
@@ -17901,6 +18007,23 @@
           "media"
         ]
       },
+      "NoteReplyRefDto": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The note text when the reply was sent"
+          },
+          "songTitle": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "text",
+          "songTitle"
+        ]
+      },
       "DirectMessageDto": {
         "type": "object",
         "properties": {
@@ -17981,6 +18104,16 @@
               }
             ]
           },
+          "noteReply": {
+            "nullable": true,
+            "description": "Set when this message replies to a note",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NoteReplyRefDto"
+              }
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -18004,6 +18137,7 @@
           "openedAt",
           "deliveredAt",
           "storyReply",
+          "noteReply",
           "createdAt",
           "readAt"
         ]

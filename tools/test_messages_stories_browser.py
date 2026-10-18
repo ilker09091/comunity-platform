@@ -15,7 +15,8 @@ def now(): return datetime.now(timezone.utc).isoformat()
 MEDIA = dict(id='20000000-0000-4000-8000-000000000001', type='VIDEO', status='READY', url=BASE+'/qa/video.mp4', mimeType='video/mp4', sizeBytes=1000, width=180, height=320, durationMs=1000, createdAt=now(), processingProgress=None)
 PHOTO = {**MEDIA, 'id': '20000000-0000-4000-8000-000000000002', 'type': 'IMAGE', 'url': BASE+'/qa/photo.png', 'mimeType': 'image/png'}
 POST = dict(id='30000000-0000-4000-8000-000000000001', kind='POST', author=PEER, content='A video from your circle', media=[MEDIA], visibility='PUBLIC', createdAt=now(), updatedAt=now(), editedAt=None, likeCount=0, commentCount=0, repostCount=0, quoteCount=0, bookmarkCount=0, isLiked=False, isBookmarked=False, isReposted=False, isFollowingAuthor=True, referencedPost=None, referencedPostUnavailable=False)
-MSG_EXTRA = dict(replyTo=None, viewOnce=False, viewOnceType=None, openedAt=None, deliveredAt=None)
+MSG_EXTRA = dict(replyTo=None, viewOnce=False, viewOnceType=None, openedAt=None, deliveredAt=None, noteReply=None)
+audio_uploads = []
 messages = [dict(id='40000000-0000-4000-8000-000000000001', senderId=PEER['id'], recipientId=ME['id'], content='Hello from your friend', media=MEDIA, post=None, storyReply=None, createdAt=now(), readAt=None, **MSG_EXTRA)]
 notes = [dict(id='90000000-0000-4000-8000-000000000001', author=PEER, text='Coffee time', songTitle='Tone', audioUrl=BASE+'/qa/clip.m4a', audioDurationMs=15000, createdAt=now(), expiresAt=now(), isOwn=False)]
 presence = dict(typing=False)
@@ -40,7 +41,11 @@ def api(route):
  elif path.startswith('messages/') and path.endswith('/typing'): return route.fulfill(status=204)
  elif path=='notes' and method=='GET': body=notes
  elif path=='notes/audio':
+  audio_uploads.append(len(request.post_data_buffer or b''))
   body=dict(id='91000000-0000-4000-8000-000000000001',url=BASE+'/qa/clip.m4a',durationMs=15000);status=201
+ elif path.startswith('notes/') and path.endswith('/reply'):
+  body=dict(messages[0],id='40000000-0000-4000-8000-000000000088',senderId=ME['id'],recipientId=PEER['id'],content=data.get('content'),media=None,createdAt=now(),readAt=None,**{**MSG_EXTRA,'noteReply':dict(text='Coffee time',songTitle='Tone')})
+  messages.append(body);status=201
  elif path=='notes' and method=='POST':
   note=dict(id='90000000-0000-4000-8000-000000000002',author=ME,text=data.get('text') or '',songTitle=data.get('songTitle'),audioUrl=BASE+'/qa/clip.m4a' if data.get('audioId') else None,audioDurationMs=15000 if data.get('audioId') else None,createdAt=now(),expiresAt=now(),isOwn=True)
   notes[:]=[n for n in notes if not n['isOwn']]+[note];body=note;status=201
@@ -105,7 +110,7 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
  temp=Path(temp);video=temp/'video.mp4';photo=temp/'photo.png';song=temp/'song.wav'
  photo.write_bytes(base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6r1cAAAAASUVORK5CYII='))
  subprocess.run([str(ROOT/'server/node_modules/ffmpeg-static/ffmpeg.exe'),'-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=royalblue:s=180x320:r=10','-t','1','-c:v','libx264','-pix_fmt','yuv420p','-y',str(video)],check=True,capture_output=True,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
- subprocess.run([str(ROOT/'server/node_modules/ffmpeg-static/ffmpeg.exe'),'-hide_banner','-loglevel','error','-f','lavfi','-i','sine=frequency=440:duration=40','-ac','1','-ar','8000','-y',str(song)],check=True,capture_output=True,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+ subprocess.run([str(ROOT/'server/node_modules/ffmpeg-static/ffmpeg.exe'),'-hide_banner','-loglevel','error','-f','lavfi','-i','sine=frequency=440:duration=40','-ac','2','-ar','44100','-y',str(song)],check=True,capture_output=True,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
  log=(out/'server.log').open('wb')
  server=subprocess.Popen(['node','node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port','3017'],cwd=ROOT/'client',stdout=log,stderr=log,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
  try:
@@ -182,6 +187,10 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
    tab.get_by_label('Message',exact=True).press('Enter')
    tab.locator('.dm-quote').filter(has_text='Hello from your friend').wait_for()
    assert any(data.get('replyToId')==messages[0]['id'] for method,path,data in calls if isinstance(data,dict))
+   # Swiping a message sideways (as on a phone) must not create a horizontal scroll.
+   tab.evaluate('document.querySelector(".dm-message").style.transform="translateX(72px)"')
+   assert tab.evaluate('(() => { const el = document.querySelector(".dm-scroll"); el.scrollLeft = 200; return el.scrollLeft === 0 && getComputedStyle(el).overflowX === "hidden"; })()')
+   tab.evaluate('document.querySelector(".dm-message").style.transform=""')
    print('PASS replying to a message with a quote')
    tab.locator('.dm-composer input[type=file]').set_input_files(str(photo))
    tab.get_by_text('Photo ready to send',exact=True).wait_for()
@@ -230,7 +239,16 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
    tab.wait_for_function('parseFloat(getComputedStyle(document.querySelector(".note-song-progress")).transform.split(",")[0].replace("matrix(",""))>0',timeout=8000)
    tab.locator('.note-song-player').click()
    tab.wait_for_function('!document.querySelector(".note-song-player.playing")')
-   tab.keyboard.press('Escape');tab.wait_for_function('!document.querySelector("dialog[open]")')
+   tab.get_by_label('Reply to qa_friend').fill('Count me in')
+   tab.get_by_role('button',name='Send reply').click()
+   tab.wait_for_function('!document.querySelector("dialog[open]")')
+   assert any(method=='POST' and path.endswith('/reply') and path.startswith('notes/') and data.get('content')=='Count me in' for method,path,data in calls if isinstance(data,dict))
+   tab.locator('.dm-row').first.click()
+   tab.locator('.dm-note-reply').filter(has_text='You replied to their note').get_by_text('Coffee time').wait_for()
+   tab.locator('.dm-note-reply').locator('.dm-note-song').get_by_text('Tone').wait_for()
+   tab.locator('.dm-note-reply').scroll_into_view_if_needed();tab.screenshot(path=str(out/'note-reply-dm.png'))
+   tab.goto(BASE+'/messages',wait_until='networkidle')
+   print('PASS replying to a note shows the note bubble above the DM')
    tab.locator('.note-tile.own').click()
    tab.get_by_label('Note',exact=True).fill('Listening on repeat')
    tab.get_by_role('dialog',name='New note').locator('input[type=file]').set_input_files(str(song))
@@ -243,6 +261,7 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
    tab.get_by_role('button',name='Share',exact=True).click()
    tab.wait_for_function('!document.querySelector("dialog[open]")')
    assert any(method=='POST' and path=='notes/audio' for method,path,data in calls)
+   assert audio_uploads and audio_uploads[-1] < 1_000_000 and song.stat().st_size > 5_000_000,(audio_uploads,song.stat().st_size)
    assert any(method=='POST' and path=='notes' and data.get('audioId') and data.get('text')=='Listening on repeat' for method,path,data in calls if isinstance(data,dict))
    tab.locator('.note-tile.own').get_by_text('Listening on repeat').wait_for()
    tab.screenshot(path=str(out/'notes-tray.png'))
@@ -324,6 +343,23 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
    tab.wait_for_timeout(400);tab.screenshot(path=str(out/'story-reel.png'))
    tab.get_by_role('button',name='Close story',exact=True).first.click();tab.wait_for_function('!document.querySelector("dialog[open]")')
    print('PASS sharing a video post/Reel to the story and playing it with its Reel link')
+   tab.set_viewport_size(dict(width=390,height=844));tab.goto(BASE+'/reels',wait_until='networkidle')
+   tab.locator('.reels-mobile-nav').get_by_role('button',name='Create post').click()
+   dialog=tab.get_by_role('dialog',name='New Reel');dialog.wait_for()
+   dialog.get_by_text('Upload a video').wait_for()
+   assert tab.evaluate('!["TEXTAREA","INPUT"].includes(document.activeElement?.tagName)'),'no keyboard on open'
+   dialog.locator('input[type=file]').set_input_files(str(video))
+   dialog.get_by_label('Caption').wait_for()
+   assert tab.evaluate('document.activeElement?.id!=="reel-caption"'),'caption must not grab focus'
+   dialog.get_by_role('button',name='Post',exact=True).wait_for()
+   tab.wait_for_function('!document.querySelector(".reel-composer .rc-actions .reel-primary").disabled',timeout=15000)
+   tab.wait_for_timeout(500)
+   tab.screenshot(path=str(out/'reel-composer.png'))
+   dialog.get_by_role('button',name='Discard').click()
+   dialog.get_by_text('Upload a video').wait_for()
+   tab.keyboard.press('Escape');tab.wait_for_function('!document.querySelector("dialog[open]")')
+   tab.set_viewport_size(dict(width=1440,height=1000));tab.goto(BASE+'/',wait_until='networkidle')
+   print('PASS TikTok-style Reel composer: pick first, post screen, keyboard stays closed')
    before=len(vibrations)
    tab.get_by_role('button',name='Spoiler: show media').click()
    tab.wait_for_function('document.querySelector(".post-media-spoiler-wrap.revealing, .post-media-spoiler-wrap.is-gallery:not(.spoilered)")')

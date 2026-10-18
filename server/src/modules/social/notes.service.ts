@@ -19,6 +19,7 @@ import {
   USER_SUMMARY_COLUMNS,
   UsersService,
 } from '../users/users.service.js';
+import { MessagesService } from './messages.service.js';
 import { CreateNoteDto, NoteAudioDto, NoteDto } from './social.dto.js';
 
 /** Instagram-style: a note's song is a short clip the author picks. */
@@ -39,6 +40,7 @@ export class NotesService {
     private readonly users: UsersService,
     private readonly deletion: ContentDeletionService,
     private readonly settings: PlatformSettingsService,
+    private readonly messages: MessagesService,
   ) {}
 
   async list(viewerId: string): Promise<NoteDto[]> {
@@ -65,6 +67,18 @@ export class NotesService {
       expiresAt: iso(r.expires_at)!,
       isOwn: r.author_id === viewerId,
     };
+  }
+
+  /** Replies to someone's note with a direct message that shows the note above it. */
+  async reply(viewerId: string, noteId: string, content: string) {
+    const note = (await this.list(viewerId)).find((n) => n.id === noteId);
+    if (!note) throw AppException.notFound(ErrorCode.NOT_FOUND, 'This note is no longer available');
+    if (note.isOwn)
+      throw AppException.badRequest(ErrorCode.BAD_REQUEST, 'You cannot reply to your own note');
+    return this.messages.send(viewerId, note.author.id, { content }, undefined, {
+      text: note.text,
+      songTitle: note.songTitle,
+    });
   }
 
   /** Cuts a 15 s clip from an uploaded song, starting where the author chose. */

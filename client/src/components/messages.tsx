@@ -13,6 +13,7 @@ import {
   Check,
   CheckCheck,
   Image as ImageIcon,
+  Music2,
   Reply,
   Clapperboard,
   Info,
@@ -119,6 +120,30 @@ function SharedPost({ post }: { post: NonNullable<Message["post"]> }) {
   );
 }
 
+/** Instagram-style: the note being answered, in its own small bubble above the reply. */
+function NoteReplyPreview({
+  reply,
+  own,
+}: {
+  reply: NonNullable<Message["noteReply"]>;
+  own: boolean;
+}) {
+  return (
+    <div className="dm-note-reply">
+      <small>{own ? "You replied to their note" : "Replied to your note"}</small>
+      <span className="dm-note-bubble">
+        {reply.songTitle && (
+          <span className="dm-note-song">
+            <Music2 size={12} aria-hidden="true" />
+            <span>{reply.songTitle}</span>
+          </span>
+        )}
+        {reply.text && <span className="dm-note-text">{reply.text}</span>}
+      </span>
+    </div>
+  );
+}
+
 function StoryReplyPreview({
   reply,
   own,
@@ -150,6 +175,10 @@ function attachmentLabel(message: Message) {
   return "Attachment unavailable";
 }
 function preview(message: Message, own: boolean) {
+  if (message.noteReply)
+    return own
+      ? `You replied to their note: ${message.content ?? ""}`
+      : `Replied to your note: ${message.content ?? ""}`;
   if (message.storyReply)
     return own
       ? `You replied to their story${message.content ? `: ${message.content}` : ""}`
@@ -360,6 +389,7 @@ function MessageItem({
       )}
       <div className="dm-message-body" title={separatorLabel(message.createdAt)}>
         {message.storyReply && <StoryReplyPreview reply={message.storyReply} own={own} />}
+        {message.noteReply && <NoteReplyPreview reply={message.noteReply} own={own} />}
         {message.viewOnce && <ViewOnceBubble message={message} own={own} />}
         {media &&
           (media.type === "VIDEO" ? (

@@ -580,6 +580,11 @@ export const endpoints = {
     "method": "DELETE",
     "authenticated": true
   },
+  "notesReply": {
+    "path": "/api/notes/{id}/reply",
+    "method": "POST",
+    "authenticated": true
+  },
   "notesUploadAudio": {
     "path": "/api/notes/audio",
     "method": "POST",

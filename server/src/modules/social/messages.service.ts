@@ -195,6 +195,7 @@ export class MessagesService {
       storyReply: r.story_reply
         ? { storyId: r.story_id ?? null, media: byStory.get(r.story_id) ?? null }
         : null,
+      noteReply: r.note_reply ? { text: r.note_text ?? '', songTitle: r.note_song ?? null } : null,
       createdAt: iso(r.created_at)!,
       readAt: iso(r.read_at),
     }));
@@ -205,6 +206,7 @@ export class MessagesService {
     recipientId: string,
     dto: SendMessageDto,
     storyId?: string,
+    note?: { text: string; songTitle: string | null },
   ) {
     await this.assertPeer(senderId, recipientId, true);
     if (!dto.content && !dto.mediaId && !dto.postId)
@@ -261,8 +263,9 @@ export class MessagesService {
       }
       return (await sqlOne(
         m,
-        `INSERT INTO direct_messages(sender_id, recipient_id, content, media_id, post_id, story_id, story_reply, reply_to_id, view_once)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+        `INSERT INTO direct_messages(sender_id, recipient_id, content, media_id, post_id, story_id, story_reply, reply_to_id, view_once,
+          note_reply, note_text, note_song)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
         [
           senderId,
           recipientId,
@@ -273,6 +276,9 @@ export class MessagesService {
           !!storyId,
           dto.replyToId ?? null,
           !!dto.viewOnce,
+          !!note,
+          note?.text ?? null,
+          note?.songTitle ?? null,
         ],
       ))!;
     });

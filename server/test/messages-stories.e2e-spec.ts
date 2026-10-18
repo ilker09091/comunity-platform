@@ -564,4 +564,19 @@ describe('Direct messages and stories (e2e)', () => {
     await api.delete('/notes/me', alice).expect(404);
     expect((await api.get('/notes', bob)).body).toHaveLength(0);
   });
+
+  it('replies to a note with a DM that keeps a snapshot of the note', async () => {
+    const note = (await api.post('/notes', { text: 'Who is up?' }, alice).expect(201)).body;
+    await api.post(`/notes/${note.id}/reply`, { content: 'me!' }, bob).expect(404);
+    await api.post(`/users/${alice.id}/follow`, {}, bob).expect(200);
+    await api.post(`/notes/${note.id}/reply`, { content: 'me!' }, alice).expect(400);
+    const reply = (await api.post(`/notes/${note.id}/reply`, { content: 'me!' }, bob).expect(201)).body;
+    expect(reply).toMatchObject({ content: 'me!', noteReply: { text: 'Who is up?', songTitle: null } });
+    await api.delete('/notes/me', alice).expect(204);
+    expect((await api.get(`/messages/${bob.id}`, alice)).body.items[0].noteReply).toEqual({
+      text: 'Who is up?',
+      songTitle: null,
+    });
+    await api.post(`/notes/${note.id}/reply`, { content: 'late' }, bob).expect(404);
+  });
 });

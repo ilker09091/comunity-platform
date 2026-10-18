@@ -75,6 +75,10 @@ export class StoryReplyRefDto {
   })
   media: MediaDto | null;
 }
+export class NoteReplyRefDto {
+  @ApiProperty({ description: 'The note text when the reply was sent' }) text: string;
+  @ApiProperty({ type: String, nullable: true }) songTitle: string | null;
+}
 export class DirectMessageDto {
   @ApiProperty({ format: 'uuid' }) id: string;
   @ApiProperty({ format: 'uuid' }) senderId: string;
@@ -112,6 +116,12 @@ export class DirectMessageDto {
     description: 'Set when this message replies to a story',
   })
   storyReply: StoryReplyRefDto | null;
+  @ApiProperty({
+    type: NoteReplyRefDto,
+    nullable: true,
+    description: 'Set when this message replies to a note',
+  })
+  noteReply: NoteReplyRefDto | null;
   @ApiProperty({ format: 'date-time' }) createdAt: string;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) readAt:
     string | null;

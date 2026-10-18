@@ -1702,6 +1702,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/notes/{id}/reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reply to someone's note with a direct message */
+        post: operations["notesReply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/notes/audio": {
         parameters: {
             query?: never;
@@ -3883,6 +3900,11 @@ export interface components {
             /** @description Story preview while it is still live */
             media: components["schemas"]["MediaDto"] | null;
         };
+        NoteReplyRefDto: {
+            /** @description The note text when the reply was sent */
+            text: string;
+            songTitle: string | null;
+        };
         DirectMessageDto: {
             /** Format: uuid */
             id: string;
@@ -3910,6 +3932,8 @@ export interface components {
             deliveredAt: string | null;
             /** @description Set when this message replies to a story */
             storyReply: components["schemas"]["StoryReplyRefDto"] | null;
+            /** @description Set when this message replies to a note */
+            noteReply: components["schemas"]["NoteReplyRefDto"] | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -12405,6 +12429,93 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Unsupported media type (`UNSUPPORTED_MEDIA_TYPE`) */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    notesReply: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StoryReplyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectMessageDto"];
+                };
             };
             /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
             400: {
