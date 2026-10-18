@@ -4,10 +4,10 @@
 const SAMPLE_RATE = 22_050;
 
 /**
- * Cuts `seconds` of `file` starting at `start` in the browser and returns it as a mono 16-bit WAV
+ * Works for songs and for videos (their sound track). Cuts `seconds` of `file` starting at `start` in the browser and returns it as a mono 16-bit WAV
  * (about 650 KB for 15 s). Uploading the whole song instead could be rejected by proxies (413).
  */
-export async function clipToWav(file: File, start: number, seconds: number): Promise<File> {
+export async function clipToWav(file: File, start: number, seconds: number, rate = SAMPLE_RATE): Promise<File> {
   const Context =
     window.AudioContext ??
     (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -15,15 +15,15 @@ export async function clipToWav(file: File, start: number, seconds: number): Pro
   const context = new Context();
   try {
     const decoded = await context.decodeAudioData(await file.arrayBuffer());
-    const length = Math.max(1, Math.round(seconds * SAMPLE_RATE));
-    const offline = new OfflineAudioContext(1, length, SAMPLE_RATE);
+    const length = Math.max(1, Math.round(seconds * rate));
+    const offline = new OfflineAudioContext(1, length, rate);
     const source = offline.createBufferSource();
     source.buffer = decoded;
     source.connect(offline.destination);
     source.start(0, Math.max(0, start), seconds);
     const rendered = await offline.startRendering();
     const name = file.name.replace(/\.[^.]+$/, "") || "song";
-    return new File([encodeWav(rendered.getChannelData(0), SAMPLE_RATE)], `${name}.wav`, { type: "audio/wav" });
+    return new File([encodeWav(rendered.getChannelData(0), rate)], `${name}.wav`, { type: "audio/wav" });
   } finally {
     void context.close().catch(() => {});
   }

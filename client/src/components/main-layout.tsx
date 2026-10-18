@@ -2,7 +2,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Home,
@@ -372,8 +372,10 @@ export function MobileNav({ variant = "default", onCreate }: { variant?: "defaul
   const pathname = usePathname();
   const { user } = useSession();
   const { on } = useFeatures();
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState<{ mode: "post" | "reel"; files: File[] } | null>(null);
+  const picker = useRef<HTMLInputElement>(null);
   const profile = user ? `/profile/${user.username}` : "/login";
+  const reelsOnly = variant === "reels";
   const links = [
     { href: "/", label: "Home", icon: Home },
     { href: "/explore", label: "Explore", icon: Search },
@@ -397,7 +399,8 @@ export function MobileNav({ variant = "default", onCreate }: { variant?: "defaul
         type="button"
         className="mobile-nav-create"
         aria-label="Create post"
-        onClick={() => (onCreate ? onCreate() : setCreating(true))}
+        // Like Instagram/TikTok: + opens the gallery straight away; the composer opens with the pick.
+        onClick={() => (user ? picker.current?.click() : onCreate ? onCreate() : setCreating({ mode: "post", files: [] }))}
       >
         <span className="mobile-nav-icon">
           <PlusSquare size={26} strokeWidth={1.8} aria-hidden="true" />
@@ -414,7 +417,29 @@ export function MobileNav({ variant = "default", onCreate }: { variant?: "defaul
           {user ? <Avatar user={user} size={28} /> : <UserRound size={26} strokeWidth={1.8} aria-hidden="true" />}
         </span>
       </Link>
-      {creating && <PostComposer modalOpen onModalClose={() => setCreating(false)} />}
+      <input
+        ref={picker}
+        type="file"
+        hidden
+        tabIndex={-1}
+        multiple={!reelsOnly}
+        accept={reelsOnly ? "video/*" : "image/*,video/*"}
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = "";
+          if (!files.length) return;
+          const video = files.find((f) => f.type.startsWith("video/") || /\.(mp4|mov|m4v|webm|mkv|avi|3gp)$/i.test(f.name));
+          setCreating(video || reelsOnly ? { mode: "reel", files: [video ?? files[0]] } : { mode: "post", files });
+        }}
+      />
+      {creating && (
+        <PostComposer
+          modalOpen
+          mode={creating.mode}
+          initialFiles={creating.files}
+          onModalClose={() => setCreating(null)}
+        />
+      )}
     </nav>
   );
 }

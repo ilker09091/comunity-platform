@@ -6,6 +6,7 @@ import { MediaController } from './media.controller.js';
 import { MediaService } from './media.service.js';
 import { ContentDeletionService } from './content-deletion.service.js';
 import { UploadsMulterModule } from './multer.options.js';
+import { SoundtrackService } from './soundtrack.service.js';
 import { LocalStorageDriver, STORAGE_DRIVER } from './storage/storage.driver.js';
 import { FfmpegVideoProcessor, VIDEO_PROCESSOR } from './video.processor.js';
 import { VideoTranscodeQueue } from './video-transcode.queue.js';
@@ -16,6 +17,7 @@ import { MediaUploadSessionsService, MediaUploadsController } from './media-uplo
   controllers: [MediaUploadsController, MediaController],
   providers: [
     MediaService,
+    SoundtrackService,
     ContentDeletionService,
     MediaUrlService,
     {

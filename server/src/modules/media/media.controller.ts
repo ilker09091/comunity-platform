@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Delete,
   Get,
@@ -30,7 +31,8 @@ import type { AuthUser } from '../../common/decorators/auth.decorators.js';
 import { AppException, ErrorCode } from '../../common/errors/app.exception.js';
 import { UuidPipe } from '../../common/errors/validation.js';
 import { ApiAuth, ApiErrors } from '../../common/swagger/api-docs.decorators.js';
-import { MediaDto, UploadMediaDto } from './dto/media.dto.js';
+import { MediaDto, SoundtrackFieldsDto, SoundtrackUploadDto, UploadMediaDto } from './dto/media.dto.js';
+import { SoundtrackService } from './soundtrack.service.js';
 import { MediaUrlService, STORAGE_KEY_RE } from './media-url.service.js';
 import { MediaService } from './media.service.js';
 
@@ -40,7 +42,30 @@ export class MediaController {
   constructor(
     private readonly media: MediaService,
     private readonly urls: MediaUrlService,
+    private readonly soundtracks: SoundtrackService,
   ) {}
+
+  @Post(':id/soundtrack')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiAuth()
+  @ApiOperation({
+    operationId: 'mediaSoundtrack',
+    summary: 'Add music to one of your unpublished videos (Reels "Add sound")',
+    description: 'Replaces the original sound, or mixes the music over it with `mix=true`. The clip loops to the video length.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: SoundtrackUploadDto })
+  @ApiCreatedResponse({ type: MediaDto })
+  @ApiErrors(400, 404, 409, 413, 415)
+  soundtrack(
+    @CurrentUser() user: AuthUser,
+    @Param('id', UuidPipe) id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: SoundtrackFieldsDto,
+  ): Promise<MediaDto> {
+    return this.soundtracks.add(user.id, id, file, dto.mix === 'true');
+  }
 
   @Post()
   @UseInterceptors(FileInterceptor('file'))

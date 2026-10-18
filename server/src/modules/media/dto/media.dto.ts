@@ -1,4 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { IsIn, IsOptional } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum MediaTypeEnum {
   IMAGE = 'IMAGE',
@@ -62,5 +63,18 @@ export class UploadMediaDto {
       'Image (jpeg, png, webp, gif) or a video in any common format (mp4, mov, webm, mkv, avi, 3gp, …). ' +
       'Type is verified from file contents. Videos are compressed to MP4 in the background.',
   })
+  file: unknown;
+}
+
+/** Multipart fields of POST /media/{id}/soundtrack (validated). */
+export class SoundtrackFieldsDto {
+  @ApiPropertyOptional({ enum: ['true', 'false'], description: 'Keep the original sound under the music' })
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  mix?: 'true' | 'false';
+}
+/** OpenAPI shape of POST /media/{id}/soundtrack. */
+export class SoundtrackUploadDto extends SoundtrackFieldsDto {
+  @ApiProperty({ type: 'string', format: 'binary', description: 'The music clip (audio file, up to 90 s)' })
   file: unknown;
 }

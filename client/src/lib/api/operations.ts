@@ -25,6 +25,11 @@ export const endpoints = {
     "method": "POST",
     "authenticated": true
   },
+  "mediaSoundtrack": {
+    "path": "/api/media/{id}/soundtrack",
+    "method": "POST",
+    "authenticated": true
+  },
   "mediaUpload": {
     "path": "/api/media",
     "method": "POST",
@@ -475,6 +480,11 @@ export const endpoints = {
     "method": "POST",
     "authenticated": true
   },
+  "messagesDelete": {
+    "path": "/api/messages/{id}",
+    "method": "DELETE",
+    "authenticated": true
+  },
   "messagesStatus": {
     "path": "/api/messages/{id}/status",
     "method": "GET",
@@ -498,6 +508,11 @@ export const endpoints = {
   "messagesAccept": {
     "path": "/api/messages/{id}/accept",
     "method": "POST",
+    "authenticated": true
+  },
+  "messagesDeleteConversation": {
+    "path": "/api/messages/{id}/conversation",
+    "method": "DELETE",
     "authenticated": true
   },
   "messagesDecline": {

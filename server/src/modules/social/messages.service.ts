@@ -486,6 +486,45 @@ export class MessagesService {
     );
   }
 
+  /** Unsend: permanently deletes one of your own messages (and its attachment) for both people. */
+  async removeMessage(viewerId: string, messageId: string) {
+    const files = await this.db.transaction(async (m) => {
+      const row = await sqlOne<{ media_id: string | null }>(
+        m,
+        'DELETE FROM direct_messages WHERE id = $1 AND sender_id = $2 RETURNING media_id',
+        [messageId, viewerId],
+      );
+      if (!row) throw AppException.notFound(ErrorCode.NOT_FOUND, 'Message not found');
+      return this.deletion.deleteMedia(m, row.media_id ? [row.media_id] : []);
+    });
+    await this.deletion.removeFiles(files);
+  }
+
+  /** Permanently deletes the whole conversation with `peerId` (both sides) and its attachments. */
+  async removeConversation(viewerId: string, peerId: string) {
+    if (viewerId === peerId) throw AppException.notFound();
+    const files = await this.db.transaction(async (m) => {
+      const rows = await sqlRows<{ media_id: string | null }>(
+        m,
+        `DELETE FROM direct_messages
+        WHERE (sender_id = $1 AND recipient_id = $2) OR (sender_id = $2 AND recipient_id = $1)
+        RETURNING media_id`,
+        [viewerId, peerId],
+      );
+      if (!rows.length) throw AppException.notFound(ErrorCode.NOT_FOUND, 'Conversation not found');
+      await sqlRows(
+        m,
+        'DELETE FROM typing_status WHERE (user_id = $1 AND peer_id = $2) OR (user_id = $2 AND peer_id = $1)',
+        [viewerId, peerId],
+      );
+      return this.deletion.deleteMedia(
+        m,
+        rows.map((r) => r.media_id).filter((id): id is string => !!id),
+      );
+    });
+    await this.deletion.removeFiles(files);
+  }
+
   /** Deletes a pending request (the peer's messages to you). They may send a new one later. */
   async decline(viewerId: string, peerId: string) {
     const files = await this.db.transaction(async (m) => {

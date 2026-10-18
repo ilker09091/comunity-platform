@@ -579,4 +579,48 @@ describe('Direct messages and stories (e2e)', () => {
     });
     await api.post(`/notes/${note.id}/reply`, { content: 'late' }, bob).expect(404);
   });
+
+  it('unsends own messages and deletes whole conversations from the database', async () => {
+    await api.post(`/users/${alice.id}/follow`, {}, bob).expect(200);
+    const first = (await send('first')).body;
+    const photo = await image();
+    const withPhoto = (await api.post(`/messages/${bob.id}`, { mediaId: photo.id }, alice).expect(201)).body;
+    const answer = (await api.post(`/messages/${alice.id}`, { content: 'answer', replyToId: first.id }, bob).expect(201)).body;
+    await api.delete(`/messages/${first.id}`, bob).expect(404);
+    await api.delete(`/messages/${first.id}`, alice).expect(204);
+    expect((await db.query('SELECT 1 FROM direct_messages WHERE id = $1', [first.id])).length).toBe(0);
+    expect((await api.get(`/messages/${alice.id}`, bob)).body.items.find((m: any) => m.id === answer.id).replyTo).toBeNull();
+    await api.delete(`/messages/${withPhoto.id}`, alice).expect(204);
+    expect((await db.query('SELECT 1 FROM media WHERE id = $1', [photo.id])).length).toBe(0);
+    await send('again');
+    await api.delete(`/messages/${outsider.id}/conversation`, alice).expect(404);
+    await api.delete(`/messages/${alice.id}/conversation`, bob).expect(204);
+    expect(
+      (await db.query('SELECT 1 FROM direct_messages WHERE (sender_id = $1 AND recipient_id = $2) OR (sender_id = $2 AND recipient_id = $1)', [alice.id, bob.id])).length,
+    ).toBe(0);
+    expect((await api.get('/messages', alice)).body.items).toHaveLength(0);
+  });
+
+  it('adds music to an unpublished video and replaces its file', async () => {
+    const video = await api.uploadVideo(alice);
+    const before = (await db.query('SELECT storage_key FROM media WHERE id = $1', [video.id]))[0].storage_key;
+    const add = (id: string, user = alice, buffer = wav(12), mix = 'false') =>
+      api.http
+        .post(`/api/media/${id}/soundtrack`)
+        .set(user.auth)
+        .field('mix', mix)
+        .attach('file', buffer, { filename: 'song.wav', contentType: 'audio/wav' });
+    await add(video.id, bob).expect(404);
+    await add(video.id, alice, png).expect(400);
+    const updated = (await add(video.id).expect(201)).body;
+    expect(updated).toMatchObject({ id: video.id, type: 'VIDEO', status: 'READY' });
+    const after = (await db.query('SELECT storage_key FROM media WHERE id = $1', [video.id]))[0].storage_key;
+    expect(after).not.toBe(before);
+    const path = new URL(updated.url).pathname + new URL(updated.url).search;
+    await api.http.get(path).expect(200);
+    expect((await db.query('SELECT 1 FROM media_file_deletions WHERE storage_key = $1', [before])).length).toBe(0);
+    await add(video.id, alice, wav(12), 'true').expect(201);
+    await api.post('/posts', { mediaIds: [video.id] }, alice).expect(201);
+    await add(video.id).expect(404);
+  });
 });

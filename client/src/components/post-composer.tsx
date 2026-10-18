@@ -4,10 +4,11 @@ import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Camera, Film, ImageIcon, Video, Globe2, Users, X, Loader2, RotateCcw, BarChart3, Clock, HelpCircle, Sliders, MessageCircleQuestion, EyeOff, Hash, AtSign, Upload, RefreshCw } from "lucide-react";
+import { Camera, Film, ImageIcon, Video, Globe2, Users, X, Loader2, RotateCcw, BarChart3, Clock, HelpCircle, Sliders, MessageCircleQuestion, EyeOff, Hash, AtSign, Upload, RefreshCw, Volume2, VolumeX } from "lucide-react";
 import { api, upload, type Models } from "@/lib/api/client";
 import { useSession, useToast } from "./providers";
 import { useFeatures } from "@/lib/platform-config";
+import { ReelSound } from "./reel-sound";
 import { Avatar, Modal } from "./ui";
 
 const DEFAULT_MAX_LENGTH = 5000;
@@ -253,12 +254,15 @@ export default function PostComposer({
   modalOpen,
   onModalClose,
   mode = 'post',
+  initialFiles,
 }: {
   quoteId?: string;
   onDone?: () => void;
   modalOpen?: boolean;
   onModalClose?: () => void;
   mode?: 'post'|'reel';
+  /** Files picked before the composer opened (the mobile + button opens the gallery first). */
+  initialFiles?: File[];
 }) {
   const { user } = useSession();
   const toast = useToast();
@@ -316,7 +320,7 @@ export default function PostComposer({
     }
   };
 
-  const select = (files: FileList | null) => {
+  const select = (files: FileList | File[] | null) => {
     if (!files || !user) return;
     const selected: Attachment[] = [];
     for (const file of Array.from(files)) {
@@ -351,6 +355,13 @@ export default function PostComposer({
   };
 
   /** `camera`: open the phone camera directly (the browser asks for camera permission). */
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current || !initialFiles?.length || !user) return;
+    seeded.current = true;
+    select(initialFiles);
+  }, [initialFiles, user]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const pick = (accept: string, inEditor: boolean, camera = false) => {
     const target = (inEditor ? editorInput : cardInput).current;
     if (!target) return;
@@ -568,6 +579,7 @@ export default function PostComposer({
    * the cover on the right. Nothing is focused automatically, so the phone keyboard stays closed.
    */
   const reel = attachments[0];
+  const [coverMuted, setCoverMuted] = useState(true);
   const insert = (text: string) => setContent((c) => (c && !/\s$/.test(c) ? `${c} ${text}` : `${c}${text}`));
   const reelEditor = (
     <form
@@ -626,7 +638,7 @@ export default function PostComposer({
               ) : (
                 <video
                   src={reel.previewFailed && reel.media?.status === "READY" ? reel.media.url : reel.preview}
-                  muted
+                  muted={coverMuted}
                   playsInline
                   autoPlay
                   loop
@@ -645,6 +657,14 @@ export default function PostComposer({
                   {reel.media.processingProgress !== null ? `${reel.media.processingProgress}%` : "Optimizing"}
                 </span>
               )}
+              <button
+                type="button"
+                className="reel-cover-sound"
+                aria-label={coverMuted ? "Play with sound" : "Mute preview"}
+                onClick={() => setCoverMuted((m) => !m)}
+              >
+                {coverMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+              </button>
               <button
                 type="button"
                 className="reel-cover-change"
@@ -667,6 +687,15 @@ export default function PostComposer({
             </div>
           )}
           <div className="reel-settings">
+            <ReelSound
+              media={reel.media}
+              disabled={busy || !!reel.error}
+              onApplied={(media) => {
+                // The server rewrote the file with the new sound: preview the real result.
+                update(reel.key, { media, preview: media.url, previewFailed: false });
+                setCoverMuted(false);
+              }}
+            />
             <div className="reel-setting">
               <span>Who can watch</span>
               <VisibilitySelect value={visibility} onChange={setVisibility} disabled={busy} />

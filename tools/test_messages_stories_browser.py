@@ -54,6 +54,10 @@ def api(route):
   body=dict(isRequest=peer==STRANGER['id'] and peer not in accepted,awaitingAcceptance=False,canSend=True,peerTyping=presence['typing'],peerOnline=True,peerLastActiveAt=now())
  elif path.startswith('messages/') and path.endswith('/accept'):
   accepted.add(path.split('/')[1]);return route.fulfill(status=204)
+ elif method=='DELETE' and path.startswith('messages/'):
+  return route.fulfill(status=204)
+ elif path.startswith('media/') and path.endswith('/soundtrack'):
+  body=MEDIA;status=201
  elif path.startswith('messages/') and path.endswith('/read'):
   for m in messages: m['readAt']=now()
   return route.fulfill(status=204)
@@ -199,6 +203,19 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
    tab.locator('.dm-viewonce').last.wait_for()
    assert any(data.get('viewOnce') is True for method,path,data in calls if isinstance(data,dict))
    print('PASS sending a view-once photo')
+   own=tab.locator('.dm-message.own').filter(has_text='A new message from the browser')
+   own.hover();own.get_by_role('button',name='More actions').click()
+   own.get_by_role('menuitem',name='Unsend').click()
+   tab.get_by_role('dialog',name='Unsend message?').get_by_role('button',name='Unsend').click()
+   tab.get_by_text('Message unsent.').wait_for()
+   assert any(method=='DELETE' and path.startswith('messages/') and path.count('/')==1 for method,path,data in calls)
+   tab.locator('.dm-thread-head').get_by_label('Chat options').click()
+   tab.get_by_role('button',name='Delete chat').click()
+   tab.get_by_role('dialog',name='Delete this chat?').get_by_role('button',name='Delete chat').click()
+   tab.wait_for_url(BASE+'/messages')
+   assert any(method=='DELETE' and path.endswith('/conversation') for method,path,data in calls)
+   tab.locator('.dm-row').first.click();tab.locator('.dm-thread').wait_for()
+   print('PASS unsending a message and deleting the whole chat')
    tab.locator('.dm-composer input[type=file]').set_input_files(str(video))
    tab.get_by_text('Video ready to send',exact=True).wait_for()
    tab.get_by_role('button',name='Send message',exact=True).click()
@@ -219,13 +236,16 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
    tab.get_by_role('link',name='Back to conversations').click()
    tab.locator('.dm-row').first.wait_for()
    assert not tab.locator('.dm-main').is_visible()
-   nav=tab.locator('.mobile-nav > *')
+   nav=tab.locator('.mobile-nav > a, .mobile-nav > button')
    boxes=[a.bounding_box() for a in nav.all()]
    assert len(boxes)==5 and max(b['y'] for b in boxes)-min(b['y'] for b in boxes)<2,boxes
-   assert [tab.locator('.mobile-nav > *').nth(i).get_attribute('aria-label') for i in range(5)]==['Home','Explore','Create post','Reels','Profile']
+   assert [nav.nth(i).get_attribute('aria-label') for i in range(5)]==['Home','Explore','Create post','Reels','Profile']
    assert tab.locator('.app-header').get_by_role('link',name='Messages').is_visible()
-   tab.locator('.mobile-nav').get_by_role('button',name='Create post').click()
+   with tab.expect_file_chooser() as chooser:
+    tab.locator('.mobile-nav').get_by_role('button',name='Create post').click()
+   chooser.value.set_files(str(photo))
    tab.get_by_role('dialog',name='Create post').wait_for()
+   tab.get_by_role('dialog',name='Create post').locator('.attachment img').wait_for()
    tab.keyboard.press('Escape');tab.wait_for_function('!document.querySelector("dialog[open]")')
    assert tab.evaluate('document.documentElement.scrollWidth<=innerWidth')
    shell=tab.locator('.dm-shell').bounding_box();navbox=tab.locator('.mobile-nav').bounding_box()
@@ -344,22 +364,37 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
    tab.get_by_role('button',name='Close story',exact=True).first.click();tab.wait_for_function('!document.querySelector("dialog[open]")')
    print('PASS sharing a video post/Reel to the story and playing it with its Reel link')
    tab.set_viewport_size(dict(width=390,height=844));tab.goto(BASE+'/reels',wait_until='networkidle')
-   tab.locator('.reels-mobile-nav').get_by_role('button',name='Create post').click()
+   with tab.expect_file_chooser() as chooser:
+    tab.locator('.reels-mobile-nav').get_by_role('button',name='Create post').click()
+   assert chooser.value.element.get_attribute('accept')=='video/*'
+   chooser.value.set_files(str(video))
    dialog=tab.get_by_role('dialog',name='New Reel');dialog.wait_for()
-   dialog.get_by_text('Upload a video').wait_for()
-   assert tab.evaluate('!["TEXTAREA","INPUT"].includes(document.activeElement?.tagName)'),'no keyboard on open'
-   dialog.locator('input[type=file]').set_input_files(str(video))
    dialog.get_by_label('Caption').wait_for()
+   assert tab.evaluate('!["TEXTAREA","INPUT"].includes(document.activeElement?.tagName)'),'no keyboard on open'
    assert tab.evaluate('document.activeElement?.id!=="reel-caption"'),'caption must not grab focus'
    dialog.get_by_role('button',name='Post',exact=True).wait_for()
    tab.wait_for_function('!document.querySelector(".reel-composer .rc-actions .reel-primary").disabled',timeout=15000)
    tab.wait_for_timeout(500)
    tab.screenshot(path=str(out/'reel-composer.png'))
+   dialog.get_by_role('button',name='Add sound').click()
+   with tab.expect_file_chooser() as chooser:
+    dialog.get_by_role('button',name='Choose a song or video').click()
+   chooser.value.set_files(str(song))
+   dialog.get_by_label('Sound start').fill('5')
+   dialog.get_by_role('button',name='Use this sound').click()
+   tab.get_by_text('added to your Reel.').wait_for()
+   assert any(method=='POST' and path.endswith('/soundtrack') for method,path,data in calls)
+   tab.screenshot(path=str(out/'reel-sound.png'))
+   dialog.get_by_role('button',name='Discard').click()
+   with tab.expect_file_chooser() as chooser:
+    dialog.get_by_role('button',name='Select video').click()
+   chooser.value.set_files(str(video))
+   dialog.get_by_label('Caption').wait_for()
    dialog.get_by_role('button',name='Discard').click()
    dialog.get_by_text('Upload a video').wait_for()
    tab.keyboard.press('Escape');tab.wait_for_function('!document.querySelector("dialog[open]")')
    tab.set_viewport_size(dict(width=1440,height=1000));tab.goto(BASE+'/',wait_until='networkidle')
-   print('PASS TikTok-style Reel composer: pick first, post screen, keyboard stays closed')
+   print('PASS + opens the gallery; TikTok-style Reel composer with Add sound; keyboard stays closed')
    before=len(vibrations)
    tab.get_by_role('button',name='Spoiler: show media').click()
    tab.wait_for_function('document.querySelector(".post-media-spoiler-wrap.revealing, .post-media-spoiler-wrap.is-gallery:not(.spoilered)")')
@@ -382,11 +417,17 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
    print('PASS comment stickers: built-in pack, creating your own from a photo and sending it')
    tab.goto(BASE+'/',wait_until='networkidle')
    tab.get_by_role('button',name='Send to a user',exact=True).first.click()
+   sheet=tab.get_by_role('dialog',name='Send to')
+   sheet.get_by_role('button',name='Copy link').wait_for()
    with tab.expect_response(lambda r:'/search/users' in r.url):
-    tab.get_by_label('Search recipients').fill('qa_friend')
-   tab.locator('.recipient-row').first.click()
+    sheet.get_by_label('Search recipients').fill('qa_friend')
+   sheet.locator('.send-person').first.click()
+   sheet.locator('.send-person.on').wait_for()
+   sheet.get_by_label('Add a message').fill('Watch this')
+   tab.screenshot(path=str(out/'send-sheet.png'))
+   sheet.get_by_role('button',name='Send',exact=True).click()
    tab.wait_for_function('!document.querySelector("dialog[open]")')
-   assert any(path.startswith('messages/') and data.get('postId')==POST['id'] for method,path,data in calls if isinstance(data,dict))
+   assert any(path.startswith('messages/') and data.get('postId')==POST['id'] and data.get('content')=='Watch this' for method,path,data in calls if isinstance(data,dict))
    assert not errors,errors
    print('PASS recipient search and existing video-post sharing; no browser runtime errors')
    browser.close()

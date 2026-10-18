@@ -14,6 +14,9 @@ import {
   CheckCheck,
   Image as ImageIcon,
   Music2,
+  MoreHorizontal,
+  Copy,
+  Trash2,
   Reply,
   Clapperboard,
   Info,
@@ -30,6 +33,8 @@ import { haptic } from "@/lib/haptics";
 import { useSession, useToast } from "./providers";
 import {
   Avatar,
+  ConfirmDialog,
+  Dropdown,
   ErrorState,
   LoadMore,
   Modal,
@@ -328,6 +333,7 @@ function MessageItem({
   last,
   onReply,
   onJump,
+  onUnsend,
 }: {
   message: Message;
   own: boolean;
@@ -336,7 +342,26 @@ function MessageItem({
   last: boolean;
   onReply: (message: Message) => void;
   onJump: (id: string) => void;
+  onUnsend: (message: Message) => void;
 }) {
+  const toast = useToast();
+  const [menu, setMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const press = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (!menu) return;
+    const close = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenu(false);
+    };
+    const escape = (e: KeyboardEvent) => e.key === "Escape" && setMenu(false);
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [menu]);
+  useEffect(() => () => window.clearTimeout(press.current), []);
   const media = message.viewOnce ? null : message.media;
   const missing =
     !message.content && !media && !message.post && !message.storyReply && !message.viewOnce;
@@ -356,12 +381,25 @@ function MessageItem({
       style={drag ? { transform: `translateX(${drag}px)` } : undefined}
       // Touch: swipe a message to the right to reply, like WhatsApp.
       onPointerDown={(e) => {
-        if (e.pointerType === "touch") swipe.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+        if (e.pointerType !== "touch") return;
+        swipe.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+        // Long-press opens the message menu (Reply / Copy / Unsend), like Instagram.
+        window.clearTimeout(press.current);
+        press.current = window.setTimeout(() => {
+          swipe.current = null;
+          setDrag(0);
+          haptic("tap");
+          setMenu(true);
+        }, 450);
+      }}
+      onContextMenu={(e) => {
+        if (swipe.current || menu) e.preventDefault();
       }}
       onPointerMove={(e) => {
         const start = swipe.current;
         if (!start || start.id !== e.pointerId) return;
         const dx = e.clientX - start.x;
+        if (Math.abs(dx) > 8 || Math.abs(e.clientY - start.y) > 8) window.clearTimeout(press.current);
         if (Math.abs(e.clientY - start.y) > 24 && Math.abs(dx) < 24) {
           swipe.current = null;
           setDrag(0);
@@ -370,6 +408,7 @@ function MessageItem({
         setDrag(Math.max(0, Math.min(72, dx)));
       }}
       onPointerUp={() => {
+        window.clearTimeout(press.current);
         if (drag >= 56) {
           haptic("tap");
           onReply(message);
@@ -378,6 +417,7 @@ function MessageItem({
         setDrag(0);
       }}
       onPointerCancel={() => {
+        window.clearTimeout(press.current);
         swipe.current = null;
         setDrag(0);
       }}
@@ -437,14 +477,62 @@ function MessageItem({
           </span>
         )}
       </div>
-      <button
-        type="button"
-        className="dm-reply-action"
-        aria-label="Reply"
-        onClick={() => onReply(message)}
-      >
-        <Reply size={16} />
-      </button>
+      <div className="dm-hover-actions">
+        <button type="button" className="dm-reply-action" aria-label="Reply" onClick={() => onReply(message)}>
+          <Reply size={16} />
+        </button>
+        <button
+          type="button"
+          className="dm-reply-action"
+          aria-label="More actions"
+          aria-expanded={menu}
+          onClick={() => setMenu((m) => !m)}
+        >
+          <MoreHorizontal size={16} />
+        </button>
+      </div>
+      {menu && (
+        <div className="dm-message-menu" role="menu" ref={menuRef}>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setMenu(false);
+              onReply(message);
+            }}
+          >
+            <Reply size={16} /> Reply
+          </button>
+          {message.content && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setMenu(false);
+                void navigator.clipboard.writeText(message.content!).then(
+                  () => toast("Copied."),
+                  () => toast("Unable to copy.", true),
+                );
+              }}
+            >
+              <Copy size={16} /> Copy
+            </button>
+          )}
+          {own && (
+            <button
+              type="button"
+              role="menuitem"
+              className="danger"
+              onClick={() => {
+                setMenu(false);
+                onUnsend(message);
+              }}
+            >
+              <Trash2 size={16} /> Unsend
+            </button>
+          )}
+        </div>
+      )}
       {drag > 0 && (
         <span className="dm-swipe-hint" style={{ opacity: Math.min(1, drag / 56) }} aria-hidden="true">
           <Reply size={16} />
@@ -574,6 +662,28 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
     },
     onError: (e) => toast(e.message, true),
   });
+  const [unsending, setUnsending] = useState<Message | null>(null);
+  const [deletingChat, setDeletingChat] = useState(false);
+  const unsend = useMutation({
+    mutationFn: (id: string) => api("messagesDelete", { params: { id } }),
+    onSuccess: () => {
+      setUnsending(null);
+      toast("Message unsent.");
+      void client.invalidateQueries({ queryKey: ["messages"] });
+    },
+    onError: (e) => toast(e.message, true),
+  });
+  const deleteChat = useMutation({
+    mutationFn: () => api("messagesDeleteConversation", { params: { id: peer.id } }),
+    onSuccess: () => {
+      setDeletingChat(false);
+      toast("Chat deleted.");
+      client.removeQueries({ queryKey: ["messages", user?.id, "thread", peer.id] });
+      void client.invalidateQueries({ queryKey: ["messages"] });
+      router.push("/messages");
+    },
+    onError: (e) => toast(e.message, true),
+  });
   const read = useMutation({
     mutationFn: (id: string) => api("messagesRead", { params: { id } }),
     onSuccess: () => void client.invalidateQueries({ queryKey: ["messages"] }),
@@ -696,10 +806,38 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
             </small>
           </span>
         </Link>
-        <Link className="dm-icon" href={`/profile/${peer.username}`} aria-label="View profile">
+        <Link className="dm-icon dm-info" href={`/profile/${peer.username}`} aria-label="View profile">
           <Info size={24} />
         </Link>
+        <Dropdown label="Chat options" className="dm-chat-menu" summaryClassName="dm-icon" summary={<MoreHorizontal size={24} />}>
+          <Link href={`/profile/${peer.username}`}>
+            <Info size={16} /> View profile
+          </Link>
+          <button type="button" className="danger-text" disabled={!messages.length} onClick={() => setDeletingChat(true)}>
+            <Trash2 size={16} /> Delete chat
+          </button>
+        </Dropdown>
       </header>
+      {unsending && (
+        <ConfirmDialog
+          title="Unsend message?"
+          description="It will be removed for everyone in this chat. This can't be undone."
+          confirmLabel="Unsend"
+          pending={unsend.isPending}
+          onConfirm={() => unsend.mutate(unsending.id)}
+          onClose={() => setUnsending(null)}
+        />
+      )}
+      {deletingChat && (
+        <ConfirmDialog
+          title="Delete this chat?"
+          description={`All messages, photos and videos with ${peer.displayName} will be permanently deleted for both of you.`}
+          confirmLabel="Delete chat"
+          pending={deleteChat.isPending}
+          onConfirm={() => deleteChat.mutate()}
+          onClose={() => setDeletingChat(false)}
+        />
+      )}
       <div
         className="dm-scroll"
         ref={scroller}
@@ -764,6 +902,7 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
                   last={last}
                   onReply={startReply}
                   onJump={jumpTo}
+                  onUnsend={setUnsending}
                 />
               </Fragment>
             );

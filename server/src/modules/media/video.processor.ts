@@ -35,6 +35,11 @@ export interface VideoProcessor {
   probeAudio(filePath: string): Promise<{ durationMs: number } | null>;
   /** Cuts `durationMs` of audio starting at `startMs` into a web-optimised AAC `.m4a` (metadata stripped). */
   clipAudio(input: string, output: string, startMs: number, durationMs: number): Promise<void>;
+  /**
+   * Puts `audio` (looped to the video's length, faded out at the end) on `video`: replacing the
+   * original sound, or mixed under it. The picture is copied, not re-encoded.
+   */
+  addSoundtrack(video: string, audio: string, output: string, options: { mix: boolean; durationMs: number }): Promise<void>;
 }
 
 const require = createRequire(import.meta.url);
@@ -213,6 +218,27 @@ export class FfmpegVideoProcessor implements VideoProcessor {
         '-movflags', '+faststart', '-f', 'mp4', output,
       ],
       120_000,
+    );
+  }
+
+  async addSoundtrack(video: string, audio: string, output: string, options: { mix: boolean; durationMs: number }): Promise<void> {
+    const seconds = Math.max(1, options.durationMs / 1000);
+    const fade = `afade=t=out:st=${Math.max(0, seconds - 1).toFixed(2)}:d=1`;
+    const audioMap = options.mix
+      ? ['-filter_complex', `[0:a:0]volume=0.35[a0];[1:a:0]volume=1.0[a1];[a0][a1]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,${fade}[a]`, '-map', '0:v:0', '-map', '[a]']
+      : ['-map', '0:v:0', '-map', '1:a:0', '-af', fade];
+    await this.run(
+      this.ffmpeg,
+      [
+        '-hide_banner', '-loglevel', 'error', '-y',
+        '-i', video,
+        '-stream_loop', '-1', '-i', audio,
+        ...audioMap,
+        '-t', seconds.toFixed(3),
+        '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k', '-ac', '2',
+        '-map_metadata', '-1', '-movflags', '+faststart', '-f', 'mp4', output,
+      ],
+      300_000,
     );
   }
 

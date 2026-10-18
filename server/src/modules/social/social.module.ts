@@ -179,6 +179,32 @@ export class MessagesController {
   ) {
     await this.messages.accept(u.id, id);
   }
+  @Delete(':id')
+  @HttpCode(204)
+  @ApiOperation({
+    operationId: 'messagesDelete',
+    summary: 'Unsend one of your messages (deleted for both people)',
+  })
+  @ApiNoContentResponse()
+  async remove(
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.messages.removeMessage(u.id, id);
+  }
+  @Delete(':id/conversation')
+  @HttpCode(204)
+  @ApiOperation({
+    operationId: 'messagesDeleteConversation',
+    summary: 'Delete the whole conversation with this user, for both people',
+  })
+  @ApiNoContentResponse()
+  async removeConversation(
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.messages.removeConversation(u.id, id);
+  }
   @Delete(':id/request')
   @HttpCode(204)
   @ApiOperation({
