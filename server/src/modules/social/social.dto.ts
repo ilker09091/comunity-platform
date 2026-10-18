@@ -1,10 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
 import { CursorQueryDto } from '../../common/dto/common.dto.js';
@@ -31,6 +36,29 @@ export class SendMessageDto {
   @IsOptional()
   @IsUUID('all')
   postId?: string;
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Quote a message from this conversation',
+  })
+  @IsOptional()
+  @IsUUID('all')
+  replyToId?: string;
+  @ApiPropertyOptional({
+    description: 'The attached photo/video can be opened once by the recipient',
+  })
+  @IsOptional()
+  @IsBoolean()
+  viewOnce?: boolean;
+}
+export class MessageReplyRefDto {
+  @ApiProperty({ format: 'uuid' }) id: string;
+  @ApiProperty({ format: 'uuid' }) senderId: string;
+  @ApiProperty({
+    enum: ['TEXT', 'PHOTO', 'VIDEO', 'POST', 'STORY', 'VIEW_ONCE', 'UNAVAILABLE'],
+  })
+  kind: 'TEXT' | 'PHOTO' | 'VIDEO' | 'POST' | 'STORY' | 'VIEW_ONCE' | 'UNAVAILABLE';
+  @ApiProperty({ type: String, nullable: true, description: 'Up to 140 characters' })
+  preview: string | null;
 }
 export class StoryReplyRefDto {
   @ApiProperty({
@@ -52,8 +80,32 @@ export class DirectMessageDto {
   @ApiProperty({ format: 'uuid' }) senderId: string;
   @ApiProperty({ format: 'uuid' }) recipientId: string;
   @ApiProperty({ type: String, nullable: true }) content: string | null;
-  @ApiProperty({ type: MediaDto, nullable: true }) media: MediaDto | null;
+  @ApiProperty({
+    type: MediaDto,
+    nullable: true,
+    description: 'Never set for view-once messages; the recipient opens them once',
+  })
+  media: MediaDto | null;
   @ApiProperty({ type: PostDto, nullable: true }) post: PostDto | null;
+  @ApiProperty({ type: MessageReplyRefDto, nullable: true })
+  replyTo: MessageReplyRefDto | null;
+  @ApiProperty() viewOnce: boolean;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    enum: ['IMAGE', 'VIDEO'],
+    description: 'Kind of a view-once attachment while it can still be opened',
+  })
+  viewOnceType: 'IMAGE' | 'VIDEO' | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  openedAt: string | null;
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: "Reached the recipient's device (second tick)",
+  })
+  deliveredAt: string | null;
   @ApiProperty({
     type: StoryReplyRefDto,
     nullable: true,
@@ -76,6 +128,12 @@ export class MessageStatusDto {
   awaitingAcceptance: boolean;
   @ApiProperty({ description: 'You can send a message right now' })
   canSend: boolean;
+  @ApiProperty({ description: 'They are typing to you right now' })
+  peerTyping: boolean;
+  @ApiProperty({ description: 'They have the app open right now' })
+  peerOnline: boolean;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  peerLastActiveAt: string | null;
 }
 export class ConversationDto {
   @ApiProperty({ type: UserSummaryDto }) user: UserSummaryDto;
@@ -86,6 +144,9 @@ export class ConversationDto {
       'Message request: you do not follow this user and have never replied',
   })
   isRequest: boolean;
+  @ApiProperty({ description: 'They have the app open right now' }) online: boolean;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  lastActiveAt: string | null;
 }
 export class ConversationQueryDto extends CursorQueryDto {
   @ApiPropertyOptional({
@@ -183,4 +244,55 @@ export class CreateStickerDto {
   @SanitizedText()
   @MaxLength(40)
   name?: string;
+}
+
+export class NoteDto {
+  @ApiProperty({ format: 'uuid' }) id: string;
+  @ApiProperty({ type: UserSummaryDto }) author: UserSummaryDto;
+  @ApiProperty({ description: 'Up to 60 characters; may be empty when a song is shared' })
+  text: string;
+  @ApiProperty({ type: String, nullable: true }) songTitle: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Signed URL of the 15 s song clip' })
+  audioUrl: string | null;
+  @ApiProperty({ type: Number, nullable: true }) audioDurationMs: number | null;
+  @ApiProperty({ format: 'date-time' }) createdAt: string;
+  @ApiProperty({ format: 'date-time' }) expiresAt: string;
+  @ApiProperty() isOwn: boolean;
+}
+export class CreateNoteDto {
+  @ApiPropertyOptional({ maxLength: 60 })
+  @IsOptional()
+  @IsString()
+  @SanitizedText()
+  @MaxLength(60)
+  text?: string;
+  @ApiPropertyOptional({ format: 'uuid', description: 'From POST /notes/audio' })
+  @IsOptional()
+  @IsUUID('all')
+  audioId?: string;
+  @ApiPropertyOptional({ maxLength: 80 })
+  @IsOptional()
+  @IsString()
+  @SanitizedText()
+  @MaxLength(80)
+  songTitle?: string;
+}
+/** Multipart fields of POST /notes/audio (validated). */
+export class NoteAudioFieldsDto {
+  @ApiProperty({ minimum: 0, description: 'Where the 15 second clip starts, in milliseconds' })
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(36_000_000)
+  startMs: number;
+}
+/** OpenAPI shape of POST /notes/audio: the file plus the validated fields. */
+export class NoteAudioUploadDto extends NoteAudioFieldsDto {
+  @ApiProperty({ type: 'string', format: 'binary', description: 'An audio file (MP3, M4A, WAV, OGG...)' })
+  file: unknown;
+}
+export class NoteAudioDto {
+  @ApiProperty({ format: 'uuid' }) id: string;
+  @ApiProperty({ description: 'Signed URL of the clip, for previewing' }) url: string;
+  @ApiProperty() durationMs: number;
 }

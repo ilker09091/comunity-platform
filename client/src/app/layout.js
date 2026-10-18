@@ -4,6 +4,7 @@ import "./profile-editor.css";
 import "./video-experience.css";
 import "./social-media.css";
 import "./messages-stories.css";
+import "./profile-ig.css";
 import Providers from "@/components/providers";
 import { Suspense } from "react";
 
@@ -48,7 +49,8 @@ export default function RootLayout({ children }) {
       lang="en"
       className={`${poppins.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body>
+      {/* Browser extensions (e.g. ColorZilla) add attributes to <body> before React loads. */}
+      <body suppressHydrationWarning>
         <Suspense
           fallback={<div className="initial-loading">Loading Circle…</div>}
         >

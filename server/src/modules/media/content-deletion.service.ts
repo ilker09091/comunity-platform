@@ -122,6 +122,17 @@ export class ContentDeletionService implements OnModuleInit {
     return { keys: rows.map((r) => r.storage_key), bytes: rows.reduce((s, r) => s + Number(r.size_bytes), 0) };
   }
 
+  /** Queues storage objects without a media row (e.g. note song clips); pass the result to `removeFiles` after commit. */
+  async queueFiles(m: DataSource | EntityManager, keys: string[]): Promise<PendingFiles> {
+    if (keys.length)
+      await sqlRows(
+        m,
+        'INSERT INTO media_file_deletions(storage_key) SELECT unnest($1::text[]) ON CONFLICT DO NOTHING',
+        [keys],
+      );
+    return { keys, bytes: 0 };
+  }
+
   /** Flushes deletion work saved by the media DELETE trigger, only after commit. */
   async removeFiles(files: PendingFiles): Promise<void> {
     // Chunk large admin batches; row locks keep multiple workers from sharing work.

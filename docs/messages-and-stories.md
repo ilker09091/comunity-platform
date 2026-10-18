@@ -13,6 +13,14 @@ Media attachments are exclusive to one post/profile/message/story. Attachment lo
 - **Stickers:** comments can carry a sticker (`stickerId`) with or without text. Everyone gets the built-in pack; users can create up to 60 of their own from a photo (`POST /stickers`) and delete them (`DELETE /stickers/{id}`). Comments that already use a deleted sticker keep showing it.
 - **Haptics:** revealing a `#spoiler`, liking a story and sending stickers trigger a short vibration on devices that support it (Android Chrome; iOS Safari does not expose vibration).
 
+## Chat features and notes
+
+- **Receipts (WhatsApp style):** one grey tick = sent, two grey = delivered (the recipient's app fetched it), two blue = read. Every bubble shows its time.
+- **Replies:** hover a message and press Reply (desktop) or swipe it right (phone); the quote links back to the original (`replyToId`).
+- **Photos and view once:** photos can now be sent in DMs. With the "1" toggle the recipient can open the photo/video once (`POST /messages/{messageId}/open`); the file is deleted two minutes after it is opened and the URL stops working at the same time.
+- **Typing and online:** the composer sends `POST /messages/{id}/typing` while you write; `GET /messages/{id}/status` returns `peerTyping`, `peerOnline` and `peerLastActiveAt`. Presence uses `users.last_active_at`, refreshed by the app's unread-count poll (online = active in the last 45 s). Only people you have a conversation with see it.
+- **Notes:** a 60-character note above the inbox for 24 hours, visible to your followers. You can add a song from your device and pick which 15 seconds play; the server cuts it with ffmpeg to AAC (`POST /notes/audio`, then `POST /notes`). Production needs ffmpeg/ffprobe, as for video.
+
 ## Deployment
 
 Run the existing migration command before starting the updated server:
@@ -22,7 +30,7 @@ cd server
 npm.cmd run migration:run
 ```
 
-The additive migrations are `MessagesAndStories1760191200000`, `StoryPostShares1760191300000` and `StoryEngagementRequestsStickers1760191400000`. The generated OpenAPI document, client types and gateway operation allowlist include the new routes.
+The additive migrations are `MessagesAndStories1760191200000`, `StoryPostShares1760191300000`, `StoryEngagementRequestsStickers1760191400000` and `MessagingPresenceNotes1760191500000`. The generated OpenAPI document, client types and gateway operation allowlist include the new routes.
 
 ## Checks
 

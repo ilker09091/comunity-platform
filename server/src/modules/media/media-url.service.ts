@@ -3,7 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 import { appConfig } from '../../config/app.config.js';
 
-export const STORAGE_KEY_RE = /^[a-f0-9]{32}\.(jpg|png|webp|gif|mp4|webm|mov)$/;
+export const STORAGE_KEY_RE = /^[a-f0-9]{32}\.(jpg|png|webp|gif|mp4|webm|mov|m4a)$/;
 
 /**
  * Builds HMAC-signed, expiring media URLs. URLs are only handed out in responses the viewer

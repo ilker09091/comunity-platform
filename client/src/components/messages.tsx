@@ -10,6 +10,10 @@ import {
 } from "@tanstack/react-query";
 import {
   ArrowLeft,
+  Check,
+  CheckCheck,
+  Image as ImageIcon,
+  Reply,
   Clapperboard,
   Info,
   Search,
@@ -33,6 +37,7 @@ import {
 } from "./ui";
 import { RecipientPicker } from "./social-controls";
 import { MediaVideo } from "./media-video";
+import { NotesTray } from "./notes";
 
 type Message = Models["DirectMessageDto"];
 type Conversation = Models["ConversationDto"];
@@ -77,17 +82,6 @@ function separatorLabel(value: string) {
         });
   return `${day} ${clock(value)}`;
 }
-function preview(message: Message, own: boolean) {
-  if (message.storyReply)
-    return own
-      ? `You replied to their story${message.content ? `: ${message.content}` : ""}`
-      : `Replied to your story${message.content ? `: ${message.content}` : ""}`;
-  const body =
-    message.content ||
-    (message.media ? "Sent a video" : message.post ? "Shared a post" : "Attachment unavailable");
-  return own ? `You: ${body}` : body;
-}
-
 function SharedPost({ post }: { post: NonNullable<Message["post"]> }) {
   const media = post.media[0];
   const reel = media?.type === "VIDEO";
@@ -149,26 +143,215 @@ function StoryReplyPreview({
   );
 }
 
+function attachmentLabel(message: Message) {
+  if (message.viewOnce) return message.viewOnceType === "VIDEO" ? "Video" : "Photo";
+  if (message.media) return message.media.type === "IMAGE" ? "Photo" : "Video";
+  if (message.post) return "Shared a post";
+  return "Attachment unavailable";
+}
+function preview(message: Message, own: boolean) {
+  if (message.storyReply)
+    return own
+      ? `You replied to their story${message.content ? `: ${message.content}` : ""}`
+      : `Replied to your story${message.content ? `: ${message.content}` : ""}`;
+  const body = message.content || attachmentLabel(message);
+  return own ? `You: ${body}` : body;
+}
+/** "Active now" / "Active 5m ago", from the server's presence flags. */
+function presence(online: boolean, lastActiveAt: string | null | undefined) {
+  if (online) return "Active now";
+  if (!lastActiveAt) return null;
+  const age = shortTime(lastActiveAt);
+  return age === "now" ? "Active just now" : `Active ${age} ago`;
+}
+
+/** WhatsApp-style receipt: one grey tick sent, two grey delivered, two blue read. */
+function Ticks({ message }: { message: Message }) {
+  const state = message.readAt ? "read" : message.deliveredAt ? "delivered" : "sent";
+  const label = state === "read" ? "Read" : state === "delivered" ? "Delivered" : "Sent";
+  return (
+    <span className={`dm-ticks ${state}`} role="img" aria-label={label} title={label}>
+      {state === "sent" ? <Check size={15} strokeWidth={2.4} /> : <CheckCheck size={15} strokeWidth={2.4} />}
+    </span>
+  );
+}
+
+function Stamp({ message, own }: { message: Message; own: boolean }) {
+  return (
+    <span className="dm-stamp">
+      <time dateTime={message.createdAt}>{clock(message.createdAt)}</time>
+      {own && <Ticks message={message} />}
+    </span>
+  );
+}
+
+const REPLY_KIND: Record<Models["MessageReplyRefDto"]["kind"], string> = {
+  TEXT: "",
+  PHOTO: "Photo",
+  VIDEO: "Video",
+  POST: "Shared post",
+  STORY: "Story reply",
+  VIEW_ONCE: "View once",
+  UNAVAILABLE: "Message unavailable",
+};
+
+function Quote({
+  reply,
+  author,
+  onJump,
+}: {
+  reply: Models["MessageReplyRefDto"];
+  author: string;
+  onJump?: () => void;
+}) {
+  return (
+    <button type="button" className="dm-quote" onClick={onJump} disabled={!onJump}>
+      <strong>{author}</strong>
+      <span>{reply.preview || REPLY_KIND[reply.kind]}</span>
+    </button>
+  );
+}
+
+/** Full-screen view of a view-once photo/video; it cannot be reopened once closed. */
+function ViewOnceViewer({ media, onClose }: { media: Models["MediaDto"]; onClose: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    dialog?.showModal();
+    return () => dialog?.close();
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      className="dm-viewonce-viewer"
+      aria-label="View once"
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <header>
+        <span className="dm-once-badge" aria-hidden="true">1</span>
+        <span>View once · it disappears when you close it</span>
+        <button type="button" className="dm-icon" aria-label="Close" onClick={onClose}>
+          <X size={24} />
+        </button>
+      </header>
+      {media.type === "VIDEO" ? (
+        <MediaVideo src={media.url} autoPlay playsInline controls controlsList="nodownload" />
+      ) : (
+        <img src={media.url} alt="View once photo" draggable={false} />
+      )}
+    </dialog>
+  );
+}
+
+function ViewOnceBubble({ message, own }: { message: Message; own: boolean }) {
+  const client = useQueryClient();
+  const toast = useToast();
+  const [media, setMedia] = useState<Models["MediaDto"] | null>(null);
+  const open = useMutation({
+    mutationFn: () => api("messagesOpen", { params: { id: message.id } }),
+    onSuccess: (m) => {
+      haptic("tap");
+      setMedia(m);
+    },
+    onError: (e) => {
+      toast(e.message, true);
+      void client.invalidateQueries({ queryKey: ["messages"] });
+    },
+  });
+  const kind = message.viewOnceType === "VIDEO" ? "Video" : "Photo";
+  const openable = !own && !!message.viewOnceType && !message.openedAt;
+  const label = message.openedAt ? "Opened" : message.viewOnceType ? kind : "Expired";
+  return (
+    <>
+      <button
+        type="button"
+        className={`dm-bubble dm-viewonce ${message.openedAt || !message.viewOnceType ? "spent" : ""}`}
+        disabled={!openable || open.isPending}
+        onClick={() => open.mutate()}
+        aria-label={openable ? `Open view once ${kind.toLowerCase()}` : `View once ${label.toLowerCase()}`}
+      >
+        <span className="dm-once-badge" aria-hidden="true">1</span>
+        <span>{open.isPending ? "Opening..." : label}</span>
+        <Stamp message={message} own={own} />
+      </button>
+      {media && (
+        <ViewOnceViewer
+          media={media}
+          onClose={() => {
+            setMedia(null);
+            void client.invalidateQueries({ queryKey: ["messages"] });
+          }}
+        />
+      )}
+    </>
+  );
+}
+
 function MessageItem({
   message,
   own,
   peer,
   first,
   last,
-  status,
+  onReply,
+  onJump,
 }: {
   message: Message;
   own: boolean;
   peer: Models["UserProfileDto"];
   first: boolean;
   last: boolean;
-  status?: string;
+  onReply: (message: Message) => void;
+  onJump: (id: string) => void;
 }) {
-  const video = message.media?.type === "VIDEO" ? message.media : null;
-  const missing = !message.content && !video && !message.post && !message.storyReply;
+  const media = message.viewOnce ? null : message.media;
+  const missing =
+    !message.content && !media && !message.post && !message.storyReply && !message.viewOnce;
+  const swipe = useRef<{ x: number; y: number; id: number } | null>(null);
+  const [drag, setDrag] = useState(0);
+  const { user } = useSession();
+  const quoteAuthor = message.replyTo
+    ? message.replyTo.senderId === user?.id
+      ? "You"
+      : peer.displayName
+    : "";
+  const hasText = !!message.content;
   return (
     <li
+      id={`msg-${message.id}`}
       className={`dm-message ${own ? "own" : ""} ${first ? "first" : ""} ${last ? "last" : ""}`}
+      style={drag ? { transform: `translateX(${drag}px)` } : undefined}
+      // Touch: swipe a message to the right to reply, like WhatsApp.
+      onPointerDown={(e) => {
+        if (e.pointerType === "touch") swipe.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+      }}
+      onPointerMove={(e) => {
+        const start = swipe.current;
+        if (!start || start.id !== e.pointerId) return;
+        const dx = e.clientX - start.x;
+        if (Math.abs(e.clientY - start.y) > 24 && Math.abs(dx) < 24) {
+          swipe.current = null;
+          setDrag(0);
+          return;
+        }
+        setDrag(Math.max(0, Math.min(72, dx)));
+      }}
+      onPointerUp={() => {
+        if (drag >= 56) {
+          haptic("tap");
+          onReply(message);
+        }
+        swipe.current = null;
+        setDrag(0);
+      }}
+      onPointerCancel={() => {
+        swipe.current = null;
+        setDrag(0);
+      }}
     >
       {!own && (
         <span className="dm-message-avatar" aria-hidden="true">
@@ -176,32 +359,67 @@ function MessageItem({
         </span>
       )}
       <div className="dm-message-body" title={separatorLabel(message.createdAt)}>
-        {video && (
-          <MediaVideo
-            className="dm-media"
-            src={video.url}
-            style={{
-              aspectRatio:
-                video.width && video.height ? `${video.width}/${video.height}` : "9/16",
-            }}
-            controls
-            playsInline
-            preload="metadata"
-          />
-        )}
         {message.storyReply && <StoryReplyPreview reply={message.storyReply} own={own} />}
+        {message.viewOnce && <ViewOnceBubble message={message} own={own} />}
+        {media &&
+          (media.type === "VIDEO" ? (
+            <MediaVideo
+              className="dm-media"
+              src={media.url}
+              style={{
+                aspectRatio: media.width && media.height ? `${media.width}/${media.height}` : "9/16",
+              }}
+              controls
+              playsInline
+              preload="metadata"
+            />
+          ) : (
+            <a href={media.url} target="_blank" rel="noreferrer" className="dm-photo">
+              <img
+                className="dm-media"
+                src={media.url}
+                alt="Photo"
+                style={{
+                  aspectRatio: media.width && media.height ? `${media.width}/${media.height}` : undefined,
+                }}
+              />
+            </a>
+          ))}
         {message.post && <SharedPost post={message.post} />}
-        {missing && (
-          <p className="dm-bubble muted">This attachment is no longer available.</p>
+        {missing && <p className="dm-bubble muted">This attachment is no longer available.</p>}
+        {(hasText || message.replyTo) && !message.viewOnce && (
+          <div className="dm-bubble">
+            {message.replyTo && (
+              <Quote
+                reply={message.replyTo}
+                author={quoteAuthor}
+                onJump={() => onJump(message.replyTo!.id)}
+              />
+            )}
+            {hasText && <p>{message.content}</p>}
+            <Stamp message={message} own={own} />
+          </div>
         )}
-        {message.content && <p className="dm-bubble">{message.content}</p>}
-        {last && (
-          <small className="dm-meta">
+        {!hasText && !message.replyTo && !message.viewOnce && (
+          <span className="dm-stamp standalone">
             <time dateTime={message.createdAt}>{clock(message.createdAt)}</time>
-            {status && <span>· {status}</span>}
-          </small>
+            {own && <Ticks message={message} />}
+          </span>
         )}
       </div>
+      <button
+        type="button"
+        className="dm-reply-action"
+        aria-label="Reply"
+        onClick={() => onReply(message)}
+      >
+        <Reply size={16} />
+      </button>
+      {drag > 0 && (
+        <span className="dm-swipe-hint" style={{ opacity: Math.min(1, drag / 56) }} aria-hidden="true">
+          <Reply size={16} />
+        </span>
+      )}
     </li>
   );
 }
@@ -236,6 +454,7 @@ function EmojiButton({
         aria-label="Choose an emoji"
         aria-expanded={open}
         disabled={disabled}
+        onPointerDown={(e) => e.preventDefault()}
         onClick={() => setOpen((o) => !o)}
       >
         <Smile size={24} />
@@ -248,6 +467,7 @@ function EmojiButton({
               key={emoji}
               role="option"
               aria-selected={false}
+              onPointerDown={(e) => e.preventDefault()}
               onClick={() => onPick(emoji)}
             >
               {emoji}
@@ -259,18 +479,23 @@ function EmojiButton({
   );
 }
 
+type Draft = { content?: string; mediaId?: string; viewOnce?: boolean; replyToId?: string };
+
 function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
   const { user } = useSession();
   const router = useRouter();
   const toast = useToast();
   const client = useQueryClient();
   const [text, setText] = useState("");
-  const attachment = useMediaAttachment(true);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [viewOnce, setViewOnce] = useState(false);
+  const attachment = useMediaAttachment();
   const inputRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const messageList = useRef<HTMLOListElement>(null);
   const pinned = useRef(true);
+  const typingSent = useRef(0);
   const thread = useInfiniteQuery({
     queryKey: ["messages", user?.id, "thread", peer.id],
     queryFn: ({ pageParam, signal }) =>
@@ -281,23 +506,27 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
       }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (p) => (p.hasMore ? (p.nextCursor ?? undefined) : undefined),
-    refetchInterval: 5000,
+    refetchInterval: 3000,
   });
   const messages = Array.from(
     new Map((thread.data?.pages.flatMap((p) => p.items) ?? []).map((m) => [m.id, m])).values(),
   ).reverse();
   const latest = messages.at(-1)?.id;
-  const lastOwnId = [...messages].reverse().find((m) => m.senderId === user?.id)?.id;
   const unreadId = [...messages]
     .reverse()
     .find((m) => m.recipientId === user?.id && !m.readAt)?.id;
   const status = useQuery({
     queryKey: ["messages", user?.id, "status", peer.id],
     queryFn: ({ signal }) => api("messagesStatus", { params: { id: peer.id }, signal }),
-    refetchInterval: 5000,
+    // Fast enough for a live "typing..." indicator.
+    refetchInterval: 2000,
   });
   const request = !!status.data?.isRequest;
   const awaiting = !!status.data?.awaitingAcceptance;
+  const typing = !!status.data?.peerTyping;
+  const subtitle = typing
+    ? "typing..."
+    : (presence(!!status.data?.peerOnline, status.data?.peerLastActiveAt) ?? peer.username);
   const accept = useMutation({
     mutationFn: () => api("messagesAccept", { params: { id: peer.id } }),
     onSuccess: () => {
@@ -349,18 +578,33 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
   }, [text]);
+  // Stop showing "typing..." to them when leaving the conversation.
+  useEffect(
+    () => () => {
+      if (typingSent.current) void api("messagesStopTyping", { params: { id: peer.id } }).catch(() => {});
+    },
+    [peer.id],
+  );
+  const signalTyping = (value: string) => {
+    const now = Date.now();
+    if (value.trim() && now - typingSent.current > 3000) {
+      typingSent.current = now;
+      void api("messagesTyping", { params: { id: peer.id } }).catch(() => {});
+    } else if (!value.trim() && typingSent.current) {
+      typingSent.current = 0;
+      void api("messagesStopTyping", { params: { id: peer.id } }).catch(() => {});
+    }
+  };
   const send = useMutation({
-    mutationFn: () =>
-      api("messagesSend", {
-        params: { id: peer.id },
-        body: { content: text.trim() || undefined, mediaId: attachment.media?.id },
-      }),
+    mutationFn: (draft: Draft) => api("messagesSend", { params: { id: peer.id }, body: draft }),
     onSuccess: () => {
-      setText("");
       attachment.attached();
+      setViewOnce(false);
       void client.invalidateQueries({ queryKey: ["messages"] });
     },
-    onError: (e) => {
+    onError: (e, draft) => {
+      // Give the text back so nothing typed is lost.
+      if (draft.content) setText((current) => current || draft.content!);
       toast(e.message, true);
       void status.refetch();
     },
@@ -375,8 +619,33 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
     !attachment.error &&
     (!!text.trim() || !!attachment.media);
   const submit = () => {
-    if (canSend) send.mutate();
+    if (!canSend) return;
+    const draft: Draft = {
+      content: text.trim() || undefined,
+      mediaId: attachment.media?.id,
+      viewOnce: attachment.media ? viewOnce : undefined,
+      replyToId: replyTo?.id,
+    };
+    // Clear at once (like WhatsApp) and keep the keyboard open for the next message.
+    setText("");
+    setReplyTo(null);
+    typingSent.current = 0;
+    send.mutate(draft);
+    textRef.current?.focus({ preventScroll: true });
   };
+  const jumpTo = (id: string) => {
+    const el = document.getElementById(`msg-${id}`);
+    if (!el) return toast("That message is further up the conversation.");
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.classList.remove("flash");
+    void el.offsetWidth;
+    el.classList.add("flash");
+  };
+  const startReply = (m: Message) => {
+    setReplyTo(m);
+    textRef.current?.focus({ preventScroll: true });
+  };
+  const media = attachment.media;
   return (
     <section className="dm-thread" aria-label={`Conversation with ${peer.displayName}`}>
       <header className="dm-thread-head">
@@ -384,13 +653,17 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
           <ArrowLeft size={24} />
         </Link>
         <Link className="dm-thread-person" href={`/profile/${peer.username}`}>
-          <Avatar user={peer} size={44} />
+          <span className={`dm-avatar-wrap ${status.data?.peerOnline ? "online" : ""}`}>
+            <Avatar user={peer} size={44} />
+          </span>
           <span>
             <strong>
               {peer.displayName}
               {peer.isVerified && <VerifiedBadge />}
             </strong>
-            <small>{peer.username}</small>
+            <small className={typing ? "typing" : ""} aria-live="polite">
+              {subtitle}
+            </small>
           </span>
         </Link>
         <Link className="dm-icon" href={`/profile/${peer.username}`} aria-label="View profile">
@@ -428,9 +701,7 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
             Loading messages...
           </p>
         )}
-        {thread.error && (
-          <ErrorState error={thread.error} retry={() => void thread.refetch()} />
-        )}
+        {thread.error && <ErrorState error={thread.error} retry={() => void thread.refetch()} />}
         <ol className="dm-messages" ref={messageList}>
           {messages.map((m, i) => {
             const prev = messages[i - 1];
@@ -447,10 +718,7 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
             const first =
               separated || prev.senderId !== m.senderId || at - Date.parse(prev.createdAt) > GROUP_MS;
             const last =
-              nextSeparated ||
-              next.senderId !== m.senderId ||
-              Date.parse(next.createdAt) - at > GROUP_MS;
-            const own = m.senderId === user?.id;
+              nextSeparated || next.senderId !== m.senderId || Date.parse(next.createdAt) - at > GROUP_MS;
             return (
               <Fragment key={m.id}>
                 {separated && (
@@ -460,15 +728,28 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
                 )}
                 <MessageItem
                   message={m}
-                  own={own}
+                  own={m.senderId === user?.id}
                   peer={peer}
                   first={first}
-                  last={last || m.id === lastOwnId}
-                  status={m.id === lastOwnId ? (m.readAt ? "Seen" : "Sent") : undefined}
+                  last={last}
+                  onReply={startReply}
+                  onJump={jumpTo}
                 />
               </Fragment>
             );
           })}
+          {typing && (
+            <li className="dm-message first last dm-typing-row" aria-label={`${peer.displayName} is typing`}>
+              <span className="dm-message-avatar" aria-hidden="true">
+                <Avatar user={peer} size={28} />
+              </span>
+              <span className="dm-bubble dm-typing" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+            </li>
+          )}
         </ol>
       </div>
       {request ? (
@@ -498,122 +779,178 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
           </div>
         </div>
       ) : (
-      <form
-        className="dm-composer"
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit();
-        }}
-      >
-        {awaiting && (
-          <p className="dm-notice">
-            Message request sent. You can send more once {peer.displayName} accepts.
-          </p>
-        )}
-        {!canMessage && !awaiting && (
-          <p className="dm-notice">
-            {peer.isBlocking
-              ? "You blocked this account. Unblock it to send messages."
-              : "Follow this private account before sending a message."}
-          </p>
-        )}
-        {attachment.media && (
-          <div className="dm-attachment">
-            <Video size={18} />
-            <span>
-              {attachment.media.status === "READY" ? "Video ready to send" : "Processing video..."}
-            </span>
-            <button
-              type="button"
-              className="dm-icon"
-              aria-label="Remove video"
-              disabled={send.isPending}
-              onClick={attachment.clear}
-            >
-              <X size={16} />
-            </button>
-          </div>
-        )}
-        {attachment.uploading && (
-          <p className="dm-notice" role="status">
-            Uploading video... {attachment.progress}%
-          </p>
-        )}
-        {attachment.error && (
-          <p className="dm-notice error" role="alert">
-            {attachment.error}
-          </p>
-        )}
-        <div className="dm-compose-row">
-          <EmojiButton
-            disabled={!canMessage || send.isPending}
-            onPick={(emoji) => {
-              const el = textRef.current;
-              const start = el?.selectionStart ?? text.length;
-              const end = el?.selectionEnd ?? text.length;
-              const next = (text.slice(0, start) + emoji + text.slice(end)).slice(0, 2000);
-              setText(next);
-              requestAnimationFrame(() => {
-                el?.focus();
-                el?.setSelectionRange(start + emoji.length, start + emoji.length);
-              });
-            }}
-          />
-          <textarea
-            ref={textRef}
-            aria-label="Message"
-            placeholder="Message..."
-            maxLength={2000}
-            value={text}
-            disabled={!canMessage || send.isPending}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              // Enter sends on devices with a keyboard; Shift+Enter keeps a new line.
-              if (
-                e.key === "Enter" &&
-                !e.shiftKey &&
-                !e.nativeEvent.isComposing &&
-                window.matchMedia("(hover: hover)").matches
-              ) {
-                e.preventDefault();
-                submit();
-              }
-            }}
-            rows={1}
-          />
-          <input
-            ref={inputRef}
-            hidden
-            type="file"
-            accept="video/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = "";
-              void attachment.select(file);
-            }}
-          />
-          {!text.trim() && !attachment.media ? (
-            <button
-              type="button"
-              className="dm-icon"
-              aria-label="Attach video"
-              disabled={!canMessage || attachment.busy || send.isPending}
-              onClick={() => inputRef.current?.click()}
-            >
-              <Video size={24} />
-            </button>
-          ) : (
-            <button
-              type="submit"
-              className="dm-send"
-              aria-label="Send message"
-              disabled={!canSend}
-            >
-              {send.isPending ? "Sending" : "Send"}
-            </button>
+        <form
+          className="dm-composer"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit();
+          }}
+        >
+          {awaiting && (
+            <p className="dm-notice">
+              Message request sent. You can send more once {peer.displayName} accepts.
+            </p>
           )}
-        </div>
-      </form>
+          {!canMessage && !awaiting && (
+            <p className="dm-notice">
+              {peer.isBlocking
+                ? "You blocked this account. Unblock it to send messages."
+                : "Follow this private account before sending a message."}
+            </p>
+          )}
+          {replyTo && (
+            <div className="dm-replying">
+              <Reply size={16} />
+              <span>
+                <strong>
+                  Replying to {replyTo.senderId === user?.id ? "yourself" : peer.displayName}
+                </strong>
+                <small>{replyTo.viewOnce ? "View once" : replyTo.content || attachmentLabel(replyTo)}</small>
+              </span>
+              <button
+                type="button"
+                className="dm-icon"
+                aria-label="Cancel reply"
+                onPointerDown={(e) => e.preventDefault()}
+                onClick={() => setReplyTo(null)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+          {media && (
+            <div className="dm-attachment">
+              {media.status === "READY" && media.type === "IMAGE" ? (
+                <img src={media.url} alt="" className="dm-attachment-thumb" />
+              ) : media.type === "IMAGE" ? (
+                <ImageIcon size={18} />
+              ) : (
+                <Video size={18} />
+              )}
+              <span>
+                {media.status === "READY"
+                  ? `${media.type === "IMAGE" ? "Photo" : "Video"} ready to send`
+                  : "Processing video..."}
+              </span>
+              <button
+                type="button"
+                className={`dm-once-toggle ${viewOnce ? "on" : ""}`}
+                aria-pressed={viewOnce}
+                aria-label="View once"
+                title={viewOnce ? "View once: on" : "View once: off"}
+                onPointerDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  haptic("tap");
+                  setViewOnce((v) => !v);
+                }}
+              >
+                1
+              </button>
+              <button
+                type="button"
+                className="dm-icon"
+                aria-label="Remove attachment"
+                disabled={send.isPending}
+                onClick={() => {
+                  attachment.clear();
+                  setViewOnce(false);
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+          {viewOnce && media && (
+            <p className="dm-notice">They can open it once. It disappears after it&apos;s viewed.</p>
+          )}
+          {attachment.uploading && (
+            <p className="dm-notice" role="status">
+              Uploading... {attachment.progress}%
+            </p>
+          )}
+          {attachment.error && (
+            <p className="dm-notice error" role="alert">
+              {attachment.error}
+            </p>
+          )}
+          <div className="dm-compose-row">
+            <EmojiButton
+              disabled={!canMessage}
+              onPick={(emoji) => {
+                const el = textRef.current;
+                const start = el?.selectionStart ?? text.length;
+                const end = el?.selectionEnd ?? text.length;
+                const next = (text.slice(0, start) + emoji + text.slice(end)).slice(0, 2000);
+                setText(next);
+                signalTyping(next);
+                requestAnimationFrame(() => {
+                  el?.focus({ preventScroll: true });
+                  el?.setSelectionRange(start + emoji.length, start + emoji.length);
+                });
+              }}
+            />
+            <textarea
+              ref={textRef}
+              aria-label="Message"
+              placeholder="Message..."
+              maxLength={2000}
+              value={text}
+              // Never disabled while sending: disabling would blur it and close the phone keyboard.
+              disabled={!canMessage}
+              onChange={(e) => {
+                setText(e.target.value);
+                signalTyping(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape" && replyTo) setReplyTo(null);
+                // Enter sends on devices with a keyboard; Shift+Enter keeps a new line.
+                if (
+                  e.key === "Enter" &&
+                  !e.shiftKey &&
+                  !e.nativeEvent.isComposing &&
+                  window.matchMedia("(hover: hover)").matches
+                ) {
+                  e.preventDefault();
+                  submit();
+                }
+              }}
+              rows={1}
+            />
+            <input
+              ref={inputRef}
+              hidden
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif,video/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                void attachment.select(file);
+              }}
+            />
+            {!text.trim() && !media ? (
+              <button
+                type="button"
+                className="dm-icon"
+                aria-label="Attach photo or video"
+                disabled={!canMessage || attachment.busy}
+                onClick={() => inputRef.current?.click()}
+              >
+                <ImageIcon size={24} />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className="dm-send"
+                aria-label="Send message"
+                disabled={!canSend}
+                // Keep focus in the textarea so the phone keyboard stays open after sending.
+                onPointerDown={(e) => e.preventDefault()}
+              >
+                Send
+              </button>
+            )}
+          </div>
+        </form>
       )}
     </section>
   );
@@ -637,13 +974,17 @@ function ConversationRow({
         aria-current={active ? "page" : undefined}
         title={c.user.displayName}
       >
-        <Avatar user={c.user} size={56} />
+        <span className={`dm-avatar-wrap ${c.online ? "online" : ""}`}>
+          <Avatar user={c.user} size={56} />
+          {c.online && <span className="sr-only">Active now</span>}
+        </span>
         <span className="dm-row-copy">
           <strong>
             {c.user.displayName}
             {c.user.isVerified && <VerifiedBadge />}
           </strong>
           <span>
+            {own && <Ticks message={c.lastMessage} />}
             <span className="dm-row-preview">{preview(c.lastMessage, own)}</span>
             <span aria-hidden="true">·</span>
             <time dateTime={c.lastMessage.createdAt}>{shortTime(c.lastMessage.createdAt)}</time>
@@ -763,6 +1104,7 @@ export default function Messages() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </label>
+        <NotesTray />
         <div className="dm-tabs" role="tablist" aria-label="Conversation folders">
           {(["primary", "requests"] as const).map((f) => (
             <button

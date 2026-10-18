@@ -11,6 +11,7 @@ import { appConfig } from '../src/config/app.config.js';
 import { MediaService } from '../src/modules/media/media.service.js';
 import { ContentDeletionService } from '../src/modules/media/content-deletion.service.js';
 import { StoriesService } from '../src/modules/social/stories.service.js';
+import { MessagesService } from '../src/modules/social/messages.service.js';
 
 describe('Direct messages and stories (e2e)', () => {
   let app: INestApplication;
@@ -149,13 +150,15 @@ describe('Direct messages and stories (e2e)', () => {
   });
 
   it('checks uploaded media ownership, readiness and attachment type', async () => {
+    await api.post(`/users/${alice.id}/follow`, {}, bob).expect(200);
     const photo = await image();
     await api
       .post(`/messages/${bob.id}`, { mediaId: photo.id }, outsider)
       .expect(404);
+    // Photos can be sent in direct messages too.
     await api
       .post(`/messages/${bob.id}`, { mediaId: photo.id }, alice)
-      .expect(400);
+      .expect(201);
     const video = await api.uploadVideo(alice);
     await db.query("UPDATE media SET status = 'PROCESSING' WHERE id = $1", [
       video.id,
@@ -341,12 +344,12 @@ describe('Direct messages and stories (e2e)', () => {
     await api
       .post(`/messages/${alice.id}`, { content: 'again?' }, bob)
       .expect(403);
-    expect((await api.get(`/messages/${alice.id}/status`, bob)).body).toEqual({
+    expect((await api.get(`/messages/${alice.id}/status`, bob)).body).toMatchObject({
       isRequest: false,
       awaitingAcceptance: true,
       canSend: false,
     });
-    expect((await api.get(`/messages/${bob.id}/status`, alice)).body).toEqual({
+    expect((await api.get(`/messages/${bob.id}/status`, alice)).body).toMatchObject({
       isRequest: true,
       awaitingAcceptance: false,
       canSend: true,
@@ -438,5 +441,127 @@ describe('Direct messages and stories (e2e)', () => {
     await api.delete(`/stickers/${unused.id}`, alice).expect(204);
     expect((await db.query('SELECT 1 FROM media WHERE id = $1', [media])).length).toBe(0);
     await api.post('/stickers', { mediaId: (await api.uploadVideo(alice)).id }, alice).expect(400);
+  });
+
+  /** A mono 8 kHz WAV tone, long enough to clip 15 s from. */
+  const wav = (seconds: number) => {
+    const rate = 8000;
+    const samples = rate * seconds;
+    const buffer = Buffer.alloc(44 + samples * 2);
+    buffer.write('RIFF', 0);
+    buffer.writeUInt32LE(36 + samples * 2, 4);
+    buffer.write('WAVEfmt ', 8);
+    buffer.writeUInt32LE(16, 16);
+    buffer.writeUInt16LE(1, 20);
+    buffer.writeUInt16LE(1, 22);
+    buffer.writeUInt32LE(rate, 24);
+    buffer.writeUInt32LE(rate * 2, 28);
+    buffer.writeUInt16LE(2, 32);
+    buffer.writeUInt16LE(16, 34);
+    buffer.write('data', 36);
+    buffer.writeUInt32LE(samples * 2, 40);
+    for (let i = 0; i < samples; i++)
+      buffer.writeInt16LE(Math.round(Math.sin((i / rate) * 2 * Math.PI * 440) * 8000), 44 + i * 2);
+    return buffer;
+  };
+
+  it('tracks delivery, presence, typing and quoted replies', async () => {
+    await api.post(`/users/${alice.id}/follow`, {}, bob).expect(200);
+    const hi = (await send('hi')).body;
+    expect(hi).toMatchObject({ deliveredAt: null, readAt: null, replyTo: null, viewOnce: false });
+    await api.get('/messages/unread-count', bob).expect(200);
+    const delivered = (await api.get(`/messages/${bob.id}`, alice)).body.items[0];
+    expect(delivered.deliveredAt).not.toBeNull();
+    expect(delivered.readAt).toBeNull();
+    const status = (await api.get(`/messages/${bob.id}/status`, alice)).body;
+    expect(status).toMatchObject({ peerOnline: true, peerTyping: false });
+    expect(status.peerLastActiveAt).not.toBeNull();
+    expect((await api.get('/messages', alice)).body.items[0]).toMatchObject({ online: true });
+    await api.post(`/messages/${alice.id}/typing`, {}, bob).expect(204);
+    expect((await api.get(`/messages/${bob.id}/status`, alice)).body.peerTyping).toBe(true);
+    expect((await api.get(`/messages/${alice.id}/status`, bob)).body.peerTyping).toBe(false);
+    await api.delete(`/messages/${alice.id}/typing`, bob).expect(204);
+    expect((await api.get(`/messages/${bob.id}/status`, alice)).body.peerTyping).toBe(false);
+    await db.query("UPDATE users SET last_active_at = now() - interval '5 minutes' WHERE id = $1", [bob.id]);
+    expect((await api.get(`/messages/${bob.id}/status`, alice)).body.peerOnline).toBe(false);
+    const reply = (
+      await api.post(`/messages/${alice.id}`, { content: 'yo', replyToId: hi.id }, bob).expect(201)
+    ).body;
+    expect(reply.replyTo).toEqual({ id: hi.id, senderId: alice.id, kind: 'TEXT', preview: 'hi' });
+    await api.post(`/users/${outsider.id}/follow`, {}, bob).expect(200);
+    await api.post(`/messages/${bob.id}`, { content: 'other' }, outsider).expect(201);
+    const other = (await api.get(`/messages/${outsider.id}`, bob)).body.items[0];
+    await api
+      .post(`/messages/${alice.id}`, { content: 'x', replyToId: other.id }, bob)
+      .expect(404);
+  });
+
+  it('lets the recipient open a view-once photo exactly once, then deletes it', async () => {
+    await api.post(`/users/${alice.id}/follow`, {}, bob).expect(200);
+    await api.post(`/messages/${bob.id}`, { content: 'x', viewOnce: true }, alice).expect(400);
+    const photo = await image();
+    const sent = (
+      await api.post(`/messages/${bob.id}`, { mediaId: photo.id, viewOnce: true }, alice).expect(201)
+    ).body;
+    expect(sent).toMatchObject({ media: null, viewOnce: true, viewOnceType: 'IMAGE', openedAt: null });
+    const listed = (await api.get(`/messages/${alice.id}`, bob)).body.items[0];
+    expect(listed).toMatchObject({ media: null, viewOnceType: 'IMAGE' });
+    await api.post(`/messages/${sent.id}/open`, {}, alice).expect(404);
+    const opened = (await api.post(`/messages/${sent.id}/open`, {}, bob).expect(201)).body;
+    expect(opened.type).toBe('IMAGE');
+    const path = new URL(opened.url).pathname + new URL(opened.url).search;
+    await api.http.get(path).expect(200);
+    await api.post(`/messages/${sent.id}/open`, {}, bob).expect(409);
+    const after = (await api.get(`/messages/${alice.id}`, bob)).body.items[0];
+    expect(after.openedAt).not.toBeNull();
+    expect(after.viewOnceType).toBeNull();
+    await db.query("UPDATE direct_messages SET opened_at = now() - interval '3 minutes' WHERE id = $1", [sent.id]);
+    await api.http.get(path).expect(404);
+    await app.get(MessagesService).purgeOpenedViewOnce();
+    expect((await db.query('SELECT 1 FROM media WHERE id = $1', [photo.id])).length).toBe(0);
+    expect((await api.get(`/messages/${bob.id}`, alice)).body.items[0]).toMatchObject({
+      viewOnce: true,
+      openedAt: expect.any(String),
+    });
+    const normal = (
+      await api.post(`/messages/${bob.id}`, { mediaId: (await image()).id }, alice).expect(201)
+    ).body;
+    expect(normal.media.type).toBe('IMAGE');
+  });
+
+  it('shares notes with a 15 second song clip to followers and replaces them', async () => {
+    const upload = (buffer: Buffer, startMs: number, user = alice, name = 'song.wav') =>
+      api.http
+        .post('/api/notes/audio')
+        .set(user.auth)
+        .field('startMs', String(startMs))
+        .attach('file', buffer, { filename: name, contentType: 'audio/wav' });
+    await upload(wav(20), 30_000).expect(400);
+    await upload(png, 0, alice, 'not-audio.png').expect(400);
+    const res = await upload(wav(20), 3_000);
+    expect(res.body).toMatchObject({ durationMs: 15_000 });
+    const clip = res.body;
+    expect(clip.durationMs).toBe(15_000);
+    const clipPath = new URL(clip.url).pathname + new URL(clip.url).search;
+    await api.http.get(clipPath).expect(200);
+    await api.post('/notes', {}, alice).expect(400);
+    await api.post('/notes', { text: 'x'.repeat(61) }, alice).expect(400);
+    await api.post('/notes', { audioId: clip.id }, bob).expect(404);
+    const note = (
+      await api.post('/notes', { text: 'Listening now', audioId: clip.id, songTitle: 'Tone' }, alice).expect(201)
+    ).body;
+    expect(note).toMatchObject({ text: 'Listening now', songTitle: 'Tone', audioDurationMs: 15_000, isOwn: true });
+    expect(note.audioUrl).toContain('.m4a');
+    expect((await api.get('/notes', bob)).body).toHaveLength(0);
+    await api.post(`/users/${alice.id}/follow`, {}, bob).expect(200);
+    expect((await api.get('/notes', bob)).body[0]).toMatchObject({ id: note.id, isOwn: false });
+    expect((await api.get('/notes', outsider)).body).toHaveLength(0);
+    const replaced = (await api.post('/notes', { text: 'Just text' }, alice).expect(201)).body;
+    expect(replaced).toMatchObject({ text: 'Just text', audioUrl: null });
+    await api.http.get(new URL(note.audioUrl).pathname + new URL(note.audioUrl).search).expect(404);
+    expect((await api.get('/notes', alice)).body).toHaveLength(1);
+    await api.delete('/notes/me', alice).expect(204);
+    await api.delete('/notes/me', alice).expect(404);
+    expect((await api.get('/notes', bob)).body).toHaveLength(0);
   });
 });

@@ -9,8 +9,13 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
+  ApiBody,
+  ApiConsumes,
   ApiCreatedResponse,
   ApiNoContentResponse,
   ApiOkResponse,
@@ -29,15 +34,22 @@ import {
   Paginated,
 } from '../../common/dto/common.dto.js';
 import { MediaModule } from '../media/media.module.js';
+import { MediaDto } from '../media/dto/media.dto.js';
+import { UploadsMulterModule } from '../media/multer.options.js';
 import { PostsModule } from '../posts/posts.module.js';
 import { UsersModule } from '../users/users.module.js';
 import {
   ConversationDto,
   ConversationQueryDto,
+  CreateNoteDto,
   CreateStickerDto,
   CreateStoryDto,
   DirectMessageDto,
   MessageStatusDto,
+  NoteAudioDto,
+  NoteAudioFieldsDto,
+  NoteAudioUploadDto,
+  NoteDto,
   SendMessageDto,
   StickerDto,
   StoryDto,
@@ -45,6 +57,7 @@ import {
   StoryViewerDto,
 } from './social.dto.js';
 import { MessagesService } from './messages.service.js';
+import { NotesService } from './notes.service.js';
 import { StickersService } from './stickers.service.js';
 import { StoriesService } from './stories.service.js';
 
@@ -114,6 +127,44 @@ export class MessagesController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.messages.status(u.id, id);
+  }
+  @Post(':id/typing')
+  @HttpCode(204)
+  @ApiOperation({
+    operationId: 'messagesTyping',
+    summary: 'Tell this user you are typing (lasts a few seconds)',
+  })
+  @ApiNoContentResponse()
+  async typing(
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.messages.typing(u.id, id);
+  }
+  @Delete(':id/typing')
+  @HttpCode(204)
+  @ApiOperation({
+    operationId: 'messagesStopTyping',
+    summary: 'Stop the typing indicator',
+  })
+  @ApiNoContentResponse()
+  async stopTyping(
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.messages.stopTyping(u.id, id);
+  }
+  @Post(':id/open')
+  @ApiOperation({
+    operationId: 'messagesOpen',
+    summary: 'Open a view-once photo or video you received (works once)',
+  })
+  @ApiCreatedResponse({ type: MediaDto })
+  open(
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.messages.open(u.id, id);
   }
   @Post(':id/accept')
   @HttpCode(204)
@@ -290,9 +341,57 @@ export class StickersController {
     await this.stickers.remove(u.id, id);
   }
 }
+@ApiTags('Notes')
+@ApiAuth()
+@ApiErrors(400, 401, 403, 404, 415)
+@Controller('notes')
+export class NotesController {
+  constructor(private readonly notes: NotesService) {}
+  @Get()
+  @ApiOperation({
+    operationId: 'notesList',
+    summary: 'Your note and notes from accounts you follow (24 h)',
+  })
+  @ApiOkResponse({ type: NoteDto, isArray: true })
+  list(@CurrentUser() u: AuthUser) {
+    return this.notes.list(u.id);
+  }
+  @Post()
+  @ApiOperation({
+    operationId: 'notesCreate',
+    summary: 'Share a note (replaces your current one)',
+  })
+  @ApiCreatedResponse({ type: NoteDto })
+  create(@CurrentUser() u: AuthUser, @Body() dto: CreateNoteDto) {
+    return this.notes.create(u.id, dto);
+  }
+  @Delete('me')
+  @HttpCode(204)
+  @ApiOperation({ operationId: 'notesDelete', summary: 'Delete your note' })
+  @ApiNoContentResponse()
+  async remove(@CurrentUser() u: AuthUser) {
+    await this.notes.remove(u.id);
+  }
+  @Post('audio')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({
+    operationId: 'notesUploadAudio',
+    summary: 'Upload a song and keep a 15 second clip for your note',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: NoteAudioUploadDto })
+  @ApiCreatedResponse({ type: NoteAudioDto })
+  uploadAudio(
+    @CurrentUser() u: AuthUser,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: NoteAudioFieldsDto,
+  ) {
+    return this.notes.uploadAudio(u.id, file, dto.startMs);
+  }
+}
 @Module({
-  imports: [MediaModule, UsersModule, PostsModule],
-  controllers: [MessagesController, StoriesController, StickersController],
-  providers: [MessagesService, StoriesService, StickersService],
+  imports: [MediaModule, UsersModule, PostsModule, UploadsMulterModule],
+  controllers: [MessagesController, StoriesController, StickersController, NotesController],
+  providers: [MessagesService, StoriesService, StickersService, NotesService],
 })
 export class SocialModule {}

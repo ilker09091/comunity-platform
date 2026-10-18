@@ -20,6 +20,8 @@ import {
   PlusSquare,
   ShieldCheck,
   CircleAlert,
+  Heart,
+  Send,
 } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { useFeatures } from "@/lib/platform-config";
@@ -27,6 +29,7 @@ import { useSession } from "./providers";
 import { Avatar, Dropdown, ErrorState, VerifiedBadge } from "./ui";
 import { useMessageUnread } from "./social-controls";
 import FollowButton from "./follow-button";
+import PostComposer from "./post-composer";
 import { ActivityWidget, useUnreadTotal, WidgetSkeleton } from "./notifications";
 
 export function Brand() {
@@ -104,19 +107,25 @@ export function AppHeader() {
           })}
         </nav>
         <div className="header-right">
-          {on("search") && (
-            <Link href="/explore" className="icon-button mobile-only" aria-label="Search">
-              <Search size={20} />
-            </Link>
-          )}
+          {/* Phones: Instagram-style activity heart and messages in the top-right corner. */}
           <Link
             href="/notifications"
             className="icon-button mobile-only header-bell"
             aria-label={unreadTotal ? `Notifications, ${unreadTotal} unread` : "Notifications"}
           >
-            <Bell size={20} />
+            <Heart size={24} strokeWidth={1.9} />
             <UnreadBadge count={unreadTotal} />
           </Link>
+          {user && (
+            <Link
+              href="/messages"
+              className="icon-button mobile-only header-bell header-messages"
+              aria-label={messageUnread ? `Messages, ${messageUnread} unread` : "Messages"}
+            >
+              <Send size={23} strokeWidth={1.9} />
+              <UnreadBadge count={messageUnread} />
+            </Link>
+          )}
           {user ? (
             <Dropdown
               label="Account menu"
@@ -355,34 +364,57 @@ export function RightSidebar() {
   );
 }
 
+/**
+ * Phones: an Instagram-style icon bar — Home, Explore, Create, Reels and your profile picture.
+ * Messages and activity live in the header's top-right corner.
+ */
 export function MobileNav({ variant = "default", onCreate }: { variant?: "default" | "reels"; onCreate?: () => void } = {}) {
   const pathname = usePathname();
   const { user } = useSession();
-  const unreadTotal = useUnreadTotal();
-  const messageUnread = useMessageUnread().data?.count ?? 0;
   const { on } = useFeatures();
-  const items = [
+  const [creating, setCreating] = useState(false);
+  const profile = user ? `/profile/${user.username}` : "/login";
+  const links = [
     { href: "/", label: "Home", icon: Home },
-    { href: "/explore", label: "Explore", icon: Compass },
+    { href: "/explore", label: "Explore", icon: Search },
     { href: "/reels", label: "Reels", icon: Clapperboard },
-    { href: "/messages", label: "Messages", icon: MessageCircle, badge: messageUnread },
-    { href: "/notifications", label: "Activity", icon: Bell, badge: unreadTotal },
-    { href: user ? `/profile/${user.username}` : "/login", label: "Profile", icon: UserRound },
   ].filter((item) => item.href !== "/reels" || on("reels"));
+  const tab = ({ href, label, icon: Icon }: (typeof links)[number]) => {
+    const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+    return (
+      <Link key={label} href={href} className={active ? "active" : ""} aria-current={active ? "page" : undefined} aria-label={label}>
+        <span className="mobile-nav-icon">
+          <Icon size={26} strokeWidth={active ? 2.6 : 1.8} aria-hidden="true" />
+        </span>
+      </Link>
+    );
+  };
+  const profileActive = !!user && pathname === profile;
   return (
     <nav className={`mobile-nav ${variant === "reels" ? "reels-mobile-nav" : ""}`} aria-label="Mobile navigation">
-      {items.filter(item => variant !== "reels" || item.label !== "Activity").map(({ href, label, icon: Icon, badge }) => (
-        <Fragment key={label}>
-        {variant === "reels" && label === "Reels" && <button type="button" aria-label="Create post" onClick={onCreate}><PlusSquare size={23} /><span>Create</span></button>}
-        <Link key={label} href={href} className={pathname === href ? "active" : ""} aria-current={pathname === href ? "page" : undefined}>
-          <span className="mobile-nav-icon">
-            <Icon size={21} aria-hidden="true" />
-            <UnreadBadge count={badge} />
-          </span>
-          <span>{label}</span>
-        </Link>
-        </Fragment>
-      ))}
+      {links.slice(0, 2).map(tab)}
+      <button
+        type="button"
+        className="mobile-nav-create"
+        aria-label="Create post"
+        onClick={() => (onCreate ? onCreate() : setCreating(true))}
+      >
+        <span className="mobile-nav-icon">
+          <PlusSquare size={26} strokeWidth={1.8} aria-hidden="true" />
+        </span>
+      </button>
+      {links.slice(2).map(tab)}
+      <Link
+        href={profile}
+        className={`mobile-nav-profile ${profileActive ? "active" : ""}`}
+        aria-current={profileActive ? "page" : undefined}
+        aria-label="Profile"
+      >
+        <span className="mobile-nav-icon">
+          {user ? <Avatar user={user} size={28} /> : <UserRound size={26} strokeWidth={1.8} aria-hidden="true" />}
+        </span>
+      </Link>
+      {creating && <PostComposer modalOpen onModalClose={() => setCreating(false)} />}
     </nav>
   );
 }

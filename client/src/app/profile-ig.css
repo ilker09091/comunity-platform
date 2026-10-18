@@ -1,0 +1,358 @@
+/* ==========================================================================
+   Profile — Instagram layout with Circle's cover photo
+   Desktop: cover on top, big avatar overlapping it on the left; username, buttons and menu in one
+   row; stats; bio; full-width tabs joined to the post grid below.
+   Phones: cover, avatar overlapping it beside the stats, username row, bio, full-width buttons,
+   icon tabs, then an edge-to-edge 3-column grid.
+   ========================================================================== */
+.ig-profile-header {
+  --avatar: clamp(104px, 10vw, 150px);
+  display: grid;
+  grid-template-columns: calc(var(--avatar) + 40px) minmax(0, 1fr);
+  grid-template-areas:
+    "cover cover"
+    "avatar title"
+    "avatar stats"
+    "avatar bio"
+    "tabs tabs";
+  align-items: start;
+  column-gap: 20px;
+  padding: 8px 28px 0;
+  overflow: visible;
+}
+.ig-profile-cover {
+  grid-area: cover;
+  height: clamp(130px, 13vw, 200px);
+  margin: 0 -20px 16px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #dbe9f9;
+}
+.ig-profile-cover img,
+.ig-profile-cover .cover-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ig-profile-avatar {
+  grid-area: avatar;
+  justify-self: center;
+  align-self: start;
+  /* Overlaps the bottom of the cover. */
+  margin-top: calc(var(--avatar) * -0.5);
+}
+.ig-profile-avatar .avatar {
+  width: var(--avatar) !important;
+  height: var(--avatar) !important;
+  font-size: calc(var(--avatar) * 0.32) !important;
+  border: 4px solid var(--surface);
+  box-shadow: 0 2px 10px rgba(23, 25, 29, 0.12);
+}
+.ig-profile-title {
+  grid-area: title;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  min-width: 0;
+}
+.ig-username {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 0 8px 0 0;
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+.ig-username > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ig-profile-buttons {
+  display: flex;
+  gap: 8px;
+}
+.ig-profile-buttons > .button {
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ig-profile-buttons > .button.secondary {
+  border: 0;
+  background: #efefef;
+  color: var(--text);
+}
+.ig-profile-buttons > .button.secondary:hover:not(:disabled) {
+  background: #dbdbdb;
+}
+.ig-profile-menu .dropdown > summary.button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  background: transparent;
+}
+.ig-profile-menu .dropdown > summary.button:hover {
+  background: var(--surface-hover);
+}
+.ig-stats {
+  grid-area: stats;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 15px;
+}
+.ig-stats li {
+  white-space: nowrap;
+}
+.ig-stats strong {
+  font-weight: 600;
+}
+.ig-stats button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.ig-stats button:not(:disabled):hover span {
+  text-decoration: underline;
+}
+.ig-stats button:disabled {
+  cursor: default;
+}
+.ig-bio {
+  grid-area: bio;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+  margin: 16px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.ig-display-name {
+  font-weight: 600;
+}
+.ig-bio-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ig-bio-line,
+.ig-bio-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.ig-bio-link {
+  color: #00376b;
+  font-weight: 600;
+}
+.ig-bio-link:hover {
+  text-decoration: underline;
+}
+.ig-bio-line.muted {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.ig-bio .follows-you {
+  margin: 0;
+}
+
+/* Tabs: full width, equal columns, sliding indicator; joined to the grid underneath. */
+.ig-profile-tabs {
+  grid-area: tabs;
+  margin: 22px -28px 0;
+}
+.ig-profile-tabs .profile-tabs {
+  border-top: 1px solid var(--border);
+}
+.ig-profile-tabs .profile-tabs button {
+  height: 52px;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ig-profile-tabs .profile-tabs button svg {
+  width: 17px;
+  height: 17px;
+}
+.ig-profile-tabs .profile-tab-indicator {
+  top: -1px;
+  bottom: auto;
+}
+.ig-profile-tabs .profile-tab-indicator::after {
+  width: 100%;
+  height: 2px;
+  border-radius: 0;
+  background: var(--text);
+}
+.ig-profile-header:has(.ig-profile-tabs) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+/* The grid continues the header card: same surface, no gap in between. */
+.ig-profile-header:has(.ig-profile-tabs) + .ig-profile-panel {
+  margin-top: -18px;
+  padding: 0 4px 4px;
+  border: 1px solid var(--border);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.ig-profile-header:has(.ig-profile-tabs) + .ig-profile-panel .empty-state,
+.ig-profile-header:has(.ig-profile-tabs) + .ig-profile-panel > .card {
+  border: 0;
+  box-shadow: none;
+}
+.ig-profile-header .profile-avatar-skeleton.skeleton.circle {
+  width: var(--avatar);
+  height: var(--avatar);
+  margin: 0;
+}
+.ig-profile-panel .profile-social-grid {
+  gap: 4px;
+}
+.ig-profile-panel .profile-tile {
+  aspect-ratio: 3 / 4;
+  border-radius: 0;
+}
+
+@media (max-width: 767px) {
+  .ig-profile-header {
+    --avatar: 86px;
+    grid-template-columns: 86px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "cover cover cover"
+      "avatar stats stats"
+      "name name menu"
+      "bio bio bio"
+      "buttons buttons buttons"
+      "tabs tabs tabs";
+    column-gap: 16px;
+    margin: -14px -14px 0;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .ig-profile-cover {
+    height: 132px;
+    margin: 0 -16px 10px;
+    border-radius: 0;
+  }
+  .ig-profile-avatar {
+    margin-top: -46px;
+  }
+  .ig-profile-avatar .avatar {
+    border-width: 3px;
+  }
+  /* The desktop title row dissolves so its pieces take their own places in the grid. */
+  .ig-profile-title {
+    display: contents;
+  }
+  .ig-username {
+    grid-area: name;
+    align-self: center;
+    margin: 12px 0 0;
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .ig-profile-menu {
+    grid-area: menu;
+    align-self: center;
+    margin-top: 12px;
+  }
+  .ig-stats {
+    align-self: center;
+    justify-content: space-around;
+    gap: 8px;
+    margin: 0;
+    font-size: 14px;
+    text-align: center;
+  }
+  .ig-stats li,
+  .ig-stats button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.25;
+  }
+  .ig-stats strong {
+    font-size: 17px;
+    font-weight: 700;
+  }
+  .ig-stats span {
+    font-size: 13px;
+  }
+  .ig-bio {
+    margin-top: 6px;
+  }
+  .ig-profile-buttons {
+    grid-area: buttons;
+    margin-top: 14px;
+  }
+  .ig-profile-buttons > .button,
+  .ig-profile-buttons > button {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 34px;
+    padding: 0 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ig-profile-tabs {
+    margin: 16px -16px 0;
+  }
+  .ig-profile-tabs .profile-tabs {
+    padding: 0;
+  }
+  .ig-profile-tabs .profile-tabs button {
+    height: 46px;
+    font-size: 0;
+    letter-spacing: 0;
+  }
+  .ig-profile-tabs .profile-tabs button svg {
+    width: 24px;
+    height: 24px;
+    color: var(--muted);
+  }
+  .ig-profile-tabs .profile-tabs button.active svg {
+    color: var(--text);
+  }
+  .ig-profile-tabs .profile-tab-indicator {
+    top: auto;
+    bottom: -1px;
+  }
+  .ig-profile-tabs .profile-tab-indicator::after {
+    height: 1px;
+  }
+  /* Edge-to-edge grid with hairline gaps, like Instagram. */
+  .ig-profile-header:has(.ig-profile-tabs) + .ig-profile-panel,
+  .ig-profile-panel {
+    margin: -12px -14px 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .ig-profile-panel .profile-social-grid {
+    gap: 2px;
+  }
+}

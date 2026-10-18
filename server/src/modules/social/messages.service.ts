@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import { AppException, ErrorCode } from '../../common/errors/app.exception.js';
@@ -14,9 +15,17 @@ import {
 } from '../users/users.service.js';
 import {
   DirectMessageDto,
+  MessageReplyRefDto,
   MessageStatusDto,
   SendMessageDto,
 } from './social.dto.js';
+
+/** Someone counts as online while their app polled us this recently. */
+export const ONLINE_WINDOW_SQL = "interval '45 seconds'";
+/** A typing signal lasts this long unless refreshed. */
+const TYPING_WINDOW_SQL = "interval '6 seconds'";
+/** Opened view-once media can still finish loading for this long, then it is deleted. */
+const VIEW_ONCE_GRACE_SQL = "interval '2 minutes'";
 
 /**
  * A thread from `peer` is a request for `owner` until the owner follows them, writes to them
@@ -29,6 +38,7 @@ const requestSql = (owner: string, peer: string) => `(
 
 @Injectable()
 export class MessagesService {
+  private readonly logger = new Logger(MessagesService.name);
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly users: UsersService,
@@ -134,13 +144,54 @@ export class MessagesService {
             : null,
       ]),
     );
+    const replyIds = [...new Set(rows.map((r) => r.reply_to_id).filter(Boolean))];
+    const parents = replyIds.length
+      ? await sqlRows(
+          this.db,
+          `SELECT d.id, d.sender_id, d.content, d.post_id, d.story_reply, d.view_once, m.type AS media_type
+          FROM direct_messages d LEFT JOIN media m ON m.id = d.media_id WHERE d.id = ANY($1::uuid[])`,
+          [replyIds],
+        )
+      : [];
+    const byParent = new Map<string, MessageReplyRefDto>(
+      parents.map((m) => [
+        m.id,
+        {
+          id: m.id,
+          senderId: m.sender_id,
+          kind: m.view_once
+            ? 'VIEW_ONCE'
+            : m.content
+              ? 'TEXT'
+              : m.media_type === 'IMAGE'
+                ? 'PHOTO'
+                : m.media_type === 'VIDEO'
+                  ? 'VIDEO'
+                  : m.post_id
+                    ? 'POST'
+                    : m.story_reply
+                      ? 'STORY'
+                      : 'UNAVAILABLE',
+          preview: m.view_once ? null : m.content ? String(m.content).slice(0, 140) : null,
+        },
+      ]),
+    );
     return rows.map((r) => ({
       id: r.id,
       senderId: r.sender_id,
       recipientId: r.recipient_id,
       content: r.content,
-      media: byMedia.get(r.media_id) ?? null,
+      // View-once media is only ever handed out by `open`, exactly once, to the recipient.
+      media: r.view_once ? null : (byMedia.get(r.media_id) ?? null),
       post: byPost.get(r.post_id) ?? null,
+      replyTo: r.reply_to_id ? (byParent.get(r.reply_to_id) ?? null) : null,
+      viewOnce: !!r.view_once,
+      viewOnceType:
+        r.view_once && !r.opened_at && r.media_id
+          ? (byMedia.get(r.media_id)?.type ?? null)
+          : null,
+      openedAt: iso(r.opened_at),
+      deliveredAt: iso(r.delivered_at),
       storyReply: r.story_reply
         ? { storyId: r.story_id ?? null, media: byStory.get(r.story_id) ?? null }
         : null,
@@ -166,6 +217,20 @@ export class MessagesService {
         ErrorCode.VALIDATION_ERROR,
         'Choose one attachment',
       );
+    if (dto.viewOnce && !dto.mediaId)
+      throw AppException.badRequest(
+        ErrorCode.VALIDATION_ERROR,
+        'View once needs a photo or video',
+      );
+    if (dto.replyToId) {
+      const parent = await sqlOne(
+        this.db,
+        `SELECT 1 FROM direct_messages WHERE id = $1
+        AND ((sender_id = $2 AND recipient_id = $3) OR (sender_id = $3 AND recipient_id = $2))`,
+        [dto.replyToId, senderId, recipientId],
+      );
+      if (!parent) throw AppException.notFound(ErrorCode.NOT_FOUND, 'Message not found');
+    }
     if (dto.postId) {
       await this.posts.getOne(dto.postId, senderId);
       await this.posts.getOne(dto.postId, recipientId);
@@ -187,7 +252,7 @@ export class MessagesService {
         const [media] = await this.media.lockAttachable(m, senderId, [
           dto.mediaId,
         ]);
-        if (media.type !== 'VIDEO' || media.status !== 'READY') {
+        if (media.status !== 'READY') {
           throw AppException.badRequest(
             ErrorCode.INVALID_MEDIA,
             'Wait for the video to finish processing',
@@ -196,8 +261,8 @@ export class MessagesService {
       }
       return (await sqlOne(
         m,
-        `INSERT INTO direct_messages(sender_id, recipient_id, content, media_id, post_id, story_id, story_reply)
-        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+        `INSERT INTO direct_messages(sender_id, recipient_id, content, media_id, post_id, story_id, story_reply, reply_to_id, view_once)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
         [
           senderId,
           recipientId,
@@ -206,6 +271,8 @@ export class MessagesService {
           dto.postId ?? null,
           storyId ?? null,
           !!storyId,
+          dto.replyToId ?? null,
+          !!dto.viewOnce,
         ],
       ))!;
     });
@@ -219,6 +286,7 @@ export class MessagesService {
     limit: number,
   ) {
     await this.assertPeer(viewerId, peerId);
+    await this.markDelivered(viewerId);
     const cursor = decodeCursor(cursorStr, ['date', 'uuid']);
     const rows = await sqlRows(
       this.db,
@@ -243,6 +311,7 @@ export class MessagesService {
     limit: number,
     folder?: 'primary' | 'requests',
   ) {
+    await this.markDelivered(viewerId);
     const cursor = decodeCursor(cursorStr, ['date', 'uuid']);
     const isRequest = requestSql('$1', 'u.id');
     const rows = await sqlRows(
@@ -254,7 +323,8 @@ export class MessagesService {
       ORDER BY CASE WHEN sender_id = $1 THEN recipient_id ELSE sender_id END, created_at DESC, id DESC
     ) SELECT l.*, ${USER_SUMMARY_COLUMNS}, l.id AS message_id,
       (SELECT count(*)::int FROM direct_messages d WHERE d.recipient_id = $1 AND d.sender_id = u.id AND d.read_at IS NULL) AS unread,
-      ${isRequest} AS is_request
+      ${isRequest} AS is_request,
+      u.last_active_at, (u.last_active_at > now() - ${ONLINE_WINDOW_SQL}) AS online
       FROM latest l JOIN users u ON u.id = l.peer_id ${USER_AVATAR_JOIN}
       WHERE u.status = 'ACTIVE' AND ${notBlockedSql('u.id', '$1')}
       ${folder ? `AND ${folder === 'requests' ? '' : 'NOT '}${isRequest}` : ''}
@@ -279,6 +349,8 @@ export class MessagesService {
         lastMessage: messages[i],
         unreadCount: r.unread,
         isRequest: r.is_request,
+        online: !!r.online,
+        lastActiveAt: iso(r.last_active_at),
       })),
     };
   }
@@ -295,11 +367,105 @@ export class MessagesService {
       if (!(e instanceof AppException)) throw e;
       allowed = false;
     }
+    await this.touch(viewerId);
+    const presence = await sqlOne<{ typing: boolean; online: boolean; last_active_at: Date | null }>(
+      this.db,
+      `SELECT u.last_active_at, (u.last_active_at > now() - ${ONLINE_WINDOW_SQL}) AS online,
+        EXISTS (SELECT 1 FROM typing_status t WHERE t.user_id = u.id AND t.peer_id = $2
+          AND t.updated_at > now() - ${TYPING_WINDOW_SQL}) AS typing
+      FROM users u WHERE u.id = $1`,
+      [peerId, viewerId],
+    );
     return {
       isRequest: mine.request && mine.sent,
       awaitingAcceptance,
       canSend: allowed && !awaitingAcceptance,
+      peerTyping: !!presence?.typing,
+      peerOnline: !!presence?.online,
+      peerLastActiveAt: iso(presence?.last_active_at ?? null),
     };
+  }
+
+  /** Records that the viewer's app is open (throttled to one write per 20 s). */
+  async touch(viewerId: string) {
+    await sqlRows(
+      this.db,
+      `UPDATE users SET last_active_at = now()
+      WHERE id = $1 AND (last_active_at IS NULL OR last_active_at < now() - interval '20 seconds')`,
+      [viewerId],
+    );
+  }
+
+  /** The viewer's app fetched their messages: everything sent to them reached the device. */
+  private async markDelivered(viewerId: string) {
+    await sqlRows(
+      this.db,
+      'UPDATE direct_messages SET delivered_at = now() WHERE recipient_id = $1 AND delivered_at IS NULL',
+      [viewerId],
+    );
+  }
+
+  async typing(viewerId: string, peerId: string) {
+    await this.assertPeer(viewerId, peerId);
+    await sqlRows(
+      this.db,
+      `INSERT INTO typing_status(user_id, peer_id) VALUES ($1, $2)
+      ON CONFLICT (user_id, peer_id) DO UPDATE SET updated_at = now()`,
+      [viewerId, peerId],
+    );
+  }
+
+  async stopTyping(viewerId: string, peerId: string) {
+    await sqlRows(this.db, 'DELETE FROM typing_status WHERE user_id = $1 AND peer_id = $2', [
+      viewerId,
+      peerId,
+    ]);
+  }
+
+  /** The recipient opens a view-once photo/video: its URL is returned this one time only. */
+  async open(viewerId: string, messageId: string) {
+    const row = await this.db.transaction(async (m) => {
+      const message = await sqlOne(
+        m,
+        'SELECT * FROM direct_messages WHERE id = $1 AND recipient_id = $2 AND view_once FOR UPDATE',
+        [messageId, viewerId],
+      );
+      if (!message) throw AppException.notFound();
+      if (message.opened_at || !message.media_id)
+        throw AppException.conflict(ErrorCode.INVALID_STATE, 'This photo was already opened');
+      await this.assertPeer(viewerId, message.sender_id);
+      await sqlRows(m, 'UPDATE direct_messages SET opened_at = now() WHERE id = $1', [messageId]);
+      return sqlOne(m, 'SELECT * FROM media WHERE id = $1', [message.media_id]);
+    });
+    if (!row) throw AppException.notFound();
+    return this.media.toDto(row as any);
+  }
+
+  /** Deletes view-once media shortly after it was opened (the message keeps an "Opened" marker). */
+  @Cron(CronExpression.EVERY_MINUTE, { name: 'view-once-media-cleanup' })
+  async purgeOpenedViewOnce() {
+    try {
+      for (;;) {
+        const result = await this.db.transaction(async (m) => {
+          const rows = await sqlRows<{ media_id: string }>(
+            m,
+            `WITH t AS (
+              SELECT id, media_id FROM direct_messages
+              WHERE view_once AND media_id IS NOT NULL AND opened_at < now() - ${VIEW_ONCE_GRACE_SQL}
+              ORDER BY opened_at LIMIT 200 FOR UPDATE SKIP LOCKED)
+            UPDATE direct_messages d SET media_id = NULL FROM t WHERE d.id = t.id RETURNING t.media_id`,
+          );
+          return {
+            count: rows.length,
+            files: await this.deletion.deleteMedia(m, rows.map((r) => r.media_id)),
+          };
+        });
+        await this.deletion.removeFiles(result.files);
+        if (result.count < 200) break;
+      }
+    } catch (error) {
+      this.logger.warn({ message: 'View-once cleanup failed', error: (error as Error).message });
+    }
   }
 
   async accept(viewerId: string, peerId: string) {
@@ -337,6 +503,9 @@ export class MessagesService {
   }
 
   async unread(viewerId: string) {
+    // Polled by every open app: doubles as the presence heartbeat and delivery receipt.
+    await this.touch(viewerId);
+    await this.markDelivered(viewerId);
     return {
       count:
         (

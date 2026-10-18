@@ -55,7 +55,7 @@ export function parseInteractive(text: string | null | undefined): { before: str
         return { kind: "slider" as const, question: q, leftEmoji: l, rightEmoji: r };
       }
       if (k === "ask") {
-        return { kind: "ask" as const, prompt: parts.join(" | ") || "Bana soru sor" };
+        return { kind: "ask" as const, prompt: parts.join(" | ") || "Ask me anything" };
       }
       return null;
     })();
@@ -82,7 +82,7 @@ function useInteraction(postId: string) {
   });
   const respond = (value: number) => {
     if (!user) {
-      toast("Katılmak için giriş yap.");
+      toast("Sign in to take part.");
       return false;
     }
     mutation.mutate(value);
@@ -103,7 +103,7 @@ export function PollWidget({ postId, data }: { postId: string; data: ParsedPoll 
   };
   return (
     <div className="ipost ipost-poll">
-      <header><BarChart3 size={16} /><span>Anket</span></header>
+      <header><BarChart3 size={16} /><span>Poll</span></header>
       <h4>{data.question}</h4>
       <div className="ipost-options">
         {data.options.map((opt, i) => {
@@ -138,13 +138,13 @@ export function CountdownWidget({ data }: { data: ParsedCountdown }) {
   const done = diff === 0;
   return (
     <div className={`ipost ipost-countdown ${done ? "done" : ""}`}>
-      <header><Clock size={16} /><span>{data.label || "Geri sayım"}</span></header>
+      <header><Clock size={16} /><span>{data.label || "Countdown"}</span></header>
       {done ? <h4 className="ipost-done">Vakti geldi 🎉</h4> : (
         <div className="ipost-timer">
-          <span><strong>{d}</strong><small>gün</small></span>
-          <span><strong>{String(h).padStart(2, "0")}</strong><small>saat</small></span>
-          <span><strong>{String(m).padStart(2, "0")}</strong><small>dk</small></span>
-          <span><strong>{String(s).padStart(2, "0")}</strong><small>sn</small></span>
+          <span><strong>{d}</strong><small>days</small></span>
+          <span><strong>{String(h).padStart(2, "0")}</strong><small>hrs</small></span>
+          <span><strong>{String(m).padStart(2, "0")}</strong><small>min</small></span>
+          <span><strong>{String(s).padStart(2, "0")}</strong><small>sec</small></span>
         </div>
       )}
     </div>
@@ -178,10 +178,10 @@ export function QuizWidget({ postId, data }: { postId: string; data: ParsedQuiz 
       </div>
       {answered ? (
         <footer className={mine === data.correct ? "right" : "wrong"}>
-          {mine === data.correct ? "✓ Doğru!" : "✗ Yanlış"} · {total} kişinin %{correctRate}&apos;i doğru bildi
+          {mine === data.correct ? "✓ Correct!" : "✗ Wrong"} · {correctRate}% of {total} got it right
         </footer>
       ) : (
-        <footer>{total} kişi cevapladı</footer>
+        <footer>{total} {total === 1 ? "answer" : "answers"}</footer>
       )}
     </div>
   );
@@ -197,7 +197,7 @@ export function SliderWidget({ postId, data }: { postId: string; data: ParsedSli
   };
   return (
     <div className="ipost ipost-slider">
-      <header><Sliders size={16} /><span>Değerlendir</span></header>
+      <header><Sliders size={16} /><span>Rating</span></header>
       <h4>{data.question}</h4>
       <div className="ipost-slider-row">
         <span className="ipost-emoji">{data.leftEmoji}</span>
@@ -213,9 +213,9 @@ export function SliderWidget({ postId, data }: { postId: string; data: ParsedSli
       </div>
       <footer>
         {locked ? (
-          <>Sen: <strong>{mine}</strong> · Ortalama: <strong>{result?.average ?? mine}</strong> · {result?.total ?? 1} kişi</>
+          <>You: <strong>{mine}</strong> · Average: <strong>{result?.average ?? mine}</strong> · {result?.total ?? 1} {(result?.total ?? 1) === 1 ? "rating" : "ratings"}</>
         ) : (
-          <>{result?.total ? <>Ortalama gizli · {result.total} kişi değerlendirdi</> : "İlk değerlendiren sen ol"}</>
+          <>{result?.total ? <>Average hidden · {result.total} {result.total === 1 ? "rating" : "ratings"}</> : "Be the first to rate"}</>
         )}
       </footer>
     </div>
@@ -231,7 +231,7 @@ export function AskWidget({ postId, data }: { postId: string; data: ParsedAsk })
     onSuccess: () => {
       setText("");
       haptic("success");
-      toast("Sorun gönderildi ✓ Yorumlarda görünecek.");
+      toast("Question sent ✓ It will appear in the comments.");
       void client.invalidateQueries({ queryKey: ["comments"] });
       void client.invalidateQueries({ queryKey: ["posts"] });
       void client.invalidateQueries({ queryKey: ["post"] });
@@ -241,23 +241,23 @@ export function AskWidget({ postId, data }: { postId: string; data: ParsedAsk })
   const send = () => { if (text.trim() && !mutation.isPending) mutation.mutate(); };
   return (
     <div className="ipost ipost-ask">
-      <header><MessageCircleQuestion size={16} /><span>Soru sor</span></header>
+      <header><MessageCircleQuestion size={16} /><span>Ask me anything</span></header>
       <h4>{data.prompt}</h4>
       <div className="ipost-ask-row">
         <input
           type="text"
-          placeholder="Sorunu yaz…"
+          placeholder="Write your question…"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") send(); }}
           maxLength={280}
           disabled={mutation.isPending}
         />
-        <button type="button" className="ipost-ask-send" onClick={send} disabled={!text.trim() || mutation.isPending} aria-label="Gönder">
+        <button type="button" className="ipost-ask-send" onClick={send} disabled={!text.trim() || mutation.isPending} aria-label="Send">
           <Send size={16} />
         </button>
       </div>
-      <footer>Cevaplar bu postun yorumlarına düşer. Herkes görebilir.</footer>
+      <footer>Answers appear in this post’s comments. Everyone can see them.</footer>
     </div>
   );
 }

@@ -246,14 +246,19 @@ export default function Profile({ username }: { username: string }) {
     window.history.replaceState(null, "", next.size ? `${pathname}?${next}` : pathname);
   };
   const block = useBlock(query.data ?? ({} as Profile));
+  const copyLink = useCopyProfileLink(username);
 
   if (query.isPending)
     return (
-      <section className="card profile-header" aria-busy="true">
-        <div className="profile-hero skeleton" />
-        <div className="profile-header-body">
+      <section className="card ig-profile-header" aria-busy="true">
+        <div className="ig-profile-cover skeleton" />
+        <span className="ig-profile-avatar">
           <span className="skeleton circle profile-avatar-skeleton" />
+        </span>
+        <div className="ig-profile-title">
           <div className="skeleton line short" />
+        </div>
+        <div className="ig-bio">
           <div className="skeleton line tiny" />
         </div>
       </section>
@@ -270,73 +275,85 @@ export default function Profile({ username }: { username: string }) {
   const joined = new Date(user.createdAt).toLocaleDateString("en", { month: "long", year: "numeric", timeZone: "UTC" });
   return (
     <>
-      <section className="card profile-header">
-        <div className="profile-hero">
+      <section className="card ig-profile-header">
+        <div className="ig-profile-cover">
           {user.coverUrl ? <img src={user.coverUrl} alt="" /> : <div className="cover-art" aria-hidden="true" />}
         </div>
-        <div className="profile-header-body">
-          <div className="profile-header-top">
-            <span className="profile-avatar">
-              <Avatar user={user} size={104} />
-            </span>
-            <div className="profile-actions">
-              {user.isSelf ? (
-                <Link href="/profile/edit" className="button">
-                  Edit Profile
-                </Link>
-              ) : user.isBlocking ? (
-                <button type="button" className="button secondary" disabled={block.isPending} onClick={() => block.mutate(false)}>
-                  Unblock
-                </button>
-              ) : (
-                <FollowButton id={user.id} following={user.isFollowing} requested={user.isFollowRequested} />
-              )}
-              {!user.isSelf && !user.isBlocking && <Link className="button secondary" href={`/messages?to=${encodeURIComponent(user.username)}`}>Message</Link>}
-              <ProfileMenu profile={user} />
-            </div>
-          </div>
-          <h1 className="profile-name">
-            {user.displayName}
-            {user.isVerified && <VerifiedBadge size={22} className="profile-verified" />}
+        <span className="ig-profile-avatar">
+          <Avatar user={user} size={150} />
+        </span>
+        {/* Desktop: one row (username, buttons, menu). Phones: the row dissolves into the grid. */}
+        <div className="ig-profile-title">
+          <h1 className="ig-username">
+            <span>{user.username}</span>
+            {user.isVerified && <VerifiedBadge size={20} className="profile-verified" />}
             {user.isPrivate && <LockKeyhole size={16} aria-label="Private account" />}
           </h1>
-          <p className="profile-handle">
-            @{user.username}
-            {user.followsYou && <span className="follows-you">Follows you</span>}
-          </p>
-          <div className="profile-counts">
-            <span>
-              <strong>{user.postCount.toLocaleString("en")}</strong> posts
-            </span>
-            {(["followers", "following"] as const).map((kind) => (
-              <button key={kind} type="button" onClick={() => setConnections(kind)} disabled={!user.canViewContent}>
-                <strong>{(kind === "followers" ? user.followerCount : user.followingCount).toLocaleString("en")}</strong>{" "}
-                {kind}
+          <div className="ig-profile-buttons">
+            {user.isSelf ? (
+              <>
+                <Link href="/profile/edit" className="button secondary">
+                  Edit profile
+                </Link>
+                <button type="button" className="button secondary" onClick={() => void copyLink()}>
+                  Share profile
+                </button>
+              </>
+            ) : user.isBlocking ? (
+              <button type="button" className="button secondary" disabled={block.isPending} onClick={() => block.mutate(false)}>
+                Unblock
               </button>
-            ))}
+            ) : (
+              <>
+                <FollowButton id={user.id} following={user.isFollowing} requested={user.isFollowRequested} />
+                <Link className="button secondary" href={`/messages?to=${encodeURIComponent(user.username)}`}>
+                  Message
+                </Link>
+              </>
+            )}
           </div>
-          {user.bio && <p className="profile-bio-text">{user.bio}</p>}
-          <div className="profile-details">
-            {user.location && (
-              <span>
-                <MapPin size={14} />
-                {user.location}
-              </span>
-            )}
-            {user.website && /^https?:\/\//i.test(user.website) && (
-              <a href={user.website} target="_blank" rel="noopener noreferrer nofollow">
-                <Link2 size={14} />
-                {user.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
-              </a>
-            )}
-            <span>
-              <CalendarDays size={14} />
-              Joined {joined}
+          <span className="ig-profile-menu">
+            <ProfileMenu profile={user} />
+          </span>
+        </div>
+        <ul className="ig-stats">
+          <li>
+            <strong>{user.postCount.toLocaleString("en")}</strong> <span>posts</span>
+          </li>
+          {(["followers", "following"] as const).map((kind) => (
+            <li key={kind}>
+              <button type="button" onClick={() => setConnections(kind)} disabled={!user.canViewContent}>
+                <strong>{(kind === "followers" ? user.followerCount : user.followingCount).toLocaleString("en")}</strong>{" "}
+                <span>{kind}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        <div className="ig-bio">
+          <strong className="ig-display-name">{user.displayName}</strong>
+          {user.followsYou && <span className="follows-you">Follows you</span>}
+          {user.bio && <p className="ig-bio-text">{user.bio}</p>}
+          {user.location && (
+            <span className="ig-bio-line">
+              <MapPin size={14} />
+              {user.location}
             </span>
-          </div>
+          )}
+          {user.website && /^https?:\/\//i.test(user.website) && (
+            <a className="ig-bio-link" href={user.website} target="_blank" rel="noopener noreferrer nofollow">
+              <Link2 size={14} />
+              {user.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+            </a>
+          )}
+          <span className="ig-bio-line muted">
+            <CalendarDays size={14} />
+            Joined {joined}
+          </span>
         </div>
         {!user.isBlocking && user.canViewContent && (
-          <ProfileTabs active={tab} onChange={(i) => setParam("tab", i === 0 ? null : TABS[i].id)} />
+          <div className="ig-profile-tabs">
+            <ProfileTabs active={tab} onChange={(i) => setParam("tab", i === 0 ? null : TABS[i].id)} />
+          </div>
         )}
       </section>
 
@@ -364,7 +381,7 @@ export default function Profile({ username }: { username: string }) {
           />
         </div>
       ) : (
-        <div role="tabpanel" id={`panel-${active.id}`} aria-labelledby={`tab-${active.id}`} className="profile-panel">
+        <div role="tabpanel" id={`panel-${active.id}`} aria-labelledby={`tab-${active.id}`} className="profile-panel ig-profile-panel">
           <Feed
             key={active.id}
             userId={user.id}

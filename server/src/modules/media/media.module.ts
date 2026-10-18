@@ -37,6 +37,6 @@ import { MediaUploadSessionsService, MediaUploadsController } from './media-uplo
     VideoTranscodeQueue,
     MediaUploadSessionsService,
   ],
-  exports: [MediaService, MediaUrlService, ContentDeletionService],
+  exports: [MediaService, MediaUrlService, ContentDeletionService, STORAGE_DRIVER, VIDEO_PROCESSOR],
 })
 export class MediaModule {}

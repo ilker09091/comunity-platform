@@ -128,7 +128,7 @@ function InteractiveBuilder({ type, onInsert, onClose }: { type: InteractiveType
   })();
 
   const titles: Record<InteractiveType, string> = {
-    poll: "Anket oluştur", countdown: "Geri sayım ekle", quiz: "Quiz oluştur", slider: "Değerlendirme kaydırıcısı", ask: "Soru sor",
+    poll: "Create a poll", countdown: "Add a countdown", quiz: "Create a quiz", slider: "Rating slider", ask: "Ask me anything",
   };
 
   const submit = () => {
@@ -163,13 +163,13 @@ function InteractiveBuilder({ type, onInsert, onClose }: { type: InteractiveType
       <div className="ibuilder-sheet">
         <header className="ibuilder-header">
           <h2>{titles[type]}</h2>
-          <button type="button" className="icon-button" aria-label="Kapat" onClick={onClose}><X size={20} /></button>
+          <button type="button" className="icon-button" aria-label="Close" onClick={onClose}><X size={20} /></button>
         </header>
         <div className="ibuilder">
           {type !== "countdown" && (
             <label className="ibuilder-field">
-              <span>{type === "ask" ? "Prompt" : "Soru"}</span>
-              <input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={type === "ask" ? "Bana sor…" : "Sorunu yaz…"} maxLength={200} autoFocus />
+              <span>{type === "ask" ? "Prompt" : "Question"}</span>
+              <input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={type === "ask" ? "Ask me anything…" : "Write your question…"} maxLength={200} autoFocus />
             </label>
           )}
           {(type === "poll" || type === "quiz") && (
@@ -177,47 +177,47 @@ function InteractiveBuilder({ type, onInsert, onClose }: { type: InteractiveType
               {options.map((opt, i) => (
                 <div key={i} className="ibuilder-option">
                   {type === "quiz" && (
-                    <label className="ibuilder-radio" title="Doğru cevap">
+                    <label className="ibuilder-radio" title="Correct answer">
                       <input type="radio" name="correct" checked={correct === i} onChange={() => setCorrect(i)} />
                     </label>
                   )}
-                  <input value={opt} onChange={(e) => setOptions(options.map((o, j) => (j === i ? e.target.value : o)))} placeholder={`Seçenek ${i + 1}`} maxLength={100} />
+                  <input value={opt} onChange={(e) => setOptions(options.map((o, j) => (j === i ? e.target.value : o)))} placeholder={`Option ${i + 1}`} maxLength={100} />
                   {options.length > 2 && (
                     <button type="button" className="icon-button" onClick={() => setOptions(options.filter((_, j) => j !== i))}><X size={16} /></button>
                   )}
                 </div>
               ))}
               {options.length < 4 && (
-                <button type="button" className="text-button" onClick={() => setOptions([...options, ""])}>+ Seçenek ekle</button>
+                <button type="button" className="text-button" onClick={() => setOptions([...options, ""])}>+ Add option</button>
               )}
             </div>
           )}
           {type === "countdown" && (
             <>
-              <label className="ibuilder-field"><span>Tarih</span>
+              <label className="ibuilder-field"><span>Date</span>
                 <input type="date" value={whenDate} onChange={(e) => setWhenDate(e.target.value)} autoFocus />
               </label>
-              <label className="ibuilder-field"><span>Saat</span>
+              <label className="ibuilder-field"><span>Time</span>
                 <input type="time" value={whenTime} onChange={(e) => setWhenTime(e.target.value)} />
               </label>
-              <label className="ibuilder-field"><span>Etiket (opsiyonel)</span>
-                <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Albüm çıkıyor" maxLength={60} />
+              <label className="ibuilder-field"><span>Label (optional)</span>
+                <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Album drops" maxLength={60} />
               </label>
             </>
           )}
           {type === "slider" && (
             <div className="ibuilder-emoji-row">
-              <label className="ibuilder-field"><span>Sol emoji</span>
+              <label className="ibuilder-field"><span>Left emoji</span>
                 <input value={leftEmoji} onChange={(e) => setLeftEmoji(e.target.value)} maxLength={4} />
               </label>
-              <label className="ibuilder-field"><span>Sağ emoji</span>
+              <label className="ibuilder-field"><span>Right emoji</span>
                 <input value={rightEmoji} onChange={(e) => setRightEmoji(e.target.value)} maxLength={4} />
               </label>
             </div>
           )}
           <div className="ibuilder-actions">
-            <button type="button" className="button secondary" onClick={onClose}>İptal</button>
-            <button type="button" className="button" disabled={!canSubmit} onClick={submit}>Ekle</button>
+            <button type="button" className="button secondary" onClick={onClose}>Cancel</button>
+            <button type="button" className="button" disabled={!canSubmit} onClick={submit}>Add</button>
           </div>
         </div>
       </div>
@@ -229,11 +229,11 @@ function InteractiveBuilder({ type, onInsert, onClose }: { type: InteractiveType
 function InteractivePicker({ onInsert, disabled }: { onInsert: (tag: string) => void; disabled?: boolean }) {
   const [active, setActive] = useState<InteractiveType | null>(null);
   const types: { id: InteractiveType; icon: typeof BarChart3; label: string }[] = [
-    { id: "poll", icon: BarChart3, label: "Anket" },
-    { id: "countdown", icon: Clock, label: "Geri sayım" },
+    { id: "poll", icon: BarChart3, label: "Poll" },
+    { id: "countdown", icon: Clock, label: "Countdown" },
     { id: "quiz", icon: HelpCircle, label: "Quiz" },
-    { id: "slider", icon: Sliders, label: "Değerlendir" },
-    { id: "ask", icon: MessageCircleQuestion, label: "Soru sor" },
+    { id: "slider", icon: Sliders, label: "Rating" },
+    { id: "ask", icon: MessageCircleQuestion, label: "Ask me" },
   ];
   return (
     <>
@@ -389,15 +389,15 @@ export default function PostComposer({
       setAttachments([]);
       void client.invalidateQueries({ predicate: (q) => q.queryKey[0] !== "suggestions" });
       if (stillCompressing) {
-        toast(mode === "reel" ? "Reel'in hazırlanıyor, birkaç saniye içinde yayında olacak." : "Gönderin hazırlanıyor, birkaç saniye içinde yayında olacak.");
+        toast(mode === "reel" ? "Your Reel is processing and will be live in a few seconds." : "Your post is processing and will be live in a few seconds.");
         void announceWhenLive(
           post.id,
           compressingIds,
           () => {
             void client.invalidateQueries({ predicate: (q) => q.queryKey[0] !== "suggestions" });
-            toast(mode === "reel" ? "Reel'in yayında 🎉" : "Gönderin yayında 🎉");
+            toast(mode === "reel" ? "Your Reel is live 🎉" : "Your post is live 🎉");
           },
-          () => toast("Videon işlenemedi, bu yüzden gönderi yayınlanmadı. Lütfen başka bir video dene.", true),
+          () => toast("We couldn't process your video, so the post wasn't published. Please try another video.", true),
         );
       } else toast(quoteId ? "Your quote has been shared." : "Your post is live.");
       setOpen(false);

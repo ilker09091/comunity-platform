@@ -88,7 +88,7 @@ function SpoilerCover({ leaving, onReveal, onDone }: { leaving: boolean; onRevea
       <span className="media-spoiler-pill">
         <EyeOff size={16} aria-hidden="true" /> Spoiler
       </span>
-      <span className="media-spoiler-hint">Görmek için dokun</span>
+      <span className="media-spoiler-hint">Tap to reveal</span>
     </button>
   );
 }

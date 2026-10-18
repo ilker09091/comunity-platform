@@ -1,6 +1,7 @@
 import { MessagesAndStories1760191200000 } from './1760191200000-MessagesAndStories.js';
 import { StoryPostShares1760191300000 } from './1760191300000-StoryPostShares.js';
 import { StoryEngagementRequestsStickers1760191400000 } from './1760191400000-StoryEngagementRequestsStickers.js';
+import { MessagingPresenceNotes1760191500000 } from './1760191500000-MessagingPresenceNotes.js';
 import { ReelSmartState1760191100000 } from './1760191100000-ReelSmartState.js';
 import { CreateUsersAndAuth1760180000000 } from './1760180000000-CreateUsersAndAuth.js';
 import { CreateMedia1760180100000 } from './1760180100000-CreateMedia.js';
@@ -43,4 +44,5 @@ export const migrations = [
   MessagesAndStories1760191200000,
   StoryPostShares1760191300000,
   StoryEngagementRequestsStickers1760191400000,
+  MessagingPresenceNotes1760191500000,
 ];

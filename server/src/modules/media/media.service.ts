@@ -275,7 +275,18 @@ export class MediaService implements OnModuleInit {
 
   async resolveFile(storageKey: string) {
     // Old signed URLs must stop working immediately, even during a storage outage.
-    const row = await sqlOne(this.db, `SELECT 1 FROM media m WHERE storage_key = $1 AND NOT EXISTS (SELECT 1 FROM stories s WHERE s.media_id = m.id AND s.expires_at <= now())`, [storageKey]);
+    // Expired stories and opened view-once messages stop serving at once; note clips live as long as their note.
+    const row = await sqlOne(
+      this.db,
+      `SELECT 1 WHERE EXISTS (
+          SELECT 1 FROM media m WHERE m.storage_key = $1
+            AND NOT EXISTS (SELECT 1 FROM stories s WHERE s.media_id = m.id AND s.expires_at <= now())
+            AND NOT EXISTS (SELECT 1 FROM direct_messages d WHERE d.media_id = m.id AND d.view_once
+                              AND d.opened_at < now() - interval '2 minutes'))
+        OR EXISTS (SELECT 1 FROM notes n WHERE n.audio_key = $1 AND n.expires_at > now())
+        OR EXISTS (SELECT 1 FROM note_audio a WHERE a.storage_key = $1)`,
+      [storageKey],
+    );
     if (!row) return null;
     return this.storage.resolve(storageKey);
   }

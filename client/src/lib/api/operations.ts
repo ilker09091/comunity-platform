@@ -480,6 +480,21 @@ export const endpoints = {
     "method": "GET",
     "authenticated": true
   },
+  "messagesTyping": {
+    "path": "/api/messages/{id}/typing",
+    "method": "POST",
+    "authenticated": true
+  },
+  "messagesStopTyping": {
+    "path": "/api/messages/{id}/typing",
+    "method": "DELETE",
+    "authenticated": true
+  },
+  "messagesOpen": {
+    "path": "/api/messages/{id}/open",
+    "method": "POST",
+    "authenticated": true
+  },
   "messagesAccept": {
     "path": "/api/messages/{id}/accept",
     "method": "POST",
@@ -548,6 +563,26 @@ export const endpoints = {
   "stickersDelete": {
     "path": "/api/stickers/{id}",
     "method": "DELETE",
+    "authenticated": true
+  },
+  "notesList": {
+    "path": "/api/notes",
+    "method": "GET",
+    "authenticated": true
+  },
+  "notesCreate": {
+    "path": "/api/notes",
+    "method": "POST",
+    "authenticated": true
+  },
+  "notesDelete": {
+    "path": "/api/notes/me",
+    "method": "DELETE",
+    "authenticated": true
+  },
+  "notesUploadAudio": {
+    "path": "/api/notes/audio",
+    "method": "POST",
     "authenticated": true
   },
   "adminImporterRequest": {

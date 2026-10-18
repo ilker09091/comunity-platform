@@ -31,6 +31,10 @@ export interface VideoProcessor {
   probe(filePath: string): Promise<VideoProbe | null>;
   /** Compresses (or, when already efficient, just repackages) `input` into `output`. */
   compress(input: string, output: string, probe: VideoProbe, onProgress?: (percent: number) => void): Promise<'remuxed' | 'transcoded'>;
+  /** Duration of the first audio stream, or null when the file has no decodable audio. */
+  probeAudio(filePath: string): Promise<{ durationMs: number } | null>;
+  /** Cuts `durationMs` of audio starting at `startMs` into a web-optimised AAC `.m4a` (metadata stripped). */
+  clipAudio(input: string, output: string, startMs: number, durationMs: number): Promise<void>;
 }
 
 const require = createRequire(import.meta.url);
@@ -179,6 +183,37 @@ export class FfmpegVideoProcessor implements VideoProcessor {
       const match = /out_time_(?:us|ms)=(\d+)/.exec(chunk);
       if (match) onProgress(Math.min(99, Math.max(0, Math.floor((Number(match[1]) / total) * 100))));
     };
+  }
+
+  async probeAudio(filePath: string): Promise<{ durationMs: number } | null> {
+    let out: string;
+    try {
+      out = await this.run(this.ffprobe, ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', filePath], 60_000);
+    } catch {
+      return null;
+    }
+    const json = JSON.parse(out) as {
+      streams?: Array<{ codec_type?: string; duration?: string }>;
+      format?: { duration?: string };
+    };
+    const audio = json.streams?.find((s) => s.codec_type === 'audio');
+    const seconds = Number(audio?.duration ?? json.format?.duration);
+    return audio && Number.isFinite(seconds) && seconds > 0 ? { durationMs: Math.round(seconds * 1000) } : null;
+  }
+
+  async clipAudio(input: string, output: string, startMs: number, durationMs: number): Promise<void> {
+    await this.run(
+      this.ffmpeg,
+      [
+        '-hide_banner', '-loglevel', 'error', '-y',
+        '-ss', (startMs / 1000).toFixed(3), '-t', (durationMs / 1000).toFixed(3), '-i', input,
+        '-map', '0:a:0', '-vn', '-map_metadata', '-1',
+        '-c:a', 'aac', '-b:a', '128k', '-ac', '2',
+        '-af', `afade=t=out:st=${Math.max(0, durationMs / 1000 - 0.6).toFixed(2)}:d=0.6`,
+        '-movflags', '+faststart', '-f', 'mp4', output,
+      ],
+      120_000,
+    );
   }
 
   private run(bin: string, args: string[], timeoutMs: number, onStdout?: (chunk: string) => void): Promise<string> {
