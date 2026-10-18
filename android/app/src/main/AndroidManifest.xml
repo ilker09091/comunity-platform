@@ -61,7 +61,7 @@
 
         <!-- Lets Chrome show the site's notifications as Circle notifications. -->
         <service
-            android:name="com.google.androidbrowserhelper.trusted.DelegationService"
+            android:name=".DelegationService"
             android:enabled="true"
             android:exported="true">
             <meta-data
