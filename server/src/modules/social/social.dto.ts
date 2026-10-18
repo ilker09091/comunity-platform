@@ -306,3 +306,21 @@ export class NoteAudioDto {
   @ApiProperty({ description: 'Signed URL of the clip, for previewing' }) url: string;
   @ApiProperty() durationMs: number;
 }
+
+export class PushSubscriptionDto {
+  @ApiProperty({ description: 'PushSubscription.endpoint (https)' })
+  @IsString()
+  @MaxLength(2048)
+  endpoint: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(512) p256dh?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(512) auth?: string;
+}
+export class PushUnsubscribeDto {
+  @ApiProperty() @IsString() @MaxLength(2048) endpoint: string;
+}
+export class PushKeyDto {
+  @ApiProperty({ description: 'VAPID public key (applicationServerKey), base64url' }) publicKey: string;
+}
+export class PushTestDto {
+  @ApiProperty({ description: 'Devices that accepted the test notification' }) delivered: number;
+}

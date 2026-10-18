@@ -18,6 +18,7 @@ POST = dict(id='30000000-0000-4000-8000-000000000001', kind='POST', author=PEER,
 MSG_EXTRA = dict(replyTo=None, viewOnce=False, viewOnceType=None, openedAt=None, deliveredAt=None, noteReply=None)
 audio_uploads = []
 messages = [dict(id='40000000-0000-4000-8000-000000000001', senderId=PEER['id'], recipientId=ME['id'], content='Hello from your friend', media=MEDIA, post=None, storyReply=None, createdAt=now(), readAt=None, **MSG_EXTRA)]
+messages.append(dict(messages[0], id='40000000-0000-4000-8000-000000000002', content=None, media=None, **{**MSG_EXTRA, 'viewOnce': True, 'viewOnceType': 'IMAGE'}))
 notes = [dict(id='90000000-0000-4000-8000-000000000001', author=PEER, text='Coffee time', songTitle='Tone', audioUrl=BASE+'/qa/clip.m4a', audioDurationMs=15000, createdAt=now(), expiresAt=now(), isOwn=False)]
 presence = dict(typing=False)
 stories = [dict(id='50000000-0000-4000-8000-000000000001', author=PEER, media=PHOTO, post=None, caption='A quiet moment', createdAt=now(), expiresAt=(datetime.now(timezone.utc)+timedelta(hours=24)).isoformat(), isViewed=False, isLiked=False, viewCount=0, likeCount=0)]
@@ -54,6 +55,12 @@ def api(route):
   body=dict(isRequest=peer==STRANGER['id'] and peer not in accepted,awaitingAcceptance=False,canSend=True,peerTyping=presence['typing'],peerOnline=True,peerLastActiveAt=now())
  elif path.startswith('messages/') and path.endswith('/accept'):
   accepted.add(path.split('/')[1]);return route.fulfill(status=204)
+ elif path=='push/key': body=dict(publicKey='BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U')
+ elif path.startswith('push/'): return route.fulfill(status=204)
+ elif path.startswith('messages/') and path.endswith('/open'):
+  for m in messages:
+   if m['id']==path.split('/')[1]: m['openedAt']=now(); m['viewOnceType']=None
+  body=PHOTO;status=201
  elif method=='DELETE' and path.startswith('messages/'):
   return route.fulfill(status=204)
  elif path.startswith('media/') and path.endswith('/soundtrack'):
@@ -198,14 +205,28 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
    print('PASS replying to a message with a quote')
    tab.locator('.dm-composer input[type=file]').set_input_files(str(photo))
    tab.get_by_text('Photo ready to send',exact=True).wait_for()
-   tab.get_by_role('button',name='View once').click()
+   tab.get_by_role('button',name='View once',exact=True).click()
    tab.get_by_role('button',name='Send message',exact=True).click()
    tab.locator('.dm-viewonce').last.wait_for()
    assert any(data.get('viewOnce') is True for method,path,data in calls if isinstance(data,dict))
    print('PASS sending a view-once photo')
+   tab.get_by_role('button',name='Open view once photo').click()
+   viewer=tab.get_by_role('dialog',name='View once');viewer.locator('img').wait_for()
+   assert 'qa_me' in viewer.locator('.dm-viewonce-mark').inner_text()
+   tab.evaluate('window.dispatchEvent(new Event("blur"))')
+   tab.locator('.dm-viewonce-viewer.shielded').wait_for()
+   tab.evaluate('window.dispatchEvent(new Event("focus"))')
+   tab.wait_for_function('!document.querySelector(".dm-viewonce-viewer.shielded")')
+   tab.keyboard.press('PrintScreen')
+   tab.locator('.dm-viewonce-viewer.shielded').wait_for()
+   tab.screenshot(path=str(out/'view-once-shield.png'))
+   viewer.get_by_role('button',name='Close').click()
+   tab.get_by_role('button',name='View once opened').first.wait_for()
+   assert any(path.endswith('/open') for method,path,data in calls)
+   print('PASS view-once photo: watermark, hidden on blur and PrintScreen, opened once')
    own=tab.locator('.dm-message.own').filter(has_text='A new message from the browser')
    own.hover();own.get_by_role('button',name='More actions').click()
-   own.get_by_role('menuitem',name='Unsend').click()
+   tab.get_by_role('menuitem',name='Unsend').click()
    tab.get_by_role('dialog',name='Unsend message?').get_by_role('button',name='Unsend').click()
    tab.get_by_text('Message unsent.').wait_for()
    assert any(method=='DELETE' and path.startswith('messages/') and path.count('/')==1 for method,path,data in calls)
@@ -233,6 +254,18 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
    assert tab.evaluate('document.elementFromPoint(195,830).closest(".dm-shell")!==null'),'chat must cover the bottom navigation'
    assert tab.evaluate('document.documentElement.scrollWidth<=innerWidth')
    tab.screenshot(path=str(out/'messages-mobile-chat.png'))
+   last=tab.locator('.dm-message.own').last
+   last.scroll_into_view_if_needed()
+   box=last.locator('.dm-message-body').bounding_box()
+   tab.evaluate('''([x, y]) => { const el = document.elementFromPoint(x, y); el.dispatchEvent(new PointerEvent("pointerdown", {bubbles: true, pointerType: "touch", pointerId: 7, clientX: x, clientY: y})); }''', [box['x']+box['width']/2, box['y']+box['height']/2])
+   sheet=tab.locator('.dm-message-menu.sheet');sheet.wait_for()
+   tab.evaluate('''() => document.querySelectorAll(".dm-message-body").forEach(() => {})''')
+   reply=sheet.get_by_role('menuitem',name='Reply').bounding_box()
+   assert reply['y']+reply['height'] <= 844 and tab.evaluate('''([x, y]) => !!document.elementFromPoint(x, y)?.closest(".dm-message-menu.sheet")''', [reply['x']+reply['width']/2, reply['y']+reply['height']/2]),'menu must be on top and inside the screen'
+   tab.screenshot(path=str(out/'message-menu-sheet.png'))
+   sheet.get_by_role('button',name='Cancel').click()
+   tab.wait_for_function('!document.querySelector(".dm-message-menu")')
+   print('PASS long-press opens the message menu as a bottom sheet above the composer')
    tab.get_by_role('link',name='Back to conversations').click()
    tab.locator('.dm-row').first.wait_for()
    assert not tab.locator('.dm-main').is_visible()
@@ -288,7 +321,7 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
    print('PASS notes: tray with song, playing a clip, writing a note and picking 15 s of a song from the device')
    tab.set_viewport_size(dict(width=390,height=844))
    tab.goto(BASE+'/',wait_until='networkidle')
-   tab.locator('.story-tile').filter(has_text='QA Friend').click()
+   tab.locator('.story-tile').filter(has_text='qa_friend').click()
    tab.locator('.story-overlay[open]').wait_for()
    tab.get_by_role('button',name='Pause story',exact=True).click()
    tab.wait_for_function('document.querySelector(".story-stage img")?.complete')
@@ -300,7 +333,7 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
    tab.screenshot(path=str(out/'story-mobile.png'))
    tab.get_by_role('button',name='Close story',exact=True).click();tab.wait_for_function('!document.querySelector("dialog[open]")')
    tab.set_viewport_size(dict(width=1440,height=1000));tab.wait_for_timeout(200)
-   tab.locator('.story-tile').filter(has_text='QA Friend').click()
+   tab.locator('.story-tile').filter(has_text='qa_friend').click()
    tab.locator('.story-overlay[open]').wait_for()
    assert 'blur' in tab.evaluate('getComputedStyle(document.querySelector(".story-overlay"),"::backdrop").backdropFilter')
    frame=tab.locator('.story-frame').bounding_box()
@@ -308,7 +341,7 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
    tab.wait_for_timeout(400);tab.screenshot(path=str(out/'story-desktop.png'))
    tab.wait_for_function('!document.querySelector("dialog[open]")',timeout=8000)
    print('PASS story viewing: full screen on mobile, blurred page on desktop, pause holds, auto-advance closes after the last story')
-   tab.locator('.story-tile').filter(has_text='QA Friend').click()
+   tab.locator('.story-tile').filter(has_text='qa_friend').click()
    tab.locator('.story-overlay[open]').wait_for()
    tab.get_by_role('button',name='Like story').click()
    tab.get_by_role('button',name='Unlike story').wait_for()
@@ -401,6 +434,15 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
    tab.wait_for_timeout(200)
    assert '[8,30,8,30,16]' in vibrations[before:],vibrations
    print('PASS spoiler tap gives a haptic pulse')
+   messages.append(dict(messages[0], id='40000000-0000-4000-8000-000000000055', content='Did you see the new Reel?', media=None, createdAt=now(), readAt=None, **MSG_EXTRA))
+   notice=tab.locator('.message-notice');notice.wait_for(timeout=15000)
+   assert 'qa_friend' in notice.inner_text() and 'Did you see the new Reel?' in notice.inner_text()
+   tab.screenshot(path=str(out/'message-notice.png'))
+   notice.click()
+   tab.wait_for_url(BASE+'/messages?to=qa_friend')
+   for m in messages: m['readAt']=m['readAt'] or now()
+   tab.goto(BASE+'/',wait_until='networkidle')
+   print('PASS in-app banner with sender and text when a message arrives; tap opens the chat')
    tab.goto(BASE+'/post/'+SPOILER_POST['id'],wait_until='networkidle')
    tab.get_by_role('button',name='Send a sticker').first.click()
    tab.get_by_role('dialog',name='Stickers').locator('.sticker-option').nth(1).click()
@@ -428,6 +470,21 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
    sheet.get_by_role('button',name='Send',exact=True).click()
    tab.wait_for_function('!document.querySelector("dialog[open]")')
    assert any(path.startswith('messages/') and data.get('postId')==POST['id'] and data.get('content')=='Watch this' for method,path,data in calls if isinstance(data,dict))
+   assert tab.evaluate('navigator.serviceWorker.getRegistration().then(r => !!r && r.active?.scriptURL.endsWith("/sw.js"))')
+   android=browser.new_context(viewport=dict(width=390,height=844),user_agent='Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Mobile Safari/537.36',is_mobile=True,has_touch=True)
+   android.route('**/api/backend/api/**',api)
+   phone=android.new_page()
+   phone.goto(BASE+'/',wait_until='networkidle')
+   app_banner=phone.get_by_role('region',name='Get the app');app_banner.wait_for()
+   assert app_banner.get_by_role('link',name='Download').get_attribute('href')=='/downloads/circle.apk'
+   phone.screenshot(path=str(out/'app-banner.png'))
+   app_banner.get_by_role('button',name='Not now').click()
+   phone.reload(wait_until='networkidle');phone.wait_for_timeout(1600)
+   assert phone.get_by_role('region',name='Get the app').count()==0,'dismissed banner stays hidden'
+   inside=android.new_page();inside.goto(BASE+'/?source=android-app',wait_until='networkidle');inside.wait_for_timeout(1600)
+   assert inside.get_by_role('region',name='Get the app').count()==0,'no download banner inside the app'
+   android.close()
+   print('PASS service worker registered; Android visitors get the APK banner (not inside the app)')
    assert not errors,errors
    print('PASS recipient search and existing video-post sharing; no browser runtime errors')
    browser.close()

@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "store.rosefly.circle",
+      "sha256_cert_fingerprints": [
+        "E1:0A:3E:97:56:3A:A6:7C:ED:B7:0D:01:63:3D:E0:CD:D6:94:2A:82:A6:19:9D:B3:17:53:E0:FC:EA:4C:D0:57"
+      ]
+    }
+  }
+]

@@ -1,0 +1,61 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Site the app opens. Override with -PsiteUrl=https://… (also update the asset statements below).
+def siteHost = project.findProperty('siteHost') ?: 'rosefly.store'
+def siteUrl = "https://${siteHost}/?source=android-app"
+
+// Release signing comes from keystore.properties (never committed).
+def signing = new Properties()
+def signingFile = rootProject.file('keystore.properties')
+if (signingFile.exists()) signingFile.withInputStream { signing.load(it) }
+
+android {
+    namespace 'store.rosefly.circle'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'store.rosefly.circle'
+        minSdk 23
+        targetSdk 35
+        versionCode 1
+        versionName '1.0.0'
+
+        manifestPlaceholders = [
+            hostName: siteHost,
+            defaultUrl: siteUrl,
+            launcherName: 'Circle',
+        ]
+        resValue 'string', 'asset_statements',
+            "[{ \\\"relation\\\": [\\\"delegate_permission/common.handle_all_urls\\\"], \\\"target\\\": {\\\"namespace\\\": \\\"web\\\", \\\"site\\\": \\\"https://${siteHost}\\\"}}]"
+    }
+
+    signingConfigs {
+        release {
+            if (signing['storeFile']) {
+                storeFile rootProject.file(signing['storeFile'])
+                storePassword signing['storePassword']
+                keyAlias signing['keyAlias']
+                keyPassword signing['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signing['storeFile'] ? signingConfigs.release : null
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // Trusted Web Activity: full-screen Chrome with the site's own push notifications.
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+}

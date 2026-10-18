@@ -50,6 +50,10 @@ import {
   NoteAudioFieldsDto,
   NoteAudioUploadDto,
   NoteDto,
+  PushKeyDto,
+  PushSubscriptionDto,
+  PushTestDto,
+  PushUnsubscribeDto,
   SendMessageDto,
   StickerDto,
   StoryDto,
@@ -58,6 +62,7 @@ import {
 } from './social.dto.js';
 import { MessagesService } from './messages.service.js';
 import { NotesService } from './notes.service.js';
+import { PushService } from './push.service.js';
 import { StickersService } from './stickers.service.js';
 import { StoriesService } from './stories.service.js';
 
@@ -428,9 +433,42 @@ export class NotesController {
     return this.notes.uploadAudio(u.id, file, dto.startMs);
   }
 }
+@ApiTags('Push')
+@ApiAuth()
+@ApiErrors(400, 401)
+@Controller('push')
+export class PushController {
+  constructor(private readonly push: PushService) {}
+  @Get('key')
+  @ApiOperation({ operationId: 'pushKey', summary: 'VAPID public key for PushManager.subscribe' })
+  @ApiOkResponse({ type: PushKeyDto })
+  async key() {
+    return { publicKey: await this.push.publicKey() };
+  }
+  @Post('subscriptions')
+  @HttpCode(204)
+  @ApiOperation({ operationId: 'pushSubscribe', summary: 'Receive message notifications on this device' })
+  @ApiNoContentResponse()
+  async subscribe(@CurrentUser() u: AuthUser, @Body() dto: PushSubscriptionDto) {
+    await this.push.subscribe(u.id, dto);
+  }
+  @Post('subscriptions/remove')
+  @HttpCode(204)
+  @ApiOperation({ operationId: 'pushUnsubscribe', summary: 'Stop notifications on this device' })
+  @ApiNoContentResponse()
+  async unsubscribe(@CurrentUser() u: AuthUser, @Body() dto: PushUnsubscribeDto) {
+    await this.push.unsubscribe(u.id, dto.endpoint);
+  }
+  @Post('test')
+  @ApiOperation({ operationId: 'pushTest', summary: 'Send a test notification to your devices' })
+  @ApiCreatedResponse({ type: PushTestDto })
+  async test(@CurrentUser() u: AuthUser) {
+    return { delivered: await this.push.send(u.id, 'test') };
+  }
+}
 @Module({
   imports: [MediaModule, UsersModule, PostsModule, UploadsMulterModule],
-  controllers: [MessagesController, StoriesController, StickersController, NotesController],
-  providers: [MessagesService, StoriesService, StickersService, NotesService],
+  controllers: [MessagesController, StoriesController, StickersController, NotesController, PushController],
+  providers: [MessagesService, StoriesService, StickersService, NotesService, PushService],
 })
 export class SocialModule {}

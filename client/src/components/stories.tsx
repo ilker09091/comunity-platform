@@ -172,8 +172,36 @@ const QUICK_REACTIONS = ["\u{1F602}", "\u{1F62E}", "\u{1F60D}", "\u{1F622}", "\u
  * stories (only the slide remounts), so navigation never closes and reopens the overlay.
  * Desktop: the page behind is blurred (see `.story-overlay::backdrop`); mobile: edge to edge.
  */
+/** Milliseconds until `time` (plus a small margin), within setTimeout's range. */
+const msUntil = (time: number) => Math.max(0, Math.min(time - Date.now() + 50, 2 ** 31 - 1));
+
+/** Starts downloading a story's media so it shows instantly when opened. */
+function warm(story: Story) {
+  if (typeof window === "undefined") return;
+  if (story.media.type === "IMAGE") {
+    const img = new Image();
+    img.decoding = "async";
+    img.src = story.media.url;
+  } else if (!warmVideos.has(story.id)) {
+    // A detached video buffers the first seconds; keep only the last few.
+    const video = document.createElement("video");
+    video.preload = "auto";
+    video.muted = true;
+    video.src = story.media.url;
+    warmVideos.set(story.id, video);
+    for (const [id, old] of warmVideos) {
+      if (warmVideos.size <= 3) break;
+      old.removeAttribute("src");
+      old.load();
+      warmVideos.delete(id);
+    }
+  }
+}
+const warmVideos = new Map<string, HTMLVideoElement>();
+
 function StoryViewer({
   story,
+  upcoming,
   group,
   previousId,
   nextId,
@@ -181,6 +209,7 @@ function StoryViewer({
   onClose,
 }: {
   story: Story;
+  upcoming?: Story;
   group: Story[];
   previousId?: string;
   nextId?: string;
@@ -227,6 +256,10 @@ function StoryViewer({
     0,
     group.findIndex((s) => s.id === story.id),
   );
+  // The next story is ready before the current one ends.
+  useEffect(() => {
+    if (upcoming) warm(upcoming);
+  }, [upcoming]);
   return (
     <dialog
       ref={ref}
@@ -408,6 +441,10 @@ function StorySlide({
   }, [paused, muted, isVideo, failed, ready, setMuted]);
   const author = story.post?.author;
   const [viewersOpen, setViewersOpen] = useState(false);
+  const viewersOpenRef = useRef(false);
+  useEffect(() => {
+    viewersOpenRef.current = viewersOpen;
+  }, [viewersOpen]);
   const viewers = useQuery({
     queryKey: ["stories", "viewers", story.id],
     queryFn: ({ signal }) =>
@@ -417,8 +454,8 @@ function StorySlide({
         signal,
       }),
     enabled: own,
-    // Live while the author watches their story, so new viewers appear without reopening it.
-    refetchInterval: 4000,
+    // Live while the list is open; slower in the background.
+    refetchInterval: () => (viewersOpenRef.current ? 4000 : 15_000),
   });
   const seen = viewers.data
     ? viewers.data.hasMore
@@ -767,10 +804,6 @@ export default function Stories() {
   const { user } = useSession();
   const [creating, setCreating] = useState(false);
   const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
   const [viewing, setViewing] = useState<string | null>(null);
   const close = useCallback(() => setViewing(null), []);
   const query = useInfiniteQuery({
@@ -781,7 +814,8 @@ export default function Stories() {
     getNextPageParam: (p) =>
       p.hasMore ? (p.nextCursor ?? undefined) : undefined,
     enabled: !!user,
-    refetchInterval: 30000,
+    refetchInterval: 60_000,
+    staleTime: 20_000,
   });
   const items = Array.from(
     new Map(
@@ -809,13 +843,17 @@ export default function Stories() {
   const previousId = ordered[index - 1]?.id;
   const nextId = ordered[index + 1]?.id;
   const group = story ? (groups.get(story.author.id) ?? [story]) : [];
+  const upcoming = ordered[index + 1];
+  // Re-render only when the soonest story expires (instead of every second).
+  const nextExpiry = items.reduce((min, s) => Math.min(min, Date.parse(s.expiresAt)), Infinity);
+  useEffect(() => {
+    if (!Number.isFinite(nextExpiry)) return;
+    const timer = window.setTimeout(() => setNow(Date.now()), msUntil(nextExpiry));
+    return () => window.clearTimeout(timer);
+  }, [nextExpiry]);
   if (!user) return null;
   return (
     <section className="card stories-card" aria-label="Stories">
-      <div className="social-section-heading">
-        <h2>Stories</h2>
-        <span>Moments from your circle / 24h</span>
-      </div>
       <div className="stories-tray">
         <button
           className="story-tile story-add"
@@ -823,7 +861,7 @@ export default function Stories() {
           onClick={() => setCreating(true)}
         >
           <span className="story-ring">
-            <Avatar user={user} size={52} />
+            <Avatar user={user} size={60} />
             <span className="story-add-icon">
               <Plus size={14} />
             </span>
@@ -838,19 +876,26 @@ export default function Stories() {
               key={first.author.id}
               className={`story-tile ${unseen ? "unseen" : ""}`}
               onClick={() => setViewing(first.id)}
+              // Start fetching the first story while the finger/cursor is on its way.
+              onPointerEnter={() => warm(first)}
+              onTouchStart={() => warm(first)}
             >
               <span className="story-ring">
-                <Avatar user={first.author} size={52} />
+                <Avatar user={first.author} size={60} />
               </span>
               <span>
-                {first.author.id === user.id
-                  ? "Your story"
-                  : first.author.displayName}
+                {first.author.id === user.id ? "Your story" : first.author.username}
               </span>
             </button>
           );
         })}
-        {query.isPending && <p role="status">Loading stories...</p>}
+        {query.isPending &&
+          Array.from({ length: 5 }, (_, i) => (
+            <span key={i} className="story-tile story-skeleton" aria-hidden="true">
+              <span className="skeleton circle" />
+              <span className="skeleton line tiny" />
+            </span>
+          ))}
         {!query.isPending && !query.error && !items.length && (
           <p className="social-hint">Share a moment with your followers.</p>
         )}
@@ -867,6 +912,7 @@ export default function Stories() {
       {story && (
         <StoryViewer
           story={story}
+          upcoming={upcoming}
           group={group}
           previousId={previousId}
           nextId={nextId}

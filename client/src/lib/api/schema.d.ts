@@ -73,6 +73,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/media/uploads/{id}/audio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finish a resumable upload of a sound clip (for POST /media/{id}/soundtrack) */
+        post: operations["mediaUploadsCompleteAudio"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/media/uploads/{id}/complete": {
         parameters: {
             query?: never;
@@ -100,8 +117,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Add music to one of your unpublished videos (Reels "Add sound")
-         * @description Replaces the original sound, or mixes the music over it with `mix=true`. The clip loops to the video length.
+         * Add music to one of your videos (Reels "Add sound")
+         * @description Upload the clip with /media/uploads then POST /media/uploads/{id}/audio. Replaces the original sound, or mixes the music under it with `mix`. The clip loops to the video length. A video that is still processing gets the music as soon as it is ready, even if it was published meanwhile.
          */
         post: operations["mediaSoundtrack"];
         delete?: never;
@@ -1774,6 +1791,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/push/key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** VAPID public key for PushManager.subscribe */
+        get: operations["pushKey"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/push/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Receive message notifications on this device */
+        post: operations["pushSubscribe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/push/subscriptions/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop notifications on this device */
+        post: operations["pushUnsubscribe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/push/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a test notification to your devices */
+        post: operations["pushTest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/importer/request": {
         parameters: {
             query?: never;
@@ -2781,6 +2866,14 @@ export interface components {
              */
             chunkSize: number;
         };
+        AudioUploadDto: {
+            /**
+             * Format: uuid
+             * @description Pass to POST /media/{id}/soundtrack
+             */
+            id: string;
+            durationMs: number;
+        };
         /** @enum {string} */
         MediaType: "IMAGE" | "VIDEO";
         /** @enum {string} */
@@ -2824,17 +2917,14 @@ export interface components {
              */
             processingProgress: number | null;
         };
-        SoundtrackUploadDto: {
+        SoundtrackDto: {
             /**
-             * @description Keep the original sound under the music
-             * @enum {string}
+             * Format: uuid
+             * @description From POST /media/uploads/{id}/audio
              */
-            mix?: "true" | "false";
-            /**
-             * Format: binary
-             * @description The music clip (audio file, up to 90 s)
-             */
-            file: string;
+            audioId: string;
+            /** @description Keep the original sound under the music */
+            mix?: boolean;
         };
         UploadMediaDto: {
             /**
@@ -4162,6 +4252,23 @@ export interface components {
             url: string;
             durationMs: number;
         };
+        PushKeyDto: {
+            /** @description VAPID public key (applicationServerKey), base64url */
+            publicKey: string;
+        };
+        PushSubscriptionDto: {
+            /** @description PushSubscription.endpoint (https) */
+            endpoint: string;
+            p256dh?: string;
+            auth?: string;
+        };
+        PushUnsubscribeDto: {
+            endpoint: string;
+        };
+        PushTestDto: {
+            /** @description Devices that accepted the test notification */
+            delivered: number;
+        };
         ImporterRequestDto: {
             /** @enum {string} */
             method: "GET" | "POST";
@@ -5421,6 +5528,85 @@ export interface operations {
             };
         };
     };
+    mediaUploadsCompleteAudio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AudioUploadDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Unsupported media type (`UNSUPPORTED_MEDIA_TYPE`) */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
     mediaUploadsComplete: {
         parameters: {
             query?: never;
@@ -5520,7 +5706,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": components["schemas"]["SoundtrackUploadDto"];
+                "application/json": components["schemas"]["SoundtrackDto"];
             };
         };
         responses: {
@@ -5552,33 +5738,6 @@ export interface operations {
             };
             /** @description Resource not found or not visible to the viewer */
             404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponseDto"];
-                };
-            };
-            /** @description Conflict with existing state */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponseDto"];
-                };
-            };
-            /** @description Uploaded file is too large (`FILE_TOO_LARGE`) */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponseDto"];
-                };
-            };
-            /** @description Unsupported media type (`UNSUPPORTED_MEDIA_TYPE`) */
-            415: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -12930,6 +13089,226 @@ export interface operations {
             };
             /** @description Unsupported media type (`UNSUPPORTED_MEDIA_TYPE`) */
             415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    pushKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushKeyDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    pushSubscribe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushSubscriptionDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    pushUnsubscribe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushUnsubscribeDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    pushTest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushTestDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

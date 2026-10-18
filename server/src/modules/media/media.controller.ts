@@ -31,7 +31,7 @@ import type { AuthUser } from '../../common/decorators/auth.decorators.js';
 import { AppException, ErrorCode } from '../../common/errors/app.exception.js';
 import { UuidPipe } from '../../common/errors/validation.js';
 import { ApiAuth, ApiErrors } from '../../common/swagger/api-docs.decorators.js';
-import { MediaDto, SoundtrackFieldsDto, SoundtrackUploadDto, UploadMediaDto } from './dto/media.dto.js';
+import { MediaDto, SoundtrackDto, UploadMediaDto } from './dto/media.dto.js';
 import { SoundtrackService } from './soundtrack.service.js';
 import { MediaUrlService, STORAGE_KEY_RE } from './media-url.service.js';
 import { MediaService } from './media.service.js';
@@ -46,25 +46,21 @@ export class MediaController {
   ) {}
 
   @Post(':id/soundtrack')
-  @UseInterceptors(FileInterceptor('file'))
   @ApiAuth()
   @ApiOperation({
     operationId: 'mediaSoundtrack',
-    summary: 'Add music to one of your unpublished videos (Reels "Add sound")',
-    description: 'Replaces the original sound, or mixes the music over it with `mix=true`. The clip loops to the video length.',
+    summary: 'Add music to one of your videos (Reels "Add sound")',
+    description:
+      'Upload the clip with /media/uploads then POST /media/uploads/{id}/audio. Replaces the original sound, or mixes ' +
+      'the music under it with `mix`. The clip loops to the video length. A video that is still processing gets the music ' +
+      'as soon as it is ready, even if it was published meanwhile.',
   })
   @ApiParam({ name: 'id', format: 'uuid' })
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({ type: SoundtrackUploadDto })
   @ApiCreatedResponse({ type: MediaDto })
-  @ApiErrors(400, 404, 409, 413, 415)
-  soundtrack(
-    @CurrentUser() user: AuthUser,
-    @Param('id', UuidPipe) id: string,
-    @UploadedFile() file: Express.Multer.File,
-    @Body() dto: SoundtrackFieldsDto,
-  ): Promise<MediaDto> {
-    return this.soundtracks.add(user.id, id, file, dto.mix === 'true');
+  @ApiErrors(400, 404)
+  async soundtrack(@CurrentUser() user: AuthUser, @Param('id', UuidPipe) id: string, @Body() dto: SoundtrackDto): Promise<MediaDto> {
+    await this.soundtracks.add(user.id, id, dto.audioId, !!dto.mix);
+    return this.media.getOwned(user.id, id);
   }
 
   @Post()

@@ -20,6 +20,11 @@ export const endpoints = {
     "method": "POST",
     "authenticated": true
   },
+  "mediaUploadsCompleteAudio": {
+    "path": "/api/media/uploads/{id}/audio",
+    "method": "POST",
+    "authenticated": true
+  },
   "mediaUploadsComplete": {
     "path": "/api/media/uploads/{id}/complete",
     "method": "POST",
@@ -602,6 +607,26 @@ export const endpoints = {
   },
   "notesUploadAudio": {
     "path": "/api/notes/audio",
+    "method": "POST",
+    "authenticated": true
+  },
+  "pushKey": {
+    "path": "/api/push/key",
+    "method": "GET",
+    "authenticated": true
+  },
+  "pushSubscribe": {
+    "path": "/api/push/subscriptions",
+    "method": "POST",
+    "authenticated": true
+  },
+  "pushUnsubscribe": {
+    "path": "/api/push/subscriptions/remove",
+    "method": "POST",
+    "authenticated": true
+  },
+  "pushTest": {
+    "path": "/api/push/test",
     "method": "POST",
     "authenticated": true
   },

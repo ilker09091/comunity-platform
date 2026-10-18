@@ -1,0 +1,8 @@
+# Build output
+.gradle/
+build/
+app/build/
+local.properties
+# Release signing: keep these safe and out of version control.
+keystore.properties
+*.jks

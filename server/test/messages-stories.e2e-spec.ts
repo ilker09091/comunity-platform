@@ -12,6 +12,10 @@ import { MediaService } from '../src/modules/media/media.service.js';
 import { ContentDeletionService } from '../src/modules/media/content-deletion.service.js';
 import { StoriesService } from '../src/modules/social/stories.service.js';
 import { MessagesService } from '../src/modules/social/messages.service.js';
+import { SoundtrackService } from '../src/modules/media/soundtrack.service.js';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { createPublicKey, verify } from 'node:crypto';
 
 describe('Direct messages and stories (e2e)', () => {
   let app: INestApplication;
@@ -601,26 +605,91 @@ describe('Direct messages and stories (e2e)', () => {
     expect((await api.get('/messages', alice)).body.items).toHaveLength(0);
   });
 
-  it('adds music to an unpublished video and replaces its file', async () => {
+  /** Uploads a sound clip in pieces, like the app does, and returns its audio id. */
+  const uploadAudio = async (buffer: Buffer, user = alice) => {
+    const session = (await api.post('/media/uploads', { size: buffer.length, fileName: 'song.wav' }, user).expect(201)).body;
+    await api.http
+      .post(`/api/media/uploads/${session.id}/chunks?offset=0`)
+      .set(user.auth)
+      .set('Content-Type', 'application/octet-stream')
+      .send(buffer)
+      .expect(200);
+    return api.post(`/media/uploads/${session.id}/audio`, {}, user);
+  };
+
+  it('adds music to a ready video at once, and to a processing video when it is ready', async () => {
+    const pngUpload = await uploadAudio(png);
+    expect(pngUpload.status).toBe(400);
+    const clip = (await uploadAudio(wav(12)).then((r) => r.body)) as { id: string; durationMs: number };
+    expect(clip.durationMs).toBeGreaterThan(11_000);
     const video = await api.uploadVideo(alice);
-    const before = (await db.query('SELECT storage_key FROM media WHERE id = $1', [video.id]))[0].storage_key;
-    const add = (id: string, user = alice, buffer = wav(12), mix = 'false') =>
-      api.http
-        .post(`/api/media/${id}/soundtrack`)
-        .set(user.auth)
-        .field('mix', mix)
-        .attach('file', buffer, { filename: 'song.wav', contentType: 'audio/wav' });
-    await add(video.id, bob).expect(404);
-    await add(video.id, alice, png).expect(400);
-    const updated = (await add(video.id).expect(201)).body;
-    expect(updated).toMatchObject({ id: video.id, type: 'VIDEO', status: 'READY' });
-    const after = (await db.query('SELECT storage_key FROM media WHERE id = $1', [video.id]))[0].storage_key;
-    expect(after).not.toBe(before);
-    const path = new URL(updated.url).pathname + new URL(updated.url).search;
-    await api.http.get(path).expect(200);
-    expect((await db.query('SELECT 1 FROM media_file_deletions WHERE storage_key = $1', [before])).length).toBe(0);
-    await add(video.id, alice, wav(12), 'true').expect(201);
-    await api.post('/posts', { mediaIds: [video.id] }, alice).expect(201);
-    await add(video.id).expect(404);
+    const key = async () => (await db.query('SELECT storage_key FROM media WHERE id = $1', [video.id]))[0].storage_key;
+    const before = await key();
+    await api.post(`/media/${video.id}/soundtrack`, { audioId: clip.id }, bob).expect(404);
+    const updated = (await api.post(`/media/${video.id}/soundtrack`, { audioId: clip.id, mix: false }, alice).expect(201)).body;
+    expect(updated).toMatchObject({ id: video.id, status: 'READY' });
+    expect(await key()).not.toBe(before);
+    await api.http.get(new URL(updated.url).pathname + new URL(updated.url).search).expect(200);
+    expect((await db.query('SELECT 1 FROM audio_uploads WHERE id = $1', [clip.id])).length).toBe(0);
+    await api.post(`/media/${video.id}/soundtrack`, { audioId: clip.id }, alice).expect(404);
+
+    // Still compressing, and published meanwhile: the music waits and is added when ready.
+    const second = await api.uploadVideo(alice);
+    await db.query("UPDATE media SET status = 'PROCESSING' WHERE id = $1", [second.id]);
+    const later = (await uploadAudio(wav(12)).then((r) => r.body)) as { id: string };
+    await api.post(`/media/${second.id}/soundtrack`, { audioId: later.id, mix: true }, alice).expect(201);
+    expect((await db.query('SELECT mix FROM media_soundtracks WHERE media_id = $1', [second.id]))[0].mix).toBe(true);
+    const pending = (await db.query('SELECT storage_key FROM media WHERE id = $1', [second.id]))[0].storage_key;
+    await db.query("UPDATE media SET status = 'READY' WHERE id = $1", [second.id]);
+    await api.post('/posts', { mediaIds: [second.id] }, alice).expect(201);
+    expect(await app.get(SoundtrackService).applyPending(second.id)).toBe(true);
+    expect((await db.query('SELECT storage_key FROM media WHERE id = $1', [second.id]))[0].storage_key).not.toBe(pending);
+    expect((await db.query('SELECT 1 FROM media_soundtracks WHERE media_id = $1', [second.id])).length).toBe(0);
+    const third = (await uploadAudio(wav(12)).then((r) => r.body)) as { id: string };
+    await api.post(`/media/${second.id}/soundtrack`, { audioId: third.id }, alice).expect(404);
+  });
+
+  it('stores push subscriptions and wakes devices with a VAPID-signed push on new messages', async () => {
+    const received: { auth: string; ttl: string; urgency: string }[] = [];
+    let status = 201;
+    const server = createServer((req, res) => {
+      received.push({
+        auth: String(req.headers.authorization),
+        ttl: String(req.headers.ttl),
+        urgency: String(req.headers.urgency),
+      });
+      res.writeHead(status).end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}/push/abc`;
+    try {
+      const { publicKey } = (await api.get('/push/key', bob).expect(200)).body;
+      expect(Buffer.from(publicKey, 'base64url')).toHaveLength(65);
+      await api.post('/push/subscriptions', { endpoint: 'ftp://nope' }, bob).expect(400);
+      await api.post('/push/subscriptions', { endpoint, p256dh: 'k', auth: 'a' }, bob).expect(204);
+      await api.post(`/users/${alice.id}/follow`, {}, bob).expect(200);
+      await send('ping');
+      await new Promise((r) => setTimeout(r, 500));
+      expect(received).toHaveLength(1);
+      expect(received[0]).toMatchObject({ ttl: '86400', urgency: 'high' });
+      const [, token, key] = /^vapid t=([^,]+), k=(.+)$/.exec(received[0].auth)!;
+      expect(key).toBe(publicKey);
+      const [header, claims, signature] = token.split('.');
+      expect(JSON.parse(Buffer.from(claims, 'base64url').toString()).aud).toBe(new URL(endpoint).origin);
+      const raw = Buffer.from(publicKey, 'base64url');
+      const verifier = createPublicKey({
+        key: { kty: 'EC', crv: 'P-256', x: raw.subarray(1, 33).toString('base64url'), y: raw.subarray(33).toString('base64url') },
+        format: 'jwk',
+      });
+      expect(
+        verify('sha256', Buffer.from(`${header}.${claims}`), { key: verifier, dsaEncoding: 'ieee-p1363' }, Buffer.from(signature, 'base64url')),
+      ).toBe(true);
+      expect((await api.post('/push/test', {}, bob).expect(201)).body.delivered).toBe(1);
+      status = 410;
+      await api.post('/push/test', {}, bob).expect(201);
+      expect((await db.query('SELECT 1 FROM push_subscriptions WHERE endpoint = $1', [endpoint])).length).toBe(0);
+    } finally {
+      server.close();
+    }
   });
 });

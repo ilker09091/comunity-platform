@@ -156,7 +156,17 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * limit (a 413 halves the piece size), a dropped connection retries just one piece, and the
  * server's `received` offset is the source of truth for resuming.
  */
-async function chunkedUpload(file: File, onProgress: (percent: number) => void): Promise<Models["MediaDto"]> {
+async function chunkedUpload(file: File, onProgress: (percent: number) => void): Promise<Models["MediaDto"]>;
+async function chunkedUpload(
+  file: File,
+  onProgress: (percent: number) => void,
+  finish: "mediaUploadsCompleteAudio",
+): Promise<Models["AudioUploadDto"]>;
+async function chunkedUpload(
+  file: File,
+  onProgress: (percent: number) => void,
+  finish: "mediaUploadsComplete" | "mediaUploadsCompleteAudio" = "mediaUploadsComplete",
+): Promise<Models["MediaDto"] | Models["AudioUploadDto"]> {
   const session = await api("mediaUploadsStart", { body: { size: file.size, fileName: file.name || "upload" } });
   let offset = session.received;
   let size = Math.min(session.chunkSize, rememberedChunk() ?? session.chunkSize);
@@ -202,7 +212,15 @@ async function chunkedUpload(file: File, onProgress: (percent: number) => void):
     offset = (await api("mediaUploadsStatus", { params: { id: session.id } })).received;
   }
   onProgress(100);
-  return api("mediaUploadsComplete", { params: { id: session.id } });
+  return finish === "mediaUploadsCompleteAudio"
+    ? api("mediaUploadsCompleteAudio", { params: { id: session.id } })
+    : api("mediaUploadsComplete", { params: { id: session.id } });
+}
+
+/** Uploads a sound clip in pieces (never hits a proxy's body limit) for "Add sound" on Reels. */
+export async function uploadAudio(file: File, onProgress: (percent: number) => void = () => {}) {
+  await api("usersGetMe");
+  return chunkedUpload(file, onProgress, "mediaUploadsCompleteAudio");
 }
 
 /**

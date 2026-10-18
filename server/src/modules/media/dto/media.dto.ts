@@ -1,4 +1,4 @@
-import { IsIn, IsOptional } from 'class-validator';
+import { IsBoolean, IsOptional, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum MediaTypeEnum {
@@ -66,15 +66,13 @@ export class UploadMediaDto {
   file: unknown;
 }
 
-/** Multipart fields of POST /media/{id}/soundtrack (validated). */
-export class SoundtrackFieldsDto {
-  @ApiPropertyOptional({ enum: ['true', 'false'], description: 'Keep the original sound under the music' })
+/** Body of POST /media/{id}/soundtrack. */
+export class SoundtrackDto {
+  @ApiProperty({ format: 'uuid', description: 'From POST /media/uploads/{id}/audio' })
+  @IsUUID('all')
+  audioId: string;
+  @ApiPropertyOptional({ description: 'Keep the original sound under the music' })
   @IsOptional()
-  @IsIn(['true', 'false'])
-  mix?: 'true' | 'false';
-}
-/** OpenAPI shape of POST /media/{id}/soundtrack. */
-export class SoundtrackUploadDto extends SoundtrackFieldsDto {
-  @ApiProperty({ type: 'string', format: 'binary', description: 'The music clip (audio file, up to 90 s)' })
-  file: unknown;
+  @IsBoolean()
+  mix?: boolean;
 }

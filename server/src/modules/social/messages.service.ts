@@ -6,6 +6,7 @@ import { AppException, ErrorCode } from '../../common/errors/app.exception.js';
 import { decodeCursor, iso, toPage } from '../../common/utils/cursor.js';
 import { notBlockedSql, sqlOne, sqlRows } from '../../common/utils/sql.js';
 import { ContentDeletionService } from '../media/content-deletion.service.js';
+import { PushService } from './push.service.js';
 import { MediaService } from '../media/media.service.js';
 import { PostsQueryService } from '../posts/posts-query.service.js';
 import {
@@ -45,6 +46,7 @@ export class MessagesService {
     private readonly media: MediaService,
     private readonly posts: PostsQueryService,
     private readonly deletion: ContentDeletionService,
+    private readonly push: PushService,
   ) {}
 
   /** Whether `owner` still treats `peer` as a message request, and whether `peer` already wrote. */
@@ -282,6 +284,8 @@ export class MessagesService {
         ],
       ))!;
     });
+    // Wake the recipient's phones/browsers (the service worker fetches and shows the message).
+    this.push.notifyUser(recipientId);
     return (await this.hydrate([row], senderId))[0];
   }
 

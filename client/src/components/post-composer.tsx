@@ -691,9 +691,12 @@ export default function PostComposer({
               media={reel.media}
               disabled={busy || !!reel.error}
               onApplied={(media) => {
-                // The server rewrote the file with the new sound: preview the real result.
-                update(reel.key, { media, preview: media.url, previewFailed: false });
-                setCoverMuted(false);
+                // Ready: the server rewrote the file with the new sound, so preview the real result.
+                // Still processing: the music is added when it is ready; keep the local preview.
+                if (media.status === "READY") {
+                  update(reel.key, { media, preview: media.url, previewFailed: false });
+                  setCoverMuted(false);
+                }
               }}
             />
             <div className="reel-setting">

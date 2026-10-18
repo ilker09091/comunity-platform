@@ -2,14 +2,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2, Music2, Pause, Play, X } from "lucide-react";
-import { api, ApiError, type Models } from "@/lib/api/client";
+import { api, uploadAudio, type Models } from "@/lib/api/client";
 import { clipToWav } from "@/lib/audio-clip";
 import { haptic } from "@/lib/haptics";
 import { useToast } from "./providers";
 
 /** Longest music clip sent to the server; it loops for longer videos. */
 const MAX_CLIP_SECONDS = 60;
-/** Mono 32 kHz keeps a minute of music around 4 MB before the server re-encodes it to AAC. */
+/** Mono 32 kHz (about 4 MB a minute); it goes up in pieces, then the server re-encodes it to AAC. */
 const CLIP_RATE = 32_000;
 
 const mmss = (seconds: number) =>
@@ -45,7 +45,8 @@ export function ReelSound({
   const videoSeconds = media?.durationMs ? media.durationMs / 1000 : MAX_CLIP_SECONDS;
   const clip = source ? Math.min(MAX_CLIP_SECONDS, videoSeconds, source.duration) : 0;
   const maxStart = source ? Math.max(0, source.duration - clip) : 0;
-  const ready = media?.status === "READY";
+  // Music can be chosen while the video is still being optimised: the server adds it when ready.
+  const processing = media?.status === "PROCESSING";
   const apply = useMutation({
     mutationFn: async () => {
       if (!source || !media) throw new Error("Choose a sound first.");
@@ -55,15 +56,8 @@ export function ReelSound({
       } catch {
         throw new Error("This file's sound can't be read here. Try an MP3, M4A or MP4.");
       }
-      const form = new FormData();
-      form.append("mix", String(mix));
-      form.append("file", file);
-      try {
-        return await api("mediaSoundtrack", { params: { id: media.id }, body: form as never });
-      } catch (e) {
-        if (e instanceof ApiError && e.status === 413) throw new Error("This sound is too long to upload. Choose a shorter part.");
-        throw e;
-      }
+      const audio = await uploadAudio(file);
+      return api("mediaSoundtrack", { params: { id: media.id }, body: { audioId: audio.id, mix } });
     },
     onSuccess: (updated) => {
       haptic("success");
@@ -72,7 +66,11 @@ export function ReelSound({
       player.current?.pause();
       setOpen(false);
       onApplied(updated, name);
-      toast(`"${name}" added to your Reel.`);
+      toast(
+        updated.status === "PROCESSING"
+          ? `"${name}" will be added as soon as your video is ready — you can post now.`
+          : `"${name}" added to your Reel.`,
+      );
     },
     onError: (e) => toast(e.message, true),
   });
@@ -207,11 +205,14 @@ export function ReelSound({
                 <span>Keep original sound</span>
                 <span className={`reel-switch ${mix ? "on" : ""}`} aria-hidden="true" />
               </button>
-              {!ready && <p className="reel-sound-hint">Waiting for your video to finish processing…</p>}
+              {!media && <p className="reel-sound-hint">Waiting for your video to finish uploading…</p>}
+              {processing && (
+                <p className="reel-sound-hint">Your video is still being optimised. The sound is added as soon as it&apos;s ready.</p>
+              )}
               <button
                 type="button"
                 className="reel-primary"
-                disabled={!ready || apply.isPending}
+                disabled={!media || media.status === "FAILED" || apply.isPending}
                 onClick={() => apply.mutate()}
               >
                 {apply.isPending && <Loader2 size={15} className="spin" />}

@@ -1,9 +1,9 @@
 import { createWriteStream } from 'node:fs';
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { Body, Controller, Get, HttpCode, HttpStatus, Injectable, Logger, Param, ParseIntPipe, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Injectable, Logger, Param, ParseIntPipe, Post, Query, Req } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProperty, ApiQuery, ApiTags } from '@nestjs/swagger';
@@ -21,6 +21,8 @@ import { PlatformSettingsService } from '../platform/platform-settings.service.j
 import { MediaDto } from './dto/media.dto.js';
 import { MediaService } from './media.service.js';
 import { VideoTranscodeQueue } from './video-transcode.queue.js';
+import { VIDEO_PROCESSOR, type VideoProcessor } from './video.processor.js';
+import { SOUNDTRACK_MAX_MS } from './soundtrack.service.js';
 
 /** Suggested piece size. Clients halve it when a proxy rejects a piece (413). */
 export const CHUNK_SIZE = 8 * 1024 * 1024;
@@ -46,6 +48,11 @@ export class UploadSessionDto {
   @ApiProperty({ description: 'Suggested piece size in bytes (max 16 MB)', example: CHUNK_SIZE }) chunkSize: number;
 }
 
+export class AudioUploadDto {
+  @ApiProperty({ format: 'uuid', description: 'Pass to POST /media/{id}/soundtrack' }) id: string;
+  @ApiProperty() durationMs: number;
+}
+
 interface SessionRow {
   id: string;
   file_name: string;
@@ -62,6 +69,7 @@ export class MediaUploadSessionsService {
     private readonly media: MediaService,
     private readonly settings: PlatformSettingsService,
     private readonly queue: VideoTranscodeQueue,
+    @Inject(VIDEO_PROCESSOR) private readonly processor: VideoProcessor,
   ) {}
 
   private get dir() {
@@ -142,6 +150,35 @@ export class MediaUploadSessionsService {
     return this.media.upload(ownerId, file);
   }
 
+  /**
+   * Finishes a resumable upload of a sound clip (Reels music). Sound files never become media:
+   * they are kept briefly, only to be put on a video.
+   */
+  async completeAudio(ownerId: string, id: string): Promise<AudioUploadDto> {
+    const row = await this.owned(ownerId, id);
+    if (Number(row.received) !== Number(row.size))
+      throw AppException.conflict(ErrorCode.CONFLICT, `Upload incomplete: ${row.received} of ${row.size} bytes received`);
+    const deleted = await sqlRows(this.db, `DELETE FROM media_upload_sessions WHERE id = $1 AND owner_id = $2 RETURNING id`, [id, ownerId]);
+    if (!deleted.length) throw AppException.notFound(ErrorCode.NOT_FOUND, 'Upload not found or expired');
+    const part = this.partPath(id);
+    const probe = await this.processor.probeAudio(part);
+    if (!probe || probe.durationMs > SOUNDTRACK_MAX_MS + 5_000) {
+      await rm(part, { force: true }).catch(() => undefined);
+      throw AppException.badRequest(
+        probe ? ErrorCode.VALIDATION_ERROR : ErrorCode.UNSUPPORTED_MEDIA_TYPE,
+        probe ? 'Choose up to 90 seconds of music' : 'Choose a song or another audio file',
+      );
+    }
+    const path = join(this.dir, `audio-${id}`);
+    await rename(part, path);
+    const audio = await sqlOne<{ id: string }>(
+      this.db,
+      'INSERT INTO audio_uploads(owner_id, path, duration_ms) VALUES ($1, $2, $3) RETURNING id',
+      [ownerId, path, probe.durationMs],
+    );
+    return { id: audio!.id, durationMs: probe.durationMs };
+  }
+
   /** Drops uploads abandoned for more than a day. */
   @Cron(CronExpression.EVERY_HOUR, { name: 'media-upload-sessions-cleanup' })
   async cleanupStale(): Promise<number> {
@@ -198,6 +235,19 @@ export class MediaUploadsController {
     @Req() req: Request,
   ): Promise<UploadSessionDto> {
     return this.uploads.append(user.id, id, offset, req);
+  }
+
+  @Post(':id/audio')
+  @ApiAuth()
+  @ApiOperation({
+    operationId: 'mediaUploadsCompleteAudio',
+    summary: 'Finish a resumable upload of a sound clip (for POST /media/{id}/soundtrack)',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiCreatedResponse({ type: AudioUploadDto })
+  @ApiErrors(400, 404, 409, 415)
+  completeAudio(@CurrentUser() user: AuthUser, @Param('id', UuidPipe) id: string): Promise<AudioUploadDto> {
+    return this.uploads.completeAudio(user.id, id);
   }
 
   @Post(':id/complete')

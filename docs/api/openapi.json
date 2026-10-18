@@ -295,6 +295,103 @@
         ]
       }
     },
+    "/api/media/uploads/{id}/audio": {
+      "post": {
+        "operationId": "mediaUploadsCompleteAudio",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioUploadDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict with existing state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type (`UNSUPPORTED_MEDIA_TYPE`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Finish a resumable upload of a sound clip (for POST /media/{id}/soundtrack)",
+        "tags": [
+          "Media"
+        ]
+      }
+    },
     "/api/media/uploads/{id}/complete": {
       "post": {
         "operationId": "mediaUploadsComplete",
@@ -404,7 +501,7 @@
     },
     "/api/media/{id}/soundtrack": {
       "post": {
-        "description": "Replaces the original sound, or mixes the music over it with `mix=true`. The clip loops to the video length.",
+        "description": "Upload the clip with /media/uploads then POST /media/uploads/{id}/audio. Replaces the original sound, or mixes the music under it with `mix`. The clip loops to the video length. A video that is still processing gets the music as soon as it is ready, even if it was published meanwhile.",
         "operationId": "mediaSoundtrack",
         "parameters": [
           {
@@ -420,9 +517,9 @@
         "requestBody": {
           "required": true,
           "content": {
-            "multipart/form-data": {
+            "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SoundtrackUploadDto"
+                "$ref": "#/components/schemas/SoundtrackDto"
               }
             }
           }
@@ -468,36 +565,6 @@
               }
             }
           },
-          "409": {
-            "description": "Conflict with existing state",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Uploaded file is too large (`FILE_TOO_LARGE`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "Unsupported media type (`UNSUPPORTED_MEDIA_TYPE`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
-                }
-              }
-            }
-          },
           "429": {
             "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
             "content": {
@@ -514,7 +581,7 @@
             "access-token": []
           }
         ],
-        "summary": "Add music to one of your unpublished videos (Reels \"Add sound\")",
+        "summary": "Add music to one of your videos (Reels \"Add sound\")",
         "tags": [
           "Media"
         ]
@@ -10104,6 +10171,240 @@
         ]
       }
     },
+    "/api/push/key": {
+      "get": {
+        "operationId": "pushKey",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushKeyDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "VAPID public key for PushManager.subscribe",
+        "tags": [
+          "Push"
+        ]
+      }
+    },
+    "/api/push/subscriptions": {
+      "post": {
+        "operationId": "pushSubscribe",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushSubscriptionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Receive message notifications on this device",
+        "tags": [
+          "Push"
+        ]
+      }
+    },
+    "/api/push/subscriptions/remove": {
+      "post": {
+        "operationId": "pushUnsubscribe",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushUnsubscribeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Stop notifications on this device",
+        "tags": [
+          "Push"
+        ]
+      }
+    },
+    "/api/push/test": {
+      "post": {
+        "operationId": "pushTest",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushTestDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Send a test notification to your devices",
+        "tags": [
+          "Push"
+        ]
+      }
+    },
     "/api/admin/importer/request": {
       "post": {
         "description": "Allowlisted worker operations only. Database/storage settings come from Circle automatically; credentials never reach the browser. Import queues and schedules keep running after the panel closes. Requires ADMIN or SUPER_ADMIN. Source-account login happens in the isolated remote browser; no invented scraping endpoint or fake video results.",
@@ -15760,6 +16061,23 @@
           "chunkSize"
         ]
       },
+      "AudioUploadDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Pass to POST /media/{id}/soundtrack"
+          },
+          "durationMs": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "durationMs"
+        ]
+      },
       "MediaType": {
         "type": "string",
         "enum": [
@@ -15854,25 +16172,21 @@
           "processingProgress"
         ]
       },
-      "SoundtrackUploadDto": {
+      "SoundtrackDto": {
         "type": "object",
         "properties": {
-          "mix": {
+          "audioId": {
             "type": "string",
-            "enum": [
-              "true",
-              "false"
-            ],
-            "description": "Keep the original sound under the music"
+            "format": "uuid",
+            "description": "From POST /media/uploads/{id}/audio"
           },
-          "file": {
-            "type": "string",
-            "format": "binary",
-            "description": "The music clip (audio file, up to 90 s)"
+          "mix": {
+            "type": "boolean",
+            "description": "Keep the original sound under the music"
           }
         },
         "required": [
-          "file"
+          "audioId"
         ]
       },
       "UploadMediaDto": {
@@ -18886,6 +19200,59 @@
           "id",
           "url",
           "durationMs"
+        ]
+      },
+      "PushKeyDto": {
+        "type": "object",
+        "properties": {
+          "publicKey": {
+            "type": "string",
+            "description": "VAPID public key (applicationServerKey), base64url"
+          }
+        },
+        "required": [
+          "publicKey"
+        ]
+      },
+      "PushSubscriptionDto": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "description": "PushSubscription.endpoint (https)"
+          },
+          "p256dh": {
+            "type": "string"
+          },
+          "auth": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpoint"
+        ]
+      },
+      "PushUnsubscribeDto": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpoint"
+        ]
+      },
+      "PushTestDto": {
+        "type": "object",
+        "properties": {
+          "delivered": {
+            "type": "number",
+            "description": "Devices that accepted the test notification"
+          }
+        },
+        "required": [
+          "delivered"
         ]
       },
       "ImporterRequestDto": {

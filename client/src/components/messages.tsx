@@ -1,5 +1,6 @@
 "use client";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useEffectEvent, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -17,6 +18,8 @@ import {
   MoreHorizontal,
   Copy,
   Trash2,
+  Bell,
+  BellOff,
   Reply,
   Clapperboard,
   Info,
@@ -44,6 +47,7 @@ import {
 import { RecipientPicker } from "./social-controls";
 import { MediaVideo } from "./media-video";
 import { NotesTray } from "./notes";
+import { messageSoundsOn, setMessageSounds } from "./app-bridge";
 
 type Message = Models["DirectMessageDto"];
 type Conversation = Models["ConversationDto"];
@@ -247,23 +251,73 @@ function Quote({
 }
 
 /** Full-screen view of a view-once photo/video; it cannot be reopened once closed. */
+/** How long a view-once photo stays on screen. */
+const VIEW_ONCE_PHOTO_MS = 10_000;
+
+/**
+ * Full-screen view of a view-once photo/video; it cannot be reopened once closed.
+ * Browsers cannot block screenshots or screen recording, so this makes capturing harder and
+ * traceable: a watermark with the viewer's name and time, the media is hidden whenever the
+ * window loses focus or is hidden (screenshot tools usually take focus), PrintScreen hides it
+ * and clears the clipboard, saving/dragging is disabled, and photos close after 10 seconds.
+ */
 function ViewOnceViewer({ media, onClose }: { media: Models["MediaDto"]; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const { user } = useSession();
+  const [shielded, setShielded] = useState(false);
+  const [stamp] = useState(() => new Date().toLocaleString());
   useEffect(() => {
     const dialog = ref.current;
     dialog?.showModal();
     return () => dialog?.close();
   }, []);
+  useEffect(() => {
+    const hide = () => setShielded(true);
+    const show = () => setShielded(document.visibilityState !== "visible");
+    const visibility = () => (document.visibilityState === "visible" ? undefined : hide());
+    const keys = (e: KeyboardEvent) => {
+      // PrintScreen, and the macOS/Windows capture shortcuts.
+      const capture =
+        e.key === "PrintScreen" ||
+        (e.metaKey && e.shiftKey && ["3", "4", "5", "s", "S"].includes(e.key)) ||
+        (e.ctrlKey && e.shiftKey && (e.key === "s" || e.key === "S"));
+      if (!capture) return;
+      hide();
+      void navigator.clipboard?.writeText("").catch(() => undefined);
+    };
+    window.addEventListener("blur", hide);
+    window.addEventListener("focus", show);
+    document.addEventListener("visibilitychange", visibility);
+    window.addEventListener("keydown", keys, true);
+    window.addEventListener("keyup", keys, true);
+    return () => {
+      window.removeEventListener("blur", hide);
+      window.removeEventListener("focus", show);
+      document.removeEventListener("visibilitychange", visibility);
+      window.removeEventListener("keydown", keys, true);
+      window.removeEventListener("keyup", keys, true);
+    };
+  }, []);
+  // The parent re-renders on every thread refresh; the timer must not restart with it.
+  const expire = useEffectEvent(onClose);
+  useEffect(() => {
+    if (media.type === "VIDEO") return;
+    const timer = window.setTimeout(() => expire(), VIEW_ONCE_PHOTO_MS);
+    return () => window.clearTimeout(timer);
+  }, [media.type]);
+  const mark = `${user?.username ?? ""} · ${stamp}`;
   return (
     <dialog
       ref={ref}
-      className="dm-viewonce-viewer"
+      className={`dm-viewonce-viewer ${shielded ? "shielded" : ""}`}
       aria-label="View once"
       onCancel={(e) => {
         e.preventDefault();
         onClose();
       }}
       onContextMenu={(e) => e.preventDefault()}
+      onDragStart={(e) => e.preventDefault()}
+      onCopy={(e) => e.preventDefault()}
     >
       <header>
         <span className="dm-once-badge" aria-hidden="true">1</span>
@@ -272,11 +326,35 @@ function ViewOnceViewer({ media, onClose }: { media: Models["MediaDto"]; onClose
           <X size={24} />
         </button>
       </header>
-      {media.type === "VIDEO" ? (
-        <MediaVideo src={media.url} autoPlay playsInline controls controlsList="nodownload" />
-      ) : (
-        <img src={media.url} alt="View once photo" draggable={false} />
+      {media.type !== "VIDEO" && (
+        <span className="dm-viewonce-timer" style={{ animationDuration: `${VIEW_ONCE_PHOTO_MS}ms` }} aria-hidden="true" />
       )}
+      <div className="dm-viewonce-stage" onClick={() => shielded && setShielded(false)}>
+        {media.type === "VIDEO" ? (
+          <MediaVideo
+            src={media.url}
+            autoPlay
+            playsInline
+            controls
+            controlsList="nodownload noplaybackrate noremoteplayback"
+            disablePictureInPicture
+            disableRemotePlayback
+            onEnded={onClose}
+          />
+        ) : (
+          <img src={media.url} alt="View once photo" draggable={false} />
+        )}
+        <span className="dm-viewonce-mark" aria-hidden="true">
+          {Array.from({ length: 12 }, (_, i) => (
+            <span key={i}>{mark}</span>
+          ))}
+        </span>
+        {shielded && (
+          <span className="dm-viewonce-shield" role="status">
+            Hidden while Circle isn&apos;t in focus. Tap to continue.
+          </span>
+        )}
+      </div>
     </dialog>
   );
 }
@@ -345,20 +423,41 @@ function MessageItem({
   onUnsend: (message: Message) => void;
 }) {
   const toast = useToast();
-  const [menu, setMenu] = useState(false);
+  /**
+   * Message actions. Long-press (touch) opens a bottom sheet; the desktop "…" button opens a small
+   * menu pinned to the screen next to the bubble (flipped above it near the bottom). Both render
+   * in a portal so the scrolling chat can never clip them or hide them behind the composer.
+   */
+  const [menu, setMenu] = useState<null | { mode: "sheet" } | { mode: "popover"; top: number; left?: number; right?: number }>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const openPopover = () => {
+    const rect = bodyRef.current?.getBoundingClientRect();
+    if (!rect) return setMenu({ mode: "sheet" });
+    const height = own ? 150 : 108;
+    const top = window.innerHeight - rect.bottom > height + 16 ? rect.bottom + 6 : Math.max(8, rect.top - height - 6);
+    setMenu(
+      own
+        ? { mode: "popover", top, right: Math.max(8, window.innerWidth - rect.right) }
+        : { mode: "popover", top, left: Math.max(8, rect.left) },
+    );
+  };
   const menuRef = useRef<HTMLDivElement>(null);
   const press = useRef<number | undefined>(undefined);
   useEffect(() => {
     if (!menu) return;
     const close = (e: PointerEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) setMenu(false);
+      if (!menuRef.current?.contains(e.target as Node)) setMenu(null);
     };
-    const escape = (e: KeyboardEvent) => e.key === "Escape" && setMenu(false);
+    const escape = (e: KeyboardEvent) => e.key === "Escape" && setMenu(null);
+    // A pinned menu would drift away from its message while the chat scrolls.
+    const scroll = () => setMenu((m) => (m?.mode === "popover" ? null : m));
     document.addEventListener("pointerdown", close);
     document.addEventListener("keydown", escape);
+    document.addEventListener("scroll", scroll, true);
     return () => {
       document.removeEventListener("pointerdown", close);
       document.removeEventListener("keydown", escape);
+      document.removeEventListener("scroll", scroll, true);
     };
   }, [menu]);
   useEffect(() => () => window.clearTimeout(press.current), []);
@@ -389,7 +488,7 @@ function MessageItem({
           swipe.current = null;
           setDrag(0);
           haptic("tap");
-          setMenu(true);
+          setMenu({ mode: "sheet" });
         }, 450);
       }}
       onContextMenu={(e) => {
@@ -427,7 +526,7 @@ function MessageItem({
           {last && <Avatar user={peer} size={28} />}
         </span>
       )}
-      <div className="dm-message-body" title={separatorLabel(message.createdAt)}>
+      <div className="dm-message-body" ref={bodyRef} title={separatorLabel(message.createdAt)}>
         {message.storyReply && <StoryReplyPreview reply={message.storyReply} own={own} />}
         {message.noteReply && <NoteReplyPreview reply={message.noteReply} own={own} />}
         {message.viewOnce && <ViewOnceBubble message={message} own={own} />}
@@ -485,54 +584,69 @@ function MessageItem({
           type="button"
           className="dm-reply-action"
           aria-label="More actions"
-          aria-expanded={menu}
-          onClick={() => setMenu((m) => !m)}
+          aria-expanded={!!menu}
+          onClick={() => (menu ? setMenu(null) : openPopover())}
         >
           <MoreHorizontal size={16} />
         </button>
       </div>
-      {menu && (
-        <div className="dm-message-menu" role="menu" ref={menuRef}>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setMenu(false);
-              onReply(message);
-            }}
-          >
-            <Reply size={16} /> Reply
-          </button>
-          {message.content && (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setMenu(false);
-                void navigator.clipboard.writeText(message.content!).then(
-                  () => toast("Copied."),
-                  () => toast("Unable to copy.", true),
-                );
-              }}
+      {menu &&
+        createPortal(
+          <div className={`dm-menu-layer ${menu.mode}`}>
+            <div
+              className={`dm-message-menu ${menu.mode}`}
+              role="menu"
+              ref={menuRef}
+              style={menu.mode === "popover" ? { top: menu.top, left: menu.left, right: menu.right } : undefined}
             >
-              <Copy size={16} /> Copy
-            </button>
-          )}
-          {own && (
-            <button
-              type="button"
-              role="menuitem"
-              className="danger"
-              onClick={() => {
-                setMenu(false);
-                onUnsend(message);
-              }}
-            >
-              <Trash2 size={16} /> Unsend
-            </button>
-          )}
-        </div>
-      )}
+              {menu.mode === "sheet" && message.content && <p className="dm-menu-preview">{message.content}</p>}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenu(null);
+                  onReply(message);
+                }}
+              >
+                <Reply size={18} /> Reply
+              </button>
+              {message.content && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenu(null);
+                    void navigator.clipboard.writeText(message.content!).then(
+                      () => toast("Copied."),
+                      () => toast("Unable to copy.", true),
+                    );
+                  }}
+                >
+                  <Copy size={18} /> Copy
+                </button>
+              )}
+              {own && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="danger"
+                  onClick={() => {
+                    setMenu(null);
+                    onUnsend(message);
+                  }}
+                >
+                  <Trash2 size={18} /> Unsend
+                </button>
+              )}
+              {menu.mode === "sheet" && (
+                <button type="button" className="dm-menu-cancel" onClick={() => setMenu(null)}>
+                  Cancel
+                </button>
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
       {drag > 0 && (
         <span className="dm-swipe-hint" style={{ opacity: Math.min(1, drag / 56) }} aria-hidden="true">
           <Reply size={16} />
@@ -663,6 +777,7 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
     onError: (e) => toast(e.message, true),
   });
   const [unsending, setUnsending] = useState<Message | null>(null);
+  const [sounds, setSounds] = useState(messageSoundsOn);
   const [deletingChat, setDeletingChat] = useState(false);
   const unsend = useMutation({
     mutationFn: (id: string) => api("messagesDelete", { params: { id } }),
@@ -813,6 +928,15 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
           <Link href={`/profile/${peer.username}`}>
             <Info size={16} /> View profile
           </Link>
+          <button
+            type="button"
+            onClick={() => {
+              setMessageSounds(!sounds);
+              setSounds(!sounds);
+            }}
+          >
+            {sounds ? <BellOff size={16} /> : <Bell size={16} />} {sounds ? "Mute message sounds" : "Turn on message sounds"}
+          </button>
           <button type="button" className="danger-text" disabled={!messages.length} onClick={() => setDeletingChat(true)}>
             <Trash2 size={16} /> Delete chat
           </button>

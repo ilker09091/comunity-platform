@@ -10,6 +10,7 @@ import { sqlOne, sqlRows } from '../../common/utils/sql.js';
 import { JobRegistryService } from '../platform/job-registry.service.js';
 import { ContentDeletionService } from './content-deletion.service.js';
 import { STORAGE_DRIVER, type StorageDriver } from './storage/storage.driver.js';
+import { SoundtrackService } from './soundtrack.service.js';
 import { VIDEO_PROCESSOR, type VideoProbe, type VideoProcessor } from './video.processor.js';
 
 /**
@@ -34,6 +35,7 @@ export class VideoTranscodeQueue implements OnModuleInit, OnApplicationBootstrap
     @Inject(appConfig.KEY) private readonly config: ConfigType<typeof appConfig>,
     private readonly jobs: JobRegistryService,
     private readonly deletion: ContentDeletionService,
+    private readonly soundtracks: SoundtrackService,
   ) {
     this.incomingDir = join(resolve(config.media.localDir), '.incoming');
   }
@@ -125,6 +127,8 @@ export class VideoTranscodeQueue implements OnModuleInit, OnApplicationBootstrap
       );
       // Upload deleted while we were working: drop the stored file again.
       if (!updated.length) await this.storage.delete(row.storage_key);
+      // Music chosen while the video was compressing ("Add sound" on Reels).
+      else await this.soundtracks.applyPending(mediaId);
       const detail = `${mode} ${Math.round(Number(row.size_bytes) / 1048576)} MB → ${Math.round(size / 1048576)} MB in ${Math.round((Date.now() - started) / 1000)}s`;
       this.logger.log({ message: 'Video compressed', mediaId, mode, originalBytes: Number(row.size_bytes), storedBytes: size, ms: Date.now() - started });
       this.jobs.record('video-compression', 'OK', detail);

@@ -22,6 +22,7 @@ import {
   CircleAlert,
   Heart,
   Send,
+  Smartphone,
 } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { useFeatures } from "@/lib/platform-config";
@@ -30,6 +31,7 @@ import { Avatar, Dropdown, ErrorState, VerifiedBadge } from "./ui";
 import { useMessageUnread } from "./social-controls";
 import FollowButton from "./follow-button";
 import PostComposer from "./post-composer";
+import { APK_URL } from "./app-bridge";
 import { ActivityWidget, useUnreadTotal, WidgetSkeleton } from "./notifications";
 
 export function Brand() {
@@ -151,6 +153,9 @@ export function AppHeader() {
               <Link href="/settings">
                 <Settings size={16} /> Settings
               </Link>
+              <a href={APK_URL} download>
+                <Smartphone size={16} /> Get the Android app
+              </a>
               {staff && (
                 <Link href="/admin">
                   <ShieldCheck size={16} /> Admin control center
