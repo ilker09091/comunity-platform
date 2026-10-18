@@ -1,9 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { CursorQueryDto } from '../../../common/dto/common.dto.js';
 import { sanitizeText } from '../../../common/utils/sanitize.js';
 import { UserSummaryDto } from '../../users/dto/user.dto.js';
+import { StickerDto } from '../../social/social.dto.js';
 
 export enum CommentStatusEnum {
   ACTIVE = 'ACTIVE',
@@ -44,6 +45,12 @@ export class CommentDto {
   @ApiProperty({ type: String, nullable: true, example: 'Great point!' })
   content: string | null;
 
+  @ApiProperty({ type: StickerDto, nullable: true, description: 'Sticker sent with (or as) this comment' })
+  sticker: StickerDto | null;
+
+  @ApiProperty({ example: false, description: 'This comment had a sticker that is no longer available' })
+  stickerUnavailable: boolean;
+
   @ApiProperty({ example: 4 })
   likeCount: number;
 
@@ -73,6 +80,24 @@ const commentText = () =>
   Transform(({ value }) => (typeof value === 'string' ? sanitizeText(value, { multiline: true }) : value));
 
 export class CreateCommentDto {
+  @ApiPropertyOptional({
+    example: 'Great point!',
+    maxLength: 2000,
+    description: 'Plain text. Max COMMENT_MAX_LENGTH (default 2000). Required unless stickerId is set.',
+  })
+  @IsOptional()
+  @commentText()
+  @IsString()
+  @MaxLength(10000)
+  content?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'A built-in sticker or one of your own (GET /stickers)' })
+  @IsOptional()
+  @IsUUID('all')
+  stickerId?: string;
+}
+
+export class UpdateCommentDto {
   @ApiProperty({ example: 'Great point!', minLength: 1, maxLength: 2000, description: 'Plain text. Max COMMENT_MAX_LENGTH (default 2000).' })
   @commentText()
   @IsString()
@@ -80,8 +105,6 @@ export class CreateCommentDto {
   @MaxLength(10000)
   content: string;
 }
-
-export class UpdateCommentDto extends CreateCommentDto {}
 
 export class CommentsQueryDto extends CursorQueryDto {
   @ApiPropertyOptional({ enum: CommentSortEnum, enumName: 'CommentSort', default: CommentSortEnum.NEWEST })

@@ -9,7 +9,9 @@ import { NotificationTypeEnum } from '../notifications/dto/notification.dto.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { ContentDeletionService } from '../media/content-deletion.service.js';
 import { PlatformSettingsService } from '../platform/platform-settings.service.js';
+import { MediaUrlService } from '../media/media-url.service.js';
 import { PostsQueryService } from '../posts/posts-query.service.js';
+import { STICKER_COLUMNS, toStickerDto } from '../social/stickers.service.js';
 import { UsersService } from '../users/users.service.js';
 import { CommentDto, CommentSortEnum, CommentStatusEnum } from './dto/comment.dto.js';
 
@@ -32,6 +34,7 @@ export class CommentsService {
     private readonly notifications: NotificationsService,
     private readonly settings: PlatformSettingsService,
     private readonly deletion: ContentDeletionService,
+    private readonly urls: MediaUrlService,
   ) {}
 
   private async maxDepth() {
@@ -43,12 +46,15 @@ export class CommentsService {
     // children, so threads never break while empty deleted comments disappear.
     return `
       SELECT c.*, u.username::text AS username, u.display_name, u.is_private, u.is_verified, av.storage_key AS avatar_key,
+             ${STICKER_COLUMNS},
              EXISTS (SELECT 1 FROM comments ch WHERE ch.parent_id = c.id) AS has_replies,
              ($1::uuid IS NOT NULL AND EXISTS (
                SELECT 1 FROM comment_likes cl WHERE cl.comment_id = c.id AND cl.user_id = $1::uuid)) AS is_liked
         FROM comments c
         JOIN users u ON u.id = c.author_id AND u.status = 'ACTIVE'
         LEFT JOIN media av ON av.id = u.avatar_media_id
+        LEFT JOIN stickers sk ON sk.id = c.sticker_id
+        LEFT JOIN media skm ON skm.id = sk.media_id
        WHERE ${where}
          AND ${notBlockedSql('c.author_id', '$1')}
          AND ((c.deleted_at IS NULL AND c.moderation_status = 'ACTIVE')
@@ -56,13 +62,14 @@ export class CommentsService {
        ${order}`;
   }
 
-  private toDto(r: Record<string, any>, maxDepth: number): CommentDto {
+  private toDto(r: Record<string, any>, maxDepth: number, viewerId: string | null = null): CommentDto {
     const status = r.deleted_at
       ? CommentStatusEnum.DELETED
       : r.moderation_status !== 'ACTIVE'
         ? CommentStatusEnum.REMOVED
         : CommentStatusEnum.ACTIVE;
     const live = status === CommentStatusEnum.ACTIVE;
+    const sticker = live && r.sticker_id && (r.sticker_emoji || r.sticker_key) ? toStickerDto(r, this.urls, viewerId) : null;
     return {
       id: r.id,
       postId: r.post_id,
@@ -80,6 +87,8 @@ export class CommentsService {
           })
         : null,
       content: live ? r.content : null,
+      sticker,
+      stickerUnavailable: live && r.has_sticker && !sticker,
       likeCount: r.like_count,
       replyCount: r.reply_count,
       hasReplies: r.has_replies,
@@ -94,7 +103,7 @@ export class CommentsService {
   private async loadOne(commentId: string, viewerId: string | null): Promise<CommentDto> {
     const row = await sqlOne(this.db, this.selectSql('c.id = $2', ''), [viewerId, commentId]);
     if (!row) throw AppException.notFound(ErrorCode.COMMENT_NOT_FOUND, 'Comment not found');
-    return this.toDto(row, await this.maxDepth());
+    return this.toDto(row, await this.maxDepth(), viewerId);
   }
 
   /** Comment the viewer may read: its post must be visible to the viewer. */
@@ -133,9 +142,30 @@ export class CommentsService {
     }
   }
 
-  async create(viewerId: string, postId: string, content: string, parentId: string | null): Promise<CommentDto> {
+  async create(
+    viewerId: string,
+    postId: string,
+    content: string,
+    parentId: string | null,
+    stickerId?: string,
+  ): Promise<CommentDto> {
     await this.settings.assertFeature('comments');
+    content = content.trim();
+    if (!content && !stickerId) {
+      throw AppException.badRequest(ErrorCode.VALIDATION_ERROR, 'Validation failed', [
+        { field: 'content', message: 'Write a comment or choose a sticker' },
+      ]);
+    }
     await this.assertLength(content);
+    if (stickerId) {
+      // Built-in stickers, or the viewer's own that are still in their tray.
+      const usable = await sqlOne(
+        this.db,
+        'SELECT 1 FROM stickers WHERE id = $1 AND deleted_at IS NULL AND (owner_id IS NULL OR owner_id = $2)',
+        [stickerId, viewerId],
+      );
+      if (!usable) throw AppException.notFound(ErrorCode.NOT_FOUND, 'Sticker not found');
+    }
     const maxDepth = await this.maxDepth();
     const id = await this.db.transaction(async (m) => {
       let targetPostId: string;
@@ -158,9 +188,9 @@ export class CommentsService {
 
       const row = await sqlOne<{ id: string }>(
         m,
-        `INSERT INTO comments (post_id, author_id, parent_id, depth, content)
-         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-        [targetPostId, viewerId, parent?.id ?? null, parent ? parent.depth + 1 : 0, content],
+        `INSERT INTO comments (post_id, author_id, parent_id, depth, content, sticker_id, has_sticker)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+        [targetPostId, viewerId, parent?.id ?? null, parent ? parent.depth + 1 : 0, content, stickerId ?? null, !!stickerId],
       );
       await sqlRows(m, `UPDATE posts SET comment_count = comment_count + 1 WHERE id = $1`, [targetPostId]);
       if (parent) {
@@ -263,7 +293,7 @@ export class CommentsService {
       params,
     );
     const depth = await this.maxDepth();
-    return toPage(rows, limit, (r) => this.toDto(r, depth), (r) =>
+    return toPage(rows, limit, (r) => this.toDto(r, depth, viewerId), (r) =>
       sort === CommentSortEnum.TOP ? [r.like_count, iso(r.created_at)!, r.id] : [iso(r.created_at)!, r.id],
     );
   }
@@ -283,6 +313,6 @@ export class CommentsService {
       cursor ? [viewerId, commentId, limit + 1, ...cursor] : [viewerId, commentId, limit + 1],
     );
     const depth = await this.maxDepth();
-    return toPage(rows, limit, (r) => this.toDto(r, depth), (r) => [iso(r.created_at)!, r.id]);
+    return toPage(rows, limit, (r) => this.toDto(r, depth, viewerId), (r) => [iso(r.created_at)!, r.id]);
   }
 }

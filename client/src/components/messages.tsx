@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { api, type Models } from "@/lib/api/client";
 import { useMediaAttachment } from "@/lib/use-media-attachment";
+import { haptic } from "@/lib/haptics";
 import { useSession, useToast } from "./providers";
 import {
   Avatar,
@@ -77,6 +78,10 @@ function separatorLabel(value: string) {
   return `${day} ${clock(value)}`;
 }
 function preview(message: Message, own: boolean) {
+  if (message.storyReply)
+    return own
+      ? `You replied to their story${message.content ? `: ${message.content}` : ""}`
+      : `Replied to your story${message.content ? `: ${message.content}` : ""}`;
   const body =
     message.content ||
     (message.media ? "Sent a video" : message.post ? "Shared a post" : "Attachment unavailable");
@@ -120,6 +125,30 @@ function SharedPost({ post }: { post: NonNullable<Message["post"]> }) {
   );
 }
 
+function StoryReplyPreview({
+  reply,
+  own,
+}: {
+  reply: NonNullable<Message["storyReply"]>;
+  own: boolean;
+}) {
+  const media = reply.media;
+  return (
+    <div className="dm-story-reply">
+      <small>{own ? "You replied to their story" : "Replied to your story"}</small>
+      {media ? (
+        media.type === "VIDEO" ? (
+          <MediaVideo src={media.url} muted playsInline preload="metadata" />
+        ) : (
+          <img src={media.url} alt="Story" />
+        )
+      ) : (
+        <span className="dm-story-gone">Story unavailable</span>
+      )}
+    </div>
+  );
+}
+
 function MessageItem({
   message,
   own,
@@ -136,7 +165,7 @@ function MessageItem({
   status?: string;
 }) {
   const video = message.media?.type === "VIDEO" ? message.media : null;
-  const missing = !message.content && !video && !message.post;
+  const missing = !message.content && !video && !message.post && !message.storyReply;
   return (
     <li
       className={`dm-message ${own ? "own" : ""} ${first ? "first" : ""} ${last ? "last" : ""}`}
@@ -160,6 +189,7 @@ function MessageItem({
             preload="metadata"
           />
         )}
+        {message.storyReply && <StoryReplyPreview reply={message.storyReply} own={own} />}
         {message.post && <SharedPost post={message.post} />}
         {missing && (
           <p className="dm-bubble muted">This attachment is no longer available.</p>
@@ -229,14 +259,9 @@ function EmojiButton({
   );
 }
 
-function Thread({
-  peer,
-  request,
-}: {
-  peer: Models["UserProfileDto"];
-  request: boolean;
-}) {
+function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
   const { user } = useSession();
+  const router = useRouter();
   const toast = useToast();
   const client = useQueryClient();
   const [text, setText] = useState("");
@@ -266,19 +291,45 @@ function Thread({
   const unreadId = [...messages]
     .reverse()
     .find((m) => m.recipientId === user?.id && !m.readAt)?.id;
+  const status = useQuery({
+    queryKey: ["messages", user?.id, "status", peer.id],
+    queryFn: ({ signal }) => api("messagesStatus", { params: { id: peer.id }, signal }),
+    refetchInterval: 5000,
+  });
+  const request = !!status.data?.isRequest;
+  const awaiting = !!status.data?.awaitingAcceptance;
+  const accept = useMutation({
+    mutationFn: () => api("messagesAccept", { params: { id: peer.id } }),
+    onSuccess: () => {
+      haptic("success");
+      void client.invalidateQueries({ queryKey: ["messages"] });
+    },
+    onError: (e) => toast(e.message, true),
+  });
+  const decline = useMutation({
+    mutationFn: () => api("messagesDecline", { params: { id: peer.id } }),
+    onSuccess: () => {
+      toast("Request deleted.");
+      void client.invalidateQueries({ queryKey: ["messages"] });
+      router.push("/messages");
+    },
+    onError: (e) => toast(e.message, true),
+  });
   const read = useMutation({
     mutationFn: (id: string) => api("messagesRead", { params: { id } }),
     onSuccess: () => void client.invalidateQueries({ queryKey: ["messages"] }),
   });
   const markRead = read.mutate;
   useEffect(() => {
+    // Like Instagram, a request is not marked seen until it is accepted.
     const acknowledge = () => {
-      if (unreadId && document.visibilityState === "visible") markRead(unreadId);
+      if (unreadId && status.data && !status.data.isRequest && document.visibilityState === "visible")
+        markRead(unreadId);
     };
     acknowledge();
     document.addEventListener("visibilitychange", acknowledge);
     return () => document.removeEventListener("visibilitychange", acknowledge);
-  }, [unreadId, markRead]); // Read only through messages actually loaded in this thread.
+  }, [unreadId, markRead, status.data]); // Read only through messages actually loaded in this thread.
   useEffect(() => {
     const observer = new ResizeObserver(() => {
       if (pinned.current && scroller.current)
@@ -309,9 +360,14 @@ function Thread({
       attachment.attached();
       void client.invalidateQueries({ queryKey: ["messages"] });
     },
-    onError: (e) => toast(e.message, true),
+    onError: (e) => {
+      toast(e.message, true);
+      void status.refetch();
+    },
   });
-  const canMessage = !peer.isBlocking && (!peer.isPrivate || peer.isFollowing);
+  const canMessage = status.data
+    ? status.data.canSend
+    : !peer.isBlocking && (!peer.isPrivate || peer.isFollowing);
   const canSend =
     canMessage &&
     !send.isPending &&
@@ -415,6 +471,33 @@ function Thread({
           })}
         </ol>
       </div>
+      {request ? (
+        <div className="dm-request">
+          <strong>Accept message request from {peer.username}?</strong>
+          <p>
+            If you accept, {peer.displayName} can keep messaging you and will see when you&apos;ve
+            read their messages.
+          </p>
+          <div className="dm-request-actions">
+            <button
+              type="button"
+              className="dm-button secondary danger"
+              disabled={decline.isPending || accept.isPending}
+              onClick={() => decline.mutate()}
+            >
+              Delete
+            </button>
+            <button
+              type="button"
+              className="dm-button"
+              disabled={decline.isPending || accept.isPending}
+              onClick={() => accept.mutate()}
+            >
+              {accept.isPending ? "Accepting..." : "Accept"}
+            </button>
+          </div>
+        </div>
+      ) : (
       <form
         className="dm-composer"
         onSubmit={(e) => {
@@ -422,12 +505,12 @@ function Thread({
           submit();
         }}
       >
-        {request && (
+        {awaiting && (
           <p className="dm-notice">
-            {peer.displayName} sent you a message request. Reply to move this chat to Primary.
+            Message request sent. You can send more once {peer.displayName} accepts.
           </p>
         )}
-        {!canMessage && (
+        {!canMessage && !awaiting && (
           <p className="dm-notice">
             {peer.isBlocking
               ? "You blocked this account. Unblock it to send messages."
@@ -531,6 +614,7 @@ function Thread({
           )}
         </div>
       </form>
+      )}
     </section>
   );
 }
@@ -607,20 +691,34 @@ export default function Messages() {
     queryFn: ({ signal }) => api("usersGetProfile", { params: { username: to }, signal }),
     enabled: !!to && !!user,
   });
-  // Mobile: an open chat covers the whole screen (header and bottom navigation included).
+  // Mobile: the inbox is pinned between the header and the bottom navigation, so the page
+  // itself must not keep a scroll offset carried over from the previous page.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.add("dm-page");
+    window.scrollTo(0, 0);
+    return () => root.classList.remove("dm-page");
+  }, []);
+  // Mobile: an open chat covers the whole screen (header and bottom navigation included) and
+  // follows the visual viewport, so the composer stays above the on-screen keyboard.
   useEffect(() => {
     if (!to) return;
     const root = document.documentElement;
     root.classList.add("dm-chat-open");
     const viewport = window.visualViewport;
-    const resize = () =>
+    const resize = () => {
       root.style.setProperty("--dm-viewport", `${viewport?.height ?? window.innerHeight}px`);
+      root.style.setProperty("--dm-viewport-top", `${viewport?.offsetTop ?? 0}px`);
+    };
     resize();
     viewport?.addEventListener("resize", resize);
+    viewport?.addEventListener("scroll", resize);
     return () => {
       viewport?.removeEventListener("resize", resize);
+      viewport?.removeEventListener("scroll", resize);
       root.classList.remove("dm-chat-open");
       root.style.removeProperty("--dm-viewport");
+      root.style.removeProperty("--dm-viewport-top");
     };
   }, [to]);
   if (loading) return <p role="status">Loading...</p>;
@@ -638,9 +736,7 @@ export default function Messages() {
       c.user.username.toLowerCase().includes(term) ||
       c.user.displayName.toLowerCase().includes(term),
   );
-  const requestItems = requests.data?.pages.flatMap((p) => p.items) ?? [];
-  const requestCount = requestItems.length;
-  const isRequest = requestItems.some((c) => c.user.username === to);
+  const requestCount = requests.data?.pages.flatMap((p) => p.items).length ?? 0;
   return (
     <div className={`dm-shell card ${to ? "has-chat" : ""}`}>
       <h1 className="sr-only">Messages</h1>
@@ -740,7 +836,7 @@ export default function Messages() {
             </div>
           ) : (
             peer.data && (
-              <Thread key={peer.data.id} peer={peer.data} request={isRequest} />
+              <Thread key={peer.data.id} peer={peer.data} />
             )
           )
         ) : (

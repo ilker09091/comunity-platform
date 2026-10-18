@@ -220,7 +220,8 @@ export class MediaService implements OnModuleInit {
               (EXISTS (SELECT 1 FROM post_media pm WHERE pm.media_id = m.id AND pm.post_id IS DISTINCT FROM $3::uuid)
                OR EXISTS (SELECT 1 FROM users u WHERE u.avatar_media_id = m.id OR u.cover_media_id = m.id)
                OR EXISTS (SELECT 1 FROM direct_messages dm WHERE dm.media_id = m.id)
-               OR EXISTS (SELECT 1 FROM stories st WHERE st.media_id = m.id)) AS in_use
+               OR EXISTS (SELECT 1 FROM stories st WHERE st.media_id = m.id)
+               OR EXISTS (SELECT 1 FROM stickers sk WHERE sk.media_id = m.id)) AS in_use
          FROM media m
         WHERE m.id = ANY($1::uuid[]) AND m.owner_id = $2
         ORDER BY m.id
@@ -251,7 +252,8 @@ export class MediaService implements OnModuleInit {
       `SELECT * FROM media WHERE id = $1 AND owner_id = $2 AND status <> 'READY'
           AND NOT EXISTS (SELECT 1 FROM post_media pm WHERE pm.media_id = media.id)
           AND NOT EXISTS (SELECT 1 FROM direct_messages dm WHERE dm.media_id = media.id)
-          AND NOT EXISTS (SELECT 1 FROM stories st WHERE st.media_id = media.id)`,
+          AND NOT EXISTS (SELECT 1 FROM stories st WHERE st.media_id = media.id)
+          AND NOT EXISTS (SELECT 1 FROM stickers sk WHERE sk.media_id = media.id)`,
       [id, ownerId],
     );
     if (pending) {
@@ -325,6 +327,7 @@ export class MediaService implements OnModuleInit {
               AND NOT EXISTS (SELECT 1 FROM users u WHERE u.avatar_media_id = m.id OR u.cover_media_id = m.id)
               AND NOT EXISTS (SELECT 1 FROM direct_messages dm WHERE dm.media_id = m.id)
               AND NOT EXISTS (SELECT 1 FROM stories st WHERE st.media_id = m.id)
+              AND NOT EXISTS (SELECT 1 FROM stickers sk WHERE sk.media_id = m.id)
             ORDER BY m.created_at
             LIMIT 200
             FOR UPDATE SKIP LOCKED)

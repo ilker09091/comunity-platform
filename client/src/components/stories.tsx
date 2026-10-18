@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   useInfiniteQuery,
   useMutation,
+  useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import Link from "next/link";
@@ -11,9 +12,11 @@ import {
   ChevronRight,
   Clapperboard,
   Eye,
+  Heart,
   Pause,
   Play,
   Plus,
+  Send,
   Trash2,
   Upload,
   Volume2,
@@ -22,6 +25,7 @@ import {
 } from "lucide-react";
 import { api, type Models } from "@/lib/api/client";
 import { useMediaAttachment } from "@/lib/use-media-attachment";
+import { haptic } from "@/lib/haptics";
 import { useSession, useToast } from "./providers";
 import {
   Avatar,
@@ -161,6 +165,7 @@ function StoryComposer({ onClose }: { onClose: () => void }) {
 }
 
 const IMAGE_STORY_MS = 5000;
+const QUICK_REACTIONS = ["\u{1F602}", "\u{1F62E}", "\u{1F60D}", "\u{1F622}", "\u{1F44F}", "\u{1F525}", "\u{1F389}", "\u{1F4AF}"];
 
 /**
  * Full-screen story player. A single <dialog> stays open while the viewer moves between
@@ -185,6 +190,8 @@ function StoryViewer({
   const ref = useRef<HTMLDialogElement>(null);
   const [muted, setMuted] = useState(false);
   const [held, setHeld] = useState(false);
+  /** Typing a reply or browsing viewers keeps the story on screen. */
+  const [busy, setBusy] = useState(false);
   const [paused, setPaused] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -234,6 +241,7 @@ function StoryViewer({
       }}
       onKeyDown={(e) => {
         if (deleting) return;
+        if (e.target instanceof HTMLInputElement) return;
         if (e.key === "ArrowRight") move(1);
         else if (e.key === "ArrowLeft") move(-1);
         else if (e.key === " " && e.target === e.currentTarget) {
@@ -263,7 +271,8 @@ function StoryViewer({
           position={position}
           muted={muted}
           setMuted={setMuted}
-          paused={paused || held || hidden || deleting}
+          paused={paused || held || hidden || deleting || busy}
+          setBusy={setBusy}
           togglePause={() => setPaused((p) => !p)}
           setHeld={setHeld}
           move={move}
@@ -337,6 +346,7 @@ function StorySlide({
   paused,
   togglePause,
   setHeld,
+  setBusy,
   move,
   onDelete,
   onClose,
@@ -349,6 +359,7 @@ function StorySlide({
   paused: boolean;
   togglePause: () => void;
   setHeld: (held: boolean) => void;
+  setBusy: (busy: boolean) => void;
   move: (direction: number) => void;
   onDelete: () => void;
   onClose: () => void;
@@ -396,6 +407,31 @@ function StorySlide({
     });
   }, [paused, muted, isVideo, failed, ready, setMuted]);
   const author = story.post?.author;
+  const [viewersOpen, setViewersOpen] = useState(false);
+  const viewers = useQuery({
+    queryKey: ["stories", "viewers", story.id],
+    queryFn: ({ signal }) =>
+      api("storiesViewers", {
+        params: { id: story.id },
+        query: { limit: 50 },
+        signal,
+      }),
+    enabled: own,
+    // Live while the author watches their story, so new viewers appear without reopening it.
+    refetchInterval: 4000,
+  });
+  const seen = viewers.data
+    ? viewers.data.hasMore
+      ? Math.max(story.viewCount, viewers.data.items.length)
+      : viewers.data.items.length
+    : story.viewCount;
+  const likes = viewers.data
+    ? viewers.data.items.filter((v) => v.liked).length
+    : story.likeCount;
+  const showViewers = (open: boolean) => {
+    setViewersOpen(open);
+    setBusy(open);
+  };
   return (
     <div className="story-frame">
       <div className="story-progress" aria-hidden="true">
@@ -537,13 +573,192 @@ function StorySlide({
           </Link>
         )}
         {story.caption && <p className="story-caption">{story.caption}</p>}
-        {own && (
-          <span className="story-view-count">
-            <Eye size={16} /> {story.viewCount}{" "}
-            {story.viewCount === 1 ? "view" : "views"}
-          </span>
+        {own ? (
+          <button
+            type="button"
+            className="story-view-count"
+            onClick={() => showViewers(true)}
+          >
+            <Eye size={16} /> {seen} {seen === 1 ? "view" : "views"}
+            {likes > 0 && (
+              <span className="story-like-count">
+                <Heart size={14} fill="currentColor" /> {likes}
+              </span>
+            )}
+          </button>
+        ) : (
+          <StoryReplyBar story={story} setBusy={setBusy} />
         )}
       </div>
+      {own && viewersOpen && (
+        <div
+          className="story-viewers"
+          role="dialog"
+          aria-label="Story viewers"
+          onKeyDown={(e) => {
+            if (e.key !== "Escape") return;
+            // Close only the sheet; without this the dialog's cancel would close the story.
+            e.preventDefault();
+            e.stopPropagation();
+            showViewers(false);
+          }}
+        >
+          <header>
+            <strong>
+              <Eye size={18} /> {seen} {seen === 1 ? "viewer" : "viewers"}
+            </strong>
+            <button
+              type="button"
+              className="story-icon"
+              aria-label="Close viewers"
+              onClick={() => showViewers(false)}
+            >
+              <X size={20} />
+            </button>
+          </header>
+          {viewers.isPending && <p className="story-viewers-empty">Loading...</p>}
+          {viewers.data && !viewers.data.items.length && (
+            <p className="story-viewers-empty">
+              No views yet. People who watch your story will appear here.
+            </p>
+          )}
+          <ul>
+            {viewers.data?.items.map((v) => (
+              <li key={v.user.id}>
+                <Link href={`/profile/${v.user.username}`} onClick={onClose}>
+                  <Avatar user={v.user} size={40} />
+                  <span>
+                    <strong>{v.user.username}</strong>
+                    <small>{v.user.displayName}</small>
+                  </span>
+                </Link>
+                {v.liked && (
+                  <Heart
+                    className="story-viewer-liked"
+                    size={18}
+                    fill="currentColor"
+                    aria-label="Liked your story"
+                  />
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Instagram-style footer: reply privately, quick reactions and a like. */
+function StoryReplyBar({
+  story,
+  setBusy,
+}: {
+  story: Story;
+  setBusy: (busy: boolean) => void;
+}) {
+  const client = useQueryClient();
+  const toast = useToast();
+  const [text, setText] = useState("");
+  const [focused, setFocused] = useState(false);
+  const [liked, setLiked] = useState(story.isLiked);
+  const [pop, setPop] = useState(false);
+  const like = useMutation({
+    mutationFn: (next: boolean) =>
+      api(next ? "storiesLike" : "storiesUnlike", { params: { id: story.id } }),
+    onSuccess: () => void client.invalidateQueries({ queryKey: ["stories"] }),
+    onError: (e, next) => {
+      setLiked(!next);
+      toast(e.message, true);
+    },
+  });
+  const reply = useMutation({
+    mutationFn: (content: string) =>
+      api("storiesReply", { params: { id: story.id }, body: { content } }),
+    onSuccess: () => {
+      setText("");
+      haptic("success");
+      toast(`Sent to ${story.author.username}.`);
+      void client.invalidateQueries({ queryKey: ["messages"] });
+    },
+    onError: (e) => toast(e.message, true),
+  });
+  const send = (content: string) => {
+    if (content.trim() && !reply.isPending) reply.mutate(content.trim());
+  };
+  return (
+    <div className="story-reply">
+      {focused && !text && (
+        <div className="story-reactions" role="group" aria-label="Quick reactions">
+          {QUICK_REACTIONS.map((emoji) => (
+            <button
+              type="button"
+              key={emoji}
+              // Keep the input focused so the reaction row does not vanish before the click lands.
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={() => {
+                haptic("tap");
+                send(emoji);
+              }}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      )}
+      <form
+        className="story-reply-row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          send(text);
+        }}
+      >
+        <input
+          aria-label={`Reply to ${story.author.username}`}
+          placeholder={`Reply to ${story.author.username}...`}
+          maxLength={2000}
+          value={text}
+          disabled={reply.isPending}
+          onChange={(e) => setText(e.target.value)}
+          onFocus={() => {
+            setFocused(true);
+            setBusy(true);
+          }}
+          onBlur={() => {
+            setFocused(false);
+            setBusy(false);
+          }}
+        />
+        {text.trim() ? (
+          <button
+            type="submit"
+            className="story-icon"
+            aria-label="Send reply"
+            disabled={reply.isPending}
+          >
+            <Send size={22} />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className={`story-icon story-like ${liked ? "liked" : ""} ${pop ? "pop" : ""}`}
+            aria-label={liked ? "Unlike story" : "Like story"}
+            aria-pressed={liked}
+            onAnimationEnd={() => setPop(false)}
+            onClick={() => {
+              const next = !liked;
+              setLiked(next);
+              if (next) {
+                setPop(true);
+                haptic("like");
+              }
+              like.mutate(next);
+            }}
+          >
+            <Heart size={26} fill={liked ? "currentColor" : "none"} />
+          </button>
+        )}
+      </form>
     </div>
   );
 }

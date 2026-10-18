@@ -27,6 +27,7 @@ import {
   VerifiedBadge,
 } from "./ui";
 import { useFeatures } from "@/lib/platform-config";
+import { StickerButton, StickerView } from "./sticker-picker";
 
 export function CommentInput({
   postId,
@@ -45,16 +46,12 @@ export function CommentInput({
   const client = useQueryClient();
   const [content, setContent] = useState("");
   const mutation = useMutation({
-    mutationFn: () =>
-      parentId
-        ? api("commentsReply", {
-            params: { id: parentId },
-            body: { content: content.trim() },
-          })
-        : api("commentsCreate", {
-            params: { id: postId },
-            body: { content: content.trim() },
-          }),
+    mutationFn: (stickerId?: string) => {
+      const body = { content: content.trim() || undefined, stickerId };
+      return parentId
+        ? api("commentsReply", { params: { id: parentId }, body })
+        : api("commentsCreate", { params: { id: postId }, body });
+    },
     onSuccess: () => {
       setContent("");
       void client.invalidateQueries({ queryKey: ["comments"] });
@@ -76,7 +73,7 @@ export function CommentInput({
       </p>
     );
   const submit = () => {
-    if (content.trim() && !mutation.isPending) mutation.mutate();
+    if (content.trim() && !mutation.isPending) mutation.mutate(undefined);
   };
   return (
     <form
@@ -87,7 +84,7 @@ export function CommentInput({
       }}
     >
       <Link href={`/profile/${user.username}`} aria-label="Your profile"><Avatar user={user} size={inline ? 30 : 32} /></Link>
-      <div className="comment-field">
+      <div className="comment-field has-sticker">
         <label
           className="sr-only"
           htmlFor={`comment-input-${inline ? "inline-" : ""}${parentId ?? postId}`}
@@ -108,6 +105,10 @@ export function CommentInput({
           maxLength={config?.commentMaxLength ?? 2000}
           rows={1}
           disabled={mutation.isPending}
+        />
+        <StickerButton
+          disabled={mutation.isPending}
+          onPick={(sticker) => mutation.mutate(sticker.id)}
         />
         <button
           className="comment-send"
@@ -169,7 +170,7 @@ export function CommentItem({
     <article className="comment-item" id={`comment-${item.id}`}>
       {item.author ? <Link href={`/profile/${item.author.username}`} aria-label={`View @${item.author.username}'s profile`}><Avatar user={item.author} size={31} /></Link> : <Avatar user={item.author} size={31} />}
       <div className="comment-body">
-        <div className="comment-bubble">
+        <div className={`comment-bubble ${!tombstone && !item.content && item.sticker ? "sticker-only" : ""}`}>
           <div className="comment-heading">
             {item.author ? (
               <Link href={`/profile/${item.author.username}`}>
@@ -211,12 +212,18 @@ export function CommentItem({
                 </button>
               </div>
             </form>
+          ) : tombstone ? (
+            <p className="muted">This comment is no longer available.</p>
           ) : (
-            <p className={tombstone ? "muted" : ""}>
-              {tombstone
-                ? "This comment is no longer available."
-                : item.content}
-            </p>
+            <>
+              {item.content && <p>{item.content}</p>}
+              {item.sticker && (
+                <div className="comment-sticker">
+                  <StickerView sticker={item.sticker} />
+                </div>
+              )}
+              {item.stickerUnavailable && <p className="muted">Sticker unavailable</p>}
+            </>
           )}
         </div>
         {!tombstone && (
@@ -238,7 +245,7 @@ export function CommentItem({
             {item.canReply && canWrite("comments") && (
               <button onClick={() => setReply(!reply)}>Reply</button>
             )}
-            {user?.id === item.author?.id && (
+            {user?.id === item.author?.id && !!item.content && (
               <button
                 aria-label="Edit comment"
                 onClick={() => setEditing(true)}

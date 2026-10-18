@@ -1425,6 +1425,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/messages/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Message request state of a conversation and whether you can send */
+        get: operations["messagesStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept a message request so the sender can keep chatting */
+        post: operations["messagesAccept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{id}/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a message request */
+        delete: operations["messagesDecline"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/messages/{id}/read": {
         parameters: {
             query?: never;
@@ -1477,6 +1528,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stories/{id}/like": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Like a story */
+        post: operations["storiesLike"];
+        /** Remove your like */
+        delete: operations["storiesUnlike"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stories/{id}/reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reply to a story with a direct message to its author */
+        post: operations["storiesReply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stories/{id}/viewers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Who viewed and liked your story, most recent first */
+        get: operations["storiesViewers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stories/{id}": {
         parameters: {
             query?: never;
@@ -1489,6 +1592,41 @@ export interface paths {
         post?: never;
         /** Delete your story and its media */
         delete: operations["storiesDelete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stickers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The built-in sticker pack and your own stickers */
+        get: operations["stickersList"];
+        put?: never;
+        /** Create a sticker from an uploaded photo */
+        post: operations["stickersCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stickers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete one of your stickers (comments that used it keep it) */
+        delete: operations["stickersDelete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3296,6 +3434,17 @@ export interface components {
          * @enum {string}
          */
         CommentStatus: "ACTIVE" | "DELETED" | "REMOVED";
+        StickerDto: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @description Built-in emoji sticker */
+            emoji: string | null;
+            /** @description Signed image URL of a custom sticker */
+            url: string | null;
+            /** @description Created by the viewer (can be deleted) */
+            isOwn: boolean;
+        };
         CommentDto: {
             /**
              * Format: uuid
@@ -3322,6 +3471,13 @@ export interface components {
             author: components["schemas"]["UserSummaryDto"] | null;
             /** @example Great point! */
             content: string | null;
+            /** @description Sticker sent with (or as) this comment */
+            sticker: components["schemas"]["StickerDto"] | null;
+            /**
+             * @description This comment had a sticker that is no longer available
+             * @example false
+             */
+            stickerUnavailable: boolean;
             /** @example 4 */
             likeCount: number;
             /**
@@ -3369,10 +3525,15 @@ export interface components {
         };
         CreateCommentDto: {
             /**
-             * @description Plain text. Max COMMENT_MAX_LENGTH (default 2000).
+             * @description Plain text. Max COMMENT_MAX_LENGTH (default 2000). Required unless stickerId is set.
              * @example Great point!
              */
-            content: string;
+            content?: string;
+            /**
+             * Format: uuid
+             * @description A built-in sticker or one of your own (GET /stickers)
+             */
+            stickerId?: string;
         };
         UpdateCommentDto: {
             /**
@@ -3616,6 +3777,15 @@ export interface components {
             /** @example 2 */
             updated: number;
         };
+        StoryReplyRefDto: {
+            /**
+             * Format: uuid
+             * @description null once the story is gone
+             */
+            storyId: string | null;
+            /** @description Story preview while it is still live */
+            media: components["schemas"]["MediaDto"] | null;
+        };
         DirectMessageDto: {
             /** Format: uuid */
             id: string;
@@ -3626,6 +3796,8 @@ export interface components {
             content: string | null;
             media: components["schemas"]["MediaDto"] | null;
             post: components["schemas"]["PostDto"] | null;
+            /** @description Set when this message replies to a story */
+            storyReply: components["schemas"]["StoryReplyRefDto"] | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -3668,6 +3840,14 @@ export interface components {
              */
             postId?: string;
         };
+        MessageStatusDto: {
+            /** @description They sent you a message request you have not accepted */
+            isRequest: boolean;
+            /** @description You sent them a message request; you can write again once they accept */
+            awaitingAcceptance: boolean;
+            /** @description You can send a message right now */
+            canSend: boolean;
+        };
         StoryDto: {
             /** Format: uuid */
             id: string;
@@ -3682,8 +3862,11 @@ export interface components {
             /** Format: date-time */
             expiresAt: string;
             isViewed: boolean;
+            isLiked: boolean;
             /** @description Only populated for the author */
             viewCount: number;
+            /** @description Only populated for the author */
+            likeCount: number;
         };
         PaginatedStory: {
             items: components["schemas"]["StoryDto"][];
@@ -3707,6 +3890,33 @@ export interface components {
              */
             postId?: string;
             caption?: string;
+        };
+        StoryReplyDto: {
+            content: string;
+        };
+        StoryViewerDto: {
+            user: components["schemas"]["UserSummaryDto"];
+            /** Format: date-time */
+            viewedAt: string;
+            liked: boolean;
+        };
+        PaginatedStoryViewer: {
+            items: components["schemas"]["StoryViewerDto"][];
+            /**
+             * @description Pass as `cursor` to fetch the next page. `null` when there are no more items.
+             * @example null
+             */
+            nextCursor: string | null;
+            /** @example false */
+            hasMore: boolean;
+        };
+        CreateStickerDto: {
+            /**
+             * Format: uuid
+             * @description An uploaded photo
+             */
+            mediaId: string;
+            name?: string;
         };
         ImporterRequestDto: {
             /** @enum {string} */
@@ -4315,7 +4525,7 @@ export interface components {
             history: components["schemas"]["AuditLogDto"][];
         };
         /** @enum {string} */
-        MediaUsage: "MESSAGE" | "STORY" | "POST" | "AVATAR" | "COVER" | "UNATTACHED";
+        MediaUsage: "MESSAGE" | "STORY" | "STICKER" | "POST" | "AVATAR" | "COVER" | "UNATTACHED";
         MediaUsageDto: {
             kind: components["schemas"]["MediaUsage"];
             /** Format: uuid */
@@ -10494,6 +10704,224 @@ export interface operations {
             };
         };
     };
+    messagesStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageStatusDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    messagesAccept: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    messagesDecline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
     messagesRead: {
         parameters: {
             query?: never;
@@ -10790,6 +11218,306 @@ export interface operations {
             };
         };
     };
+    storiesLike: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    storiesUnlike: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    storiesReply: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StoryReplyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectMessageDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    storiesViewers: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor returned as `nextCursor` by the previous page. Omit for the first page. */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedStoryViewer"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
     storiesDelete: {
         parameters: {
             query?: never;
@@ -10840,6 +11568,253 @@ export interface operations {
             };
             /** @description Resource not found or not visible to the viewer */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    stickersList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StickerDto"][];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    stickersCreate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateStickerDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StickerDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    stickersDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

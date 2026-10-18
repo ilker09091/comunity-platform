@@ -5,6 +5,7 @@ import {
   IsString,
   IsUUID,
   MaxLength,
+  MinLength,
 } from 'class-validator';
 import { CursorQueryDto } from '../../common/dto/common.dto.js';
 import { SanitizedText } from '../../common/utils/sanitize.js';
@@ -31,6 +32,21 @@ export class SendMessageDto {
   @IsUUID('all')
   postId?: string;
 }
+export class StoryReplyRefDto {
+  @ApiProperty({
+    type: String,
+    format: 'uuid',
+    nullable: true,
+    description: 'null once the story is gone',
+  })
+  storyId: string | null;
+  @ApiProperty({
+    type: MediaDto,
+    nullable: true,
+    description: 'Story preview while it is still live',
+  })
+  media: MediaDto | null;
+}
 export class DirectMessageDto {
   @ApiProperty({ format: 'uuid' }) id: string;
   @ApiProperty({ format: 'uuid' }) senderId: string;
@@ -38,9 +54,28 @@ export class DirectMessageDto {
   @ApiProperty({ type: String, nullable: true }) content: string | null;
   @ApiProperty({ type: MediaDto, nullable: true }) media: MediaDto | null;
   @ApiProperty({ type: PostDto, nullable: true }) post: PostDto | null;
+  @ApiProperty({
+    type: StoryReplyRefDto,
+    nullable: true,
+    description: 'Set when this message replies to a story',
+  })
+  storyReply: StoryReplyRefDto | null;
   @ApiProperty({ format: 'date-time' }) createdAt: string;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) readAt:
     string | null;
+}
+export class MessageStatusDto {
+  @ApiProperty({
+    description: 'They sent you a message request you have not accepted',
+  })
+  isRequest: boolean;
+  @ApiProperty({
+    description:
+      'You sent them a message request; you can write again once they accept',
+  })
+  awaitingAcceptance: boolean;
+  @ApiProperty({ description: 'You can send a message right now' })
+  canSend: boolean;
 }
 export class ConversationDto {
   @ApiProperty({ type: UserSummaryDto }) user: UserSummaryDto;
@@ -101,6 +136,51 @@ export class StoryDto {
   @ApiProperty({ format: 'date-time' }) createdAt: string;
   @ApiProperty({ format: 'date-time' }) expiresAt: string;
   @ApiProperty() isViewed: boolean;
+  @ApiProperty() isLiked: boolean;
   @ApiProperty({ description: 'Only populated for the author' })
   viewCount: number;
+  @ApiProperty({ description: 'Only populated for the author' })
+  likeCount: number;
+}
+export class StoryViewerDto {
+  @ApiProperty({ type: UserSummaryDto }) user: UserSummaryDto;
+  @ApiProperty({ format: 'date-time' }) viewedAt: string;
+  @ApiProperty() liked: boolean;
+}
+export class StoryReplyDto {
+  @ApiProperty({ minLength: 1, maxLength: 2000 })
+  @IsString()
+  @SanitizedText({ multiline: true })
+  @MinLength(1)
+  @MaxLength(2000)
+  content: string;
+}
+export class StickerDto {
+  @ApiProperty({ format: 'uuid' }) id: string;
+  @ApiProperty() name: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Built-in emoji sticker',
+  })
+  emoji: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Signed image URL of a custom sticker',
+  })
+  url: string | null;
+  @ApiProperty({ description: 'Created by the viewer (can be deleted)' })
+  isOwn: boolean;
+}
+export class CreateStickerDto {
+  @ApiProperty({ format: 'uuid', description: 'An uploaded photo' })
+  @IsUUID('all')
+  mediaId: string;
+  @ApiPropertyOptional({ maxLength: 40 })
+  @IsOptional()
+  @IsString()
+  @SanitizedText()
+  @MaxLength(40)
+  name?: string;
 }

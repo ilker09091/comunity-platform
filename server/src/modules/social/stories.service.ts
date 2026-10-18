@@ -14,8 +14,13 @@ import { MediaService } from '../media/media.service.js';
 import { ContentDeletionService } from '../media/content-deletion.service.js';
 import { PlatformSettingsService } from '../platform/platform-settings.service.js';
 import { PostsQueryService } from '../posts/posts-query.service.js';
-import { UsersService } from '../users/users.service.js';
-import { CreateStoryDto, StoryDto } from './social.dto.js';
+import {
+  USER_AVATAR_JOIN,
+  USER_SUMMARY_COLUMNS,
+  UsersService,
+} from '../users/users.service.js';
+import { MessagesService } from './messages.service.js';
+import { CreateStoryDto, StoryDto, StoryViewerDto } from './social.dto.js';
 
 @Injectable()
 export class StoriesService {
@@ -26,6 +31,7 @@ export class StoriesService {
     private readonly deletion: ContentDeletionService,
     private readonly settings: PlatformSettingsService,
     private readonly posts: PostsQueryService,
+    private readonly messages: MessagesService,
   ) {}
 
   // Shared posts are re-checked for the viewer on every request, like shared posts in messages.
@@ -39,7 +45,9 @@ export class StoriesService {
   private select = `SELECT s.*, row_to_json(md) AS media_row,
     u.username::text AS username, u.display_name, u.is_private, u.is_verified, av.storage_key AS avatar_key,
     EXISTS (SELECT 1 FROM story_views v WHERE v.story_id = s.id AND v.user_id = $1) AS viewed,
-    CASE WHEN s.author_id = $1 THEN (SELECT count(*)::int FROM story_views v WHERE v.story_id = s.id) ELSE 0 END AS views
+    EXISTS (SELECT 1 FROM story_likes l WHERE l.story_id = s.id AND l.user_id = $1) AS liked,
+    CASE WHEN s.author_id = $1 THEN (SELECT count(*)::int FROM story_views v WHERE v.story_id = s.id) ELSE 0 END AS views,
+    CASE WHEN s.author_id = $1 THEN (SELECT count(*)::int FROM story_likes l WHERE l.story_id = s.id) ELSE 0 END AS likes
     FROM stories s JOIN users u ON u.id = s.author_id LEFT JOIN media md ON md.id = s.media_id
     LEFT JOIN media av ON av.id = u.avatar_media_id`;
 
@@ -67,7 +75,9 @@ export class StoriesService {
           createdAt: iso(r.created_at)!,
           expiresAt: iso(r.expires_at)!,
           isViewed: r.viewed,
+          isLiked: r.liked,
           viewCount: r.views,
+          likeCount: r.likes,
         },
       ];
     });
@@ -164,6 +174,89 @@ export class StoriesService {
       );
       if (!story) throw AppException.notFound();
     }
+  }
+
+  /** A story someone else posted that the viewer can currently see. */
+  private async visibleOther(viewerId: string, storyId: string) {
+    const story = await sqlOne<{ author_id: string }>(
+      this.db,
+      `SELECT s.author_id FROM stories s JOIN users u ON u.id = s.author_id
+      LEFT JOIN media md ON md.id = s.media_id WHERE s.id = $2 AND ${this.visible}`,
+      [viewerId, storyId],
+    );
+    if (!story) throw AppException.notFound();
+    if (story.author_id === viewerId)
+      throw AppException.badRequest(
+        ErrorCode.BAD_REQUEST,
+        'You cannot do this on your own story',
+      );
+    return story;
+  }
+
+  async like(viewerId: string, storyId: string) {
+    await this.visibleOther(viewerId, storyId);
+    // Liking implies watching it, so it always appears in the author's viewer list.
+    await sqlRows(
+      this.db,
+      `WITH v AS (INSERT INTO story_views(story_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING)
+      INSERT INTO story_likes(story_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [storyId, viewerId],
+    );
+  }
+
+  async unlike(viewerId: string, storyId: string) {
+    await sqlRows(
+      this.db,
+      'DELETE FROM story_likes WHERE story_id = $1 AND user_id = $2',
+      [storyId, viewerId],
+    );
+  }
+
+  /** Replies go to the author as a direct message linked to the story. */
+  async reply(viewerId: string, storyId: string, content: string) {
+    const story = await this.visibleOther(viewerId, storyId);
+    await sqlRows(
+      this.db,
+      'INSERT INTO story_views(story_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [storyId, viewerId],
+    );
+    return this.messages.send(viewerId, story.author_id, { content }, storyId);
+  }
+
+  /** Who watched (and liked) the author's own live story, most recent first. */
+  async viewers(
+    authorId: string,
+    storyId: string,
+    cursorStr: string | undefined,
+    limit: number,
+  ) {
+    const story = await sqlOne(
+      this.db,
+      'SELECT 1 FROM stories WHERE id = $1 AND author_id = $2 AND expires_at > now()',
+      [storyId, authorId],
+    );
+    if (!story) throw AppException.notFound();
+    const cursor = decodeCursor(cursorStr, ['date', 'uuid']);
+    const rows = await sqlRows(
+      this.db,
+      `SELECT v.created_at AS viewed_at, ${USER_SUMMARY_COLUMNS},
+        EXISTS (SELECT 1 FROM story_likes l WHERE l.story_id = v.story_id AND l.user_id = v.user_id) AS liked
+      FROM story_views v JOIN users u ON u.id = v.user_id ${USER_AVATAR_JOIN}
+      WHERE v.story_id = $1 AND u.status = 'ACTIVE'
+      ${cursor ? 'AND (v.created_at, u.id) < ($3::timestamptz, $4::uuid)' : ''}
+      ORDER BY v.created_at DESC, u.id DESC LIMIT $2`,
+      [storyId, limit + 1, ...(cursor ?? [])],
+    );
+    return toPage(
+      rows,
+      limit,
+      (r): StoryViewerDto => ({
+        user: this.users.toSummary(r as any),
+        viewedAt: iso(r.viewed_at)!,
+        liked: r.liked,
+      }),
+      (r) => [iso(r.viewed_at)!, r.id],
+    );
   }
 
   async remove(authorId: string, storyId: string) {

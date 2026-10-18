@@ -3,6 +3,10 @@
 /** Short tactile pulses for key interactions on supporting devices. */
 const PATTERNS = {
   tap: 10,
+  /** A soft shimmer: spoiler reveal. */
+  reveal: [8, 30, 8, 30, 16],
+  /** A quick double beat: likes. */
+  like: [10, 50, 18],
   success: [12, 40, 12],
   warn: [20, 40, 20, 40, 20],
   error: [50, 80, 50],

@@ -26,6 +26,7 @@ const MEDIA_ROW_SQL = `
            WHEN pm.post_id IS NOT NULL THEN 'POST'
            WHEN EXISTS (SELECT 1 FROM direct_messages dm WHERE dm.media_id = m.id) THEN 'MESSAGE'
            WHEN EXISTS (SELECT 1 FROM stories st WHERE st.media_id = m.id) THEN 'STORY'
+           WHEN EXISTS (SELECT 1 FROM stickers sk WHERE sk.media_id = m.id) THEN 'STICKER'
            WHEN EXISTS (SELECT 1 FROM users ua WHERE ua.avatar_media_id = m.id) THEN 'AVATAR'
            WHEN EXISTS (SELECT 1 FROM users uc WHERE uc.cover_media_id = m.id) THEN 'COVER'
            ELSE 'UNATTACHED'
@@ -41,6 +42,7 @@ const ORPHAN_WHERE = `m.created_at < now() - make_interval(hours => $1)
   AND NOT EXISTS (SELECT 1 FROM post_media x WHERE x.media_id = m.id)
   AND NOT EXISTS (SELECT 1 FROM direct_messages dm WHERE dm.media_id = m.id)
   AND NOT EXISTS (SELECT 1 FROM stories st WHERE st.media_id = m.id)
+  AND NOT EXISTS (SELECT 1 FROM stickers sk WHERE sk.media_id = m.id)
   AND NOT EXISTS (SELECT 1 FROM users x WHERE x.avatar_media_id = m.id OR x.cover_media_id = m.id)`;
 
 @Injectable()

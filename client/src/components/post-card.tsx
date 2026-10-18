@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import ReportDialog from "./report-dialog";
 import { SendPostButton } from "./social-controls";
+import { haptic } from "@/lib/haptics";
 import { useFeatures } from "@/lib/platform-config";
 import { api, type Post, type Models } from "@/lib/api/client";
 import { sharePath, usePostEngagement } from "@/lib/use-post-engagement";
@@ -96,7 +97,11 @@ export function PostMedia({ media, postId, spoiler = false }: { media: Models["M
   const client = useQueryClient();
   /** hidden → revealing (unblur animation) → shown */
   const [spoilerPhase, setSpoilerPhase] = useState<"hidden" | "revealing" | "shown">("hidden");
-  const reveal = () => setSpoilerPhase((phase) => (phase === "hidden" ? "revealing" : phase));
+  const reveal = () => {
+    if (spoilerPhase !== "hidden") return;
+    haptic("reveal");
+    setSpoilerPhase("revealing");
+  };
   const refresh = postId ? async () => {
     const post = await api("postsGet", { params: { id: postId } });
     client.setQueryData(["post", postId], post);

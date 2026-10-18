@@ -7820,6 +7820,250 @@
         ]
       }
     },
+    "/api/messages/{id}/status": {
+      "get": {
+        "operationId": "messagesStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageStatusDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Message request state of a conversation and whether you can send",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/api/messages/{id}/accept": {
+      "post": {
+        "operationId": "messagesAccept",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Accept a message request so the sender can keep chatting",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/api/messages/{id}/request": {
+      "delete": {
+        "operationId": "messagesDecline",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Delete a message request",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
     "/api/messages/{id}/read": {
       "post": {
         "operationId": "messagesRead",
@@ -8163,6 +8407,366 @@
         ]
       }
     },
+    "/api/stories/{id}/like": {
+      "post": {
+        "operationId": "storiesLike",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Like a story",
+        "tags": [
+          "Stories"
+        ]
+      },
+      "delete": {
+        "operationId": "storiesUnlike",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Remove your like",
+        "tags": [
+          "Stories"
+        ]
+      }
+    },
+    "/api/stories/{id}/reply": {
+      "post": {
+        "operationId": "storiesReply",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoryReplyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectMessageDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Reply to a story with a direct message to its author",
+        "tags": [
+          "Stories"
+        ]
+      }
+    },
+    "/api/stories/{id}/viewers": {
+      "get": {
+        "operationId": "storiesViewers",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor returned as `nextCursor` by the previous page. Omit for the first page.",
+            "schema": {
+              "example": "eyJ2IjpbIjIwMjYtMTAtMTFUMTI6MDA6MDAuMDAwWiIsIjNmYTg1ZjY0LTU3MTctNDU2Mi1iM2ZjLTJjOTYzZjY2YWZhNiJdfQ",
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedStoryViewer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Who viewed and liked your story, most recent first",
+        "tags": [
+          "Stories"
+        ]
+      }
+    },
     "/api/stories/{id}": {
       "delete": {
         "operationId": "storiesDelete",
@@ -8239,6 +8843,280 @@
         "summary": "Delete your story and its media",
         "tags": [
           "Stories"
+        ]
+      }
+    },
+    "/api/stickers": {
+      "get": {
+        "operationId": "stickersList",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StickerDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict with existing state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "The built-in sticker pack and your own stickers",
+        "tags": [
+          "Stickers"
+        ]
+      },
+      "post": {
+        "operationId": "stickersCreate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStickerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StickerDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict with existing state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create a sticker from an uploaded photo",
+        "tags": [
+          "Stickers"
+        ]
+      }
+    },
+    "/api/stickers/{id}": {
+      "delete": {
+        "operationId": "stickersDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict with existing state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Delete one of your stickers (comments that used it keep it)",
+        "tags": [
+          "Stickers"
         ]
       }
     },
@@ -13560,7 +14438,7 @@
   "tags": [],
   "servers": [
     {
-      "url": "http://localhost:3000"
+      "url": "https://api.rosefly.store"
     }
   ],
   "components": {
@@ -15462,6 +16340,39 @@
         ],
         "description": "DELETED/REMOVED comments are tombstones kept only to preserve thread structure; author and content are null."
       },
+      "StickerDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "emoji": {
+            "type": "string",
+            "nullable": true,
+            "description": "Built-in emoji sticker"
+          },
+          "url": {
+            "type": "string",
+            "nullable": true,
+            "description": "Signed image URL of a custom sticker"
+          },
+          "isOwn": {
+            "type": "boolean",
+            "description": "Created by the viewer (can be deleted)"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "emoji",
+          "url",
+          "isOwn"
+        ]
+      },
       "CommentDto": {
         "type": "object",
         "properties": {
@@ -15507,6 +16418,21 @@
             "type": "string",
             "nullable": true,
             "example": "Great point!"
+          },
+          "sticker": {
+            "nullable": true,
+            "description": "Sticker sent with (or as) this comment",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StickerDto"
+              }
+            ]
+          },
+          "stickerUnavailable": {
+            "type": "boolean",
+            "example": false,
+            "description": "This comment had a sticker that is no longer available"
           },
           "likeCount": {
             "type": "number",
@@ -15556,6 +16482,8 @@
           "status",
           "author",
           "content",
+          "sticker",
+          "stickerUnavailable",
           "likeCount",
           "replyCount",
           "hasReplies",
@@ -15598,14 +16526,15 @@
           "content": {
             "type": "string",
             "example": "Great point!",
-            "minLength": 1,
             "maxLength": 2000,
-            "description": "Plain text. Max COMMENT_MAX_LENGTH (default 2000)."
+            "description": "Plain text. Max COMMENT_MAX_LENGTH (default 2000). Required unless stickerId is set."
+          },
+          "stickerId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "A built-in sticker or one of your own (GET /stickers)"
           }
-        },
-        "required": [
-          "content"
-        ]
+        }
       },
       "UpdateCommentDto": {
         "type": "object",
@@ -16307,6 +17236,31 @@
           "updated"
         ]
       },
+      "StoryReplyRefDto": {
+        "type": "object",
+        "properties": {
+          "storyId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "null once the story is gone"
+          },
+          "media": {
+            "nullable": true,
+            "description": "Story preview while it is still live",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MediaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "storyId",
+          "media"
+        ]
+      },
       "DirectMessageDto": {
         "type": "object",
         "properties": {
@@ -16344,6 +17298,16 @@
               }
             ]
           },
+          "storyReply": {
+            "nullable": true,
+            "description": "Set when this message replies to a story",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StoryReplyRefDto"
+              }
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -16361,6 +17325,7 @@
           "content",
           "media",
           "post",
+          "storyReply",
           "createdAt",
           "readAt"
         ]
@@ -16459,6 +17424,28 @@
           }
         }
       },
+      "MessageStatusDto": {
+        "type": "object",
+        "properties": {
+          "isRequest": {
+            "type": "boolean",
+            "description": "They sent you a message request you have not accepted"
+          },
+          "awaitingAcceptance": {
+            "type": "boolean",
+            "description": "You sent them a message request; you can write again once they accept"
+          },
+          "canSend": {
+            "type": "boolean",
+            "description": "You can send a message right now"
+          }
+        },
+        "required": [
+          "isRequest",
+          "awaitingAcceptance",
+          "canSend"
+        ]
+      },
       "StoryDto": {
         "type": "object",
         "properties": {
@@ -16502,7 +17489,14 @@
           "isViewed": {
             "type": "boolean"
           },
+          "isLiked": {
+            "type": "boolean"
+          },
           "viewCount": {
+            "type": "number",
+            "description": "Only populated for the author"
+          },
+          "likeCount": {
             "type": "number",
             "description": "Only populated for the author"
           }
@@ -16516,7 +17510,9 @@
           "createdAt",
           "expiresAt",
           "isViewed",
-          "viewCount"
+          "isLiked",
+          "viewCount",
+          "likeCount"
         ]
       },
       "PaginatedStory": {
@@ -16563,6 +17559,82 @@
             "maxLength": 300
           }
         }
+      },
+      "StoryReplyDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "content"
+        ]
+      },
+      "StoryViewerDto": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserSummaryDto"
+          },
+          "viewedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "liked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "user",
+          "viewedAt",
+          "liked"
+        ]
+      },
+      "PaginatedStoryViewer": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoryViewerDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "example": null,
+            "description": "Pass as `cursor` to fetch the next page. `null` when there are no more items."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "hasMore"
+        ]
+      },
+      "CreateStickerDto": {
+        "type": "object",
+        "properties": {
+          "mediaId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "An uploaded photo"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "mediaId"
+        ]
       },
       "ImporterRequestDto": {
         "type": "object",
@@ -18602,6 +19674,7 @@
         "enum": [
           "MESSAGE",
           "STORY",
+          "STICKER",
           "POST",
           "AVATAR",
           "COVER",

@@ -1135,10 +1135,18 @@
   }
 
   /* Inbox fills the screen between the header and the bottom navigation. */
+  /* Pinned between the sticky header and the fixed bottom navigation: independent of page
+     scroll, so coming back from another page never leaves it shifted up. */
   .dm-shell {
-    height: calc(100dvh - var(--header-h) - 61px - env(safe-area-inset-bottom));
+    position: fixed;
+    top: var(--header-h);
+    left: 0;
+    right: 0;
+    bottom: calc(61px + env(safe-area-inset-bottom));
+    z-index: 1;
+    height: auto;
     min-height: 0;
-    margin: -14px -14px 0;
+    margin: 0;
     border: 0;
     border-radius: 0;
     box-shadow: none;
@@ -1168,11 +1176,10 @@
 
   /* An open chat takes over the whole screen, like Instagram. */
   .dm-shell.has-chat {
-    position: fixed;
-    inset: 0 0 auto;
+    top: var(--dm-viewport-top, 0px);
+    bottom: auto;
     z-index: 60;
     height: var(--dm-viewport, 100dvh);
-    margin: 0;
   }
   .dm-shell.has-chat .dm-sidebar {
     display: none;
@@ -1229,11 +1236,411 @@
     display: grid;
   }
 }
-html.dm-chat-open {
-  overflow: hidden;
-}
-@media (min-width: 768px) {
+@media (max-width: 767px) {
+  html.dm-page,
   html.dm-chat-open {
-    overflow: visible;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+}
+
+/* Story engagement: reply bar, quick reactions, like, live viewer list */
+.story-reply {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.story-reply-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.story-reply-row input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 22px;
+  outline: 0;
+  background: rgba(0, 0, 0, 0.18);
+  color: #fff;
+  font-size: 15px;
+}
+.story-reply-row input::placeholder {
+  color: rgba(255, 255, 255, 0.85);
+}
+.story-reply-row input:focus {
+  border-color: #fff;
+  background: rgba(0, 0, 0, 0.35);
+}
+.story-reply-row .story-icon {
+  width: 44px;
+  height: 44px;
+}
+.story-like.liked {
+  color: #ff3040;
+}
+.story-like.pop svg {
+  animation: story-like-pop 0.42s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+.story-reactions {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  animation: dm-in 0.16s ease-out;
+}
+.story-reactions button {
+  flex: 1;
+  height: 46px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  font-size: 30px;
+  transition: transform 0.12s ease;
+}
+.story-reactions button:hover {
+  transform: scale(1.18);
+}
+.story-reactions button:active {
+  transform: scale(0.9);
+}
+button.story-view-count {
+  padding: 6px 10px 6px 0;
+  border: 0;
+  background: transparent;
+  font-weight: 600;
+}
+.story-like-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  color: #ff3040;
+}
+.story-viewers {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  height: 58%;
+  border-radius: 16px 16px 0 0;
+  background: #fff;
+  color: var(--text);
+  animation: story-sheet-in 0.22s ease-out;
+}
+.story-viewers header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 10px 10px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.story-viewers header strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+.story-viewers .story-icon {
+  color: var(--text);
+  filter: none;
+}
+.story-viewers .story-icon:hover {
+  background: var(--surface-hover);
+}
+.story-viewers ul {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  margin: 0;
+  padding: 6px 0 calc(10px + env(safe-area-inset-bottom));
+}
+.story-viewers li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 18px;
+}
+.story-viewers li a {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.story-viewers li a > span:not(.avatar) {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.story-viewers li strong {
+  font-size: 14px;
+}
+.story-viewers li small {
+  color: var(--muted);
+  font-size: 12.5px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.story-viewer-liked {
+  flex-shrink: 0;
+  color: #ff3040;
+}
+.story-viewers-empty {
+  margin: 0;
+  padding: 26px 20px;
+  color: var(--muted);
+  font-size: 13.5px;
+  text-align: center;
+}
+@keyframes story-like-pop {
+  40% {
+    transform: scale(1.35);
+  }
+}
+@keyframes story-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+/* Message requests and story replies in DMs */
+.dm-request {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--dm-line);
+  text-align: center;
+}
+.dm-request strong {
+  font-size: 15px;
+}
+.dm-request p {
+  max-width: 420px;
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.dm-request-actions {
+  display: flex;
+  gap: 10px;
+  width: min(100%, 360px);
+}
+.dm-request-actions .dm-button {
+  flex: 1;
+}
+.dm-button.danger {
+  color: #ed4956;
+}
+.dm-story-reply {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+.dm-message.own .dm-story-reply {
+  align-items: flex-end;
+}
+.dm-story-reply small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.dm-story-reply img,
+.dm-story-reply video {
+  display: block;
+  width: 110px;
+  aspect-ratio: 9 / 16;
+  object-fit: cover;
+  border-radius: 14px;
+  background: #0d1015;
+}
+.dm-story-gone {
+  display: grid;
+  place-items: center;
+  width: 110px;
+  aspect-ratio: 9 / 16;
+  padding: 8px;
+  border-radius: 14px;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 11.5px;
+  text-align: center;
+}
+
+/* Stickers in comments */
+.comment-field.has-sticker textarea {
+  padding-right: 80px;
+}
+.sticker-picker-anchor {
+  position: absolute;
+  right: 40px;
+  top: 4px;
+}
+.comment-sticker-button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+.comment-sticker-button:hover:not(:disabled),
+.comment-sticker-button[aria-expanded="true"] {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.comment-sticker-button:active {
+  transform: scale(0.9);
+}
+.sticker-picker {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: -40px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: min(340px, calc(100vw - 32px));
+  max-height: 340px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 14px 40px rgba(15, 20, 30, 0.16);
+  animation: dm-in 0.14s ease-out;
+}
+.sticker-picker.up {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+.sticker-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+.sticker-tabs button {
+  flex: 1;
+  padding: 10px 8px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.sticker-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--primary);
+  color: var(--text);
+}
+.sticker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 4px;
+  padding: 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.sticker-cell {
+  position: relative;
+}
+.sticker-option,
+.sticker-create {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+.sticker-option:hover {
+  background: var(--surface-hover);
+  transform: scale(1.06);
+}
+.sticker-option:active {
+  transform: scale(0.94);
+}
+.sticker-create {
+  align-content: center;
+  gap: 2px;
+  border: 2px dashed var(--border-strong);
+  color: var(--primary);
+}
+.sticker-create small {
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.sticker-remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: #4b5563;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.sticker-cell:hover .sticker-remove,
+.sticker-remove:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .sticker-remove {
+    opacity: 1;
+  }
+}
+.sticker-hint {
+  margin: 0;
+  padding: 4px 14px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.sticker-view {
+  display: inline-grid;
+  place-items: center;
+  object-fit: contain;
+  line-height: 1;
+  user-select: none;
+}
+.comment-sticker {
+  margin-top: 4px;
+  animation: sticker-in 0.32s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+.comment-bubble.sticker-only {
+  padding-left: 0;
+  padding-right: 0;
+  background: transparent;
+}
+@keyframes sticker-in {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .story-like.pop svg,
+  .story-viewers,
+  .comment-sticker,
+  .sticker-picker,
+  .story-reactions {
+    animation: none;
   }
 }

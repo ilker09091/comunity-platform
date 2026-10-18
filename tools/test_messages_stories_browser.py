@@ -15,8 +15,12 @@ def now(): return datetime.now(timezone.utc).isoformat()
 MEDIA = dict(id='20000000-0000-4000-8000-000000000001', type='VIDEO', status='READY', url=BASE+'/qa/video.mp4', mimeType='video/mp4', sizeBytes=1000, width=180, height=320, durationMs=1000, createdAt=now(), processingProgress=None)
 PHOTO = {**MEDIA, 'id': '20000000-0000-4000-8000-000000000002', 'type': 'IMAGE', 'url': BASE+'/qa/photo.png', 'mimeType': 'image/png'}
 POST = dict(id='30000000-0000-4000-8000-000000000001', kind='POST', author=PEER, content='A video from your circle', media=[MEDIA], visibility='PUBLIC', createdAt=now(), updatedAt=now(), editedAt=None, likeCount=0, commentCount=0, repostCount=0, quoteCount=0, bookmarkCount=0, isLiked=False, isBookmarked=False, isReposted=False, isFollowingAuthor=True, referencedPost=None, referencedPostUnavailable=False)
-messages = [dict(id='40000000-0000-4000-8000-000000000001', senderId=PEER['id'], recipientId=ME['id'], content='Hello from your friend', media=MEDIA, post=None, createdAt=now(), readAt=None)]
-stories = [dict(id='50000000-0000-4000-8000-000000000001', author=PEER, media=PHOTO, post=None, caption='A quiet moment', createdAt=now(), expiresAt=(datetime.now(timezone.utc)+timedelta(hours=24)).isoformat(), isViewed=False, viewCount=0)]
+messages = [dict(id='40000000-0000-4000-8000-000000000001', senderId=PEER['id'], recipientId=ME['id'], content='Hello from your friend', media=MEDIA, post=None, storyReply=None, createdAt=now(), readAt=None)]
+stories = [dict(id='50000000-0000-4000-8000-000000000001', author=PEER, media=PHOTO, post=None, caption='A quiet moment', createdAt=now(), expiresAt=(datetime.now(timezone.utc)+timedelta(hours=24)).isoformat(), isViewed=False, isLiked=False, viewCount=0, likeCount=0)]
+SPOILER_POST = {**POST, 'id': '30000000-0000-4000-8000-000000000002', 'content': 'Big reveal #spoiler', 'media': [PHOTO]}
+STICKERS = [dict(id='70000000-0000-4000-8000-0000000000%02d' % i, name=n, emoji=e, url=None, isOwn=False) for i, (e, n) in enumerate([('\U0001F602', 'Laughing'), ('\U0001F525', 'Fire'), ('\u2764\ufe0f', 'Heart')])]
+comments = []
+accepted = set()
 calls=[]; errors=[]; upload_media=MEDIA
 def page(items): return dict(items=items, hasMore=False, nextCursor=None)
 def api(route):
@@ -30,20 +34,41 @@ def api(route):
  elif path=='messages/unread-count': body={'count':sum(not m['readAt'] and m['recipientId']==ME['id'] for m in messages)}
  elif path=='messages' and parse_qs(urlparse(request.url).query).get('folder')==['requests']: body=page([dict(user=STRANGER,lastMessage=dict(messages[0],id='40000000-0000-4000-8000-000000000099',senderId=STRANGER['id'],content='Hi, can we talk?',media=None,readAt=now()),unreadCount=0,isRequest=True)])
  elif path=='messages': body=page([dict(user=PEER,lastMessage=messages[-1],unreadCount=sum(not m['readAt'] and m['recipientId']==ME['id'] for m in messages),isRequest=False)])
+ elif path.startswith('messages/') and path.endswith('/status'):
+  peer=path.split('/')[1]
+  body=dict(isRequest=peer==STRANGER['id'] and peer not in accepted,awaitingAcceptance=False,canSend=True)
+ elif path.startswith('messages/') and path.endswith('/accept'):
+  accepted.add(path.split('/')[1]);return route.fulfill(status=204)
  elif path.startswith('messages/') and path.endswith('/read'):
   for m in messages: m['readAt']=now()
   return route.fulfill(status=204)
  elif path.startswith('messages/') and method=='POST':
-  body=dict(id='40000000-0000-4000-8000-'+str(len(messages)+1).zfill(12),senderId=ME['id'],recipientId=PEER['id'],content=data.get('content'),media=MEDIA if data.get('mediaId') else None,post=POST if data.get('postId') else None,createdAt=now(),readAt=None)
+  body=dict(id='40000000-0000-4000-8000-'+str(len(messages)+1).zfill(12),senderId=ME['id'],recipientId=PEER['id'],content=data.get('content'),media=MEDIA if data.get('mediaId') else None,post=POST if data.get('postId') else None,storyReply=None,createdAt=now(),readAt=None)
   messages.append(body);status=201
  elif path.startswith('messages/'): body=page(list(reversed(messages)))
  elif path=='search/users': body=page([PEER])
  elif path.startswith('users/') and path.endswith('/posts'): body=page([POST])
  elif path=='users/'+PEER['username']: body=PEER
  elif path=='stories' and method=='POST':
-  body=dict(id='50000000-0000-4000-8000-'+str(len(stories)+1).zfill(12),author=ME,media=MEDIA if data.get('postId') else upload_media,post=POST if data.get('postId') else None,caption=data.get('caption'),createdAt=now(),expiresAt=(datetime.now(timezone.utc)+timedelta(hours=24)).isoformat(),isViewed=False,viewCount=0)
+  body=dict(id='50000000-0000-4000-8000-'+str(len(stories)+1).zfill(12),author=ME,media=MEDIA if data.get('postId') else upload_media,post=POST if data.get('postId') else None,caption=data.get('caption'),createdAt=now(),expiresAt=(datetime.now(timezone.utc)+timedelta(hours=24)).isoformat(),isViewed=False,isLiked=False,viewCount=1,likeCount=1)
   stories.insert(0,body);status=201
  elif path=='stories': body=page(stories)
+ elif path.startswith('stories/') and path.endswith('/viewers'): body=page([dict(user=PEER,viewedAt=now(),liked=True)])
+ elif path.startswith('stories/') and path.endswith('/like'):
+  for st in stories:
+   if st['id']==path.split('/')[1]: st['isLiked']=method=='POST'
+  return route.fulfill(status=204)
+ elif path.startswith('stories/') and path.endswith('/reply'):
+  body=dict(messages[0],id='40000000-0000-4000-8000-000000000077',senderId=ME['id'],recipientId=PEER['id'],content=data.get('content'),media=None,storyReply=dict(storyId=path.split('/')[1],media=PHOTO),readAt=None);status=201
+ elif path=='stickers' and method=='POST':
+  body=dict(id='70000000-0000-4000-8000-000000000099',name='photo',emoji=None,url=BASE+'/qa/photo.png',isOwn=True);STICKERS.append(body);status=201
+ elif path=='stickers': body=STICKERS
+ elif path.startswith('posts/') and path.endswith('/comments') and method=='POST':
+  sticker=next((x for x in STICKERS if x['id']==data.get('stickerId')),None)
+  body=dict(id='80000000-0000-4000-8000-'+str(len(comments)+1).zfill(12),postId=POST['id'],parentId=None,depth=0,status='ACTIVE',author=ME,content=data.get('content') or '',sticker=sticker,stickerUnavailable=False,likeCount=0,replyCount=0,hasReplies=False,isLiked=False,canReply=True,createdAt=now(),updatedAt=now(),editedAt=None)
+  comments.insert(0,body);status=201
+ elif path.startswith('posts/') and path.endswith('/comments'): body=page(comments)
+ elif path=='users/'+STRANGER['username']: body=STRANGER
  elif path.startswith('stories/') and method=='DELETE':
   stories[:]=[s for s in stories if s['id']!=path.split('/')[1]]
   return route.fulfill(status=204)
@@ -57,8 +82,8 @@ def api(route):
  elif path.endswith('/chunks'):body=dict(received=len(request.post_data_buffer))
  elif path.endswith('/complete'):body=upload_media;status=201
  elif path.startswith('media/'):body=upload_media
- elif path.startswith('feed/'):body=page([POST])
- elif path.startswith('posts/'):body=POST
+ elif path.startswith('feed/'):body=page([POST,SPOILER_POST])
+ elif path.startswith('posts/'):body=SPOILER_POST if SPOILER_POST['id'] in path else POST
  else:body={**page([]),'count':0,'unreadCount':0}
  route.fulfill(status=status,content_type='application/json',body=json.dumps(body))
 
@@ -82,7 +107,9 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
    context.route('**/api/backend/api/**',api)
    context.route('**/qa/video.mp4',lambda r:r.fulfill(status=200,content_type='video/mp4',body=video.read_bytes()))
    context.route('**/qa/photo.png',lambda r:r.fulfill(status=200,content_type='image/png',body=photo.read_bytes()))
+   context.add_init_script("window.__vibrations=[];Object.defineProperty(navigator,'vibrate',{value:(p)=>{window.__vibrations.push(p);console.log('VIBRATE '+JSON.stringify(p)+' '+location.pathname);return true},configurable:true})")
    tab=context.new_page();tab.on('pageerror',lambda e:errors.append(str(e)))
+   vibrations=[];tab.on('console',lambda m: vibrations.append(m.text.split(' ')[1]) if m.text.startswith('VIBRATE ') else None)
    tab.on("console",lambda m: errors.append(m.text) if m.type=="error" else None)
    tab.on("requestfailed",lambda r: errors.append(r.url+" "+str(r.failure)) if r.failure!="net::ERR_ABORTED" else None)
    tab.goto(BASE+'/messages',wait_until='networkidle')
@@ -95,6 +122,15 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
    tab.screenshot(path=str(out/'initial.png'),full_page=True)
    tab.get_by_role('tab',name='Requests').click()
    tab.get_by_text('Hi, can we talk?').wait_for()
+   tab.get_by_text('Hi, can we talk?').click()
+   tab.get_by_text('Accept message request from qa_stranger?').wait_for()
+   assert tab.locator('.dm-composer').count()==0
+   assert not any(path.endswith('/read') for method,path,data in calls),'requests must not be marked seen'
+   tab.get_by_role('button',name='Accept',exact=True).click()
+   tab.locator('.dm-composer').wait_for()
+   assert any(method=='POST' and path=='messages/'+STRANGER['id']+'/accept' for method,path,data in calls)
+   print('PASS message request: Accept/Delete panel, no seen receipt before accepting, accept opens the composer')
+   tab.goto(BASE+'/messages',wait_until='networkidle')
    tab.get_by_role('tab',name='Primary').click()
    tab.get_by_label('Search conversations').fill('nobody')
    tab.get_by_text('No conversations match your search.').wait_for()
@@ -161,6 +197,24 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
    tab.wait_for_timeout(400);tab.screenshot(path=str(out/'story-desktop.png'))
    tab.wait_for_function('!document.querySelector("dialog[open]")',timeout=8000)
    print('PASS story viewing: full screen on mobile, blurred page on desktop, pause holds, auto-advance closes after the last story')
+   tab.locator('.story-tile').filter(has_text='QA Friend').click()
+   tab.locator('.story-overlay[open]').wait_for()
+   tab.get_by_role('button',name='Like story').click()
+   tab.get_by_role('button',name='Unlike story').wait_for()
+   assert any(method=='POST' and path.endswith('/like') for method,path,data in calls)
+   tab.wait_for_timeout(200)
+   assert '[10,50,18]' in vibrations,'like should vibrate'
+   tab.get_by_label('Reply to qa_friend').click()
+   tab.locator('.story-reactions').wait_for()
+   tab.wait_for_timeout(5600)
+   assert tab.locator('.story-overlay[open]').count()==1,'typing a reply must pause the story'
+   tab.get_by_label('Reply to qa_friend').fill('Love this!')
+   tab.get_by_role('button',name='Send reply').click()
+   tab.get_by_text('Sent to qa_friend.').wait_for()
+   assert any(method=='POST' and path.endswith('/reply') and data.get('content')=='Love this!' for method,path,data in calls)
+   tab.screenshot(path=str(out/'story-reply.png'))
+   tab.get_by_role('button',name='Close story',exact=True).first.click();tab.wait_for_function('!document.querySelector("dialog[open]")')
+   print('PASS story like (with haptic), quick reactions, reply pauses the story and sends a DM')
    tab.get_by_role('button',name='Add story',exact=True).click()
    tab.locator('.story-create-form input[type=file]').set_input_files(str(photo))
    tab.locator('.story-preview img').wait_for()
@@ -168,6 +222,12 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
    tab.get_by_role('button',name='Share story',exact=True).click()
    tab.locator('.story-tile').filter(has_text='Your story').wait_for()
    tab.locator('.story-tile').filter(has_text='Your story').click()
+   tab.get_by_role('button',name='1 view').click()
+   tab.get_by_role('dialog',name='Story viewers').get_by_text('qa_friend').wait_for()
+   assert tab.get_by_role('dialog',name='Story viewers').get_by_label('Liked your story').count()==1
+   tab.screenshot(path=str(out/'story-viewers.png'))
+   tab.get_by_role('button',name='Close viewers').click()
+   print('PASS own story: live view count and viewer list with likes')
    tab.get_by_role('button',name='Delete story',exact=True).click()
    tab.get_by_role('dialog',name='Delete this story?',exact=True).get_by_role('button',name='Delete story',exact=True).click()
    tab.wait_for_function('!document.querySelector("dialog[open]")')
@@ -192,6 +252,27 @@ with tempfile.TemporaryDirectory(prefix='circle-social-') as temp:
    tab.wait_for_timeout(400);tab.screenshot(path=str(out/'story-reel.png'))
    tab.get_by_role('button',name='Close story',exact=True).first.click();tab.wait_for_function('!document.querySelector("dialog[open]")')
    print('PASS sharing a video post/Reel to the story and playing it with its Reel link')
+   before=len(vibrations)
+   tab.get_by_role('button',name='Spoiler: show media').click()
+   tab.wait_for_function('document.querySelector(".post-media-spoiler-wrap.revealing, .post-media-spoiler-wrap.is-gallery:not(.spoilered)")')
+   tab.wait_for_timeout(200)
+   assert '[8,30,8,30,16]' in vibrations[before:],vibrations
+   print('PASS spoiler tap gives a haptic pulse')
+   tab.goto(BASE+'/post/'+SPOILER_POST['id'],wait_until='networkidle')
+   tab.get_by_role('button',name='Send a sticker').first.click()
+   tab.get_by_role('dialog',name='Stickers').locator('.sticker-option').nth(1).click()
+   tab.locator('.comment-sticker .sticker-view').first.wait_for()
+   assert any(method=='POST' and path.endswith('/comments') and data.get('stickerId')==STICKERS[1]['id'] for method,path,data in calls)
+   tab.get_by_role('button',name='Send a sticker').first.click()
+   tab.get_by_role('tab',name='Your stickers').click()
+   tab.get_by_role('dialog',name='Stickers').locator('input[type=file]').set_input_files(str(photo))
+   tab.get_by_text('Sticker created.').wait_for()
+   assert any(method=='POST' and path=='stickers' for method,path,data in calls)
+   tab.get_by_role('dialog',name='Stickers').locator('.sticker-option').first.click()
+   tab.wait_for_function('document.querySelectorAll(".comment-sticker").length===2')
+   tab.screenshot(path=str(out/'comment-stickers.png'))
+   print('PASS comment stickers: built-in pack, creating your own from a photo and sending it')
+   tab.goto(BASE+'/',wait_until='networkidle')
    tab.get_by_role('button',name='Send to a user',exact=True).first.click()
    with tab.expect_response(lambda r:'/search/users' in r.url):
     tab.get_by_label('Search recipients').fill('qa_friend')

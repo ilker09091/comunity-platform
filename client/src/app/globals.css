@@ -3154,7 +3154,8 @@ a.quoted-post:hover {
    Profile header (Instagram-inspired structure, Circle styling)
    ========================================================================== */
 .profile-header {
-  overflow: hidden;
+  /* The cover clips itself; the card stays visible so the options menu is never cut off. */
+  overflow: visible;
 }
 .profile-hero {
   height: clamp(140px, 14vw, 220px);
@@ -3951,9 +3952,34 @@ html.reels-mode body {
     width: 84px !important;
     height: 84px !important;
   }
+  /* Follow / Message / ... share the row next to the avatar and shrink instead of overflowing. */
+  .profile-actions {
+    flex: 1;
+    min-width: 0;
+    justify-content: flex-end;
+    gap: 6px;
+  }
   .profile-actions > .button {
+    flex: 0 1 auto;
     min-width: 0;
     height: 34px;
+    padding-left: 12px;
+    padding-right: 12px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .profile-actions > .dropdown {
+    flex-shrink: 0;
+  }
+  .profile-actions .dropdown-menu {
+    width: max-content;
+    max-width: min(300px, calc(100vw - 64px));
+  }
+  .profile-actions .dropdown-menu a,
+  .profile-actions .dropdown-menu button {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
   .profile-name {
     font-size: 20px;

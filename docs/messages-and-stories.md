@@ -6,6 +6,13 @@ The home feed includes **Stories**. Reels and video posts can be added to your s
 
 Media attachments are exclusive to one post/profile/message/story. Attachment locking and both automatic and administrator orphan cleanup protect media in use. Messaging and story uploads reuse the existing chunked upload, video transcoding, signed URLs and cookie-authenticated API gateway. Message threads poll every 5 seconds; the navigation unread badge polls every 15 seconds. No WebSocket server is required.
 
+## Story engagement, message requests and stickers
+
+- **Stories:** viewers can like a story (`POST/DELETE /stories/{id}/like`) and reply (`POST /stories/{id}/reply`), which sends a direct message linked to the story; the author sees a live list of who watched and liked it (`GET /stories/{id}/viewers`). Liking or replying also counts as a view.
+- **Message requests:** someone you do not follow can send you one message. It lands in **Requests**, is not marked seen, and the sender cannot write again until you **Accept** (`POST /messages/{id}/accept`) or follow/reply to them. **Delete** (`DELETE /messages/{id}/request`) removes the request; they may send a new one later. `GET /messages/{id}/status` reports the state for the composer.
+- **Stickers:** comments can carry a sticker (`stickerId`) with or without text. Everyone gets the built-in pack; users can create up to 60 of their own from a photo (`POST /stickers`) and delete them (`DELETE /stickers/{id}`). Comments that already use a deleted sticker keep showing it.
+- **Haptics:** revealing a `#spoiler`, liking a story and sending stickers trigger a short vibration on devices that support it (Android Chrome; iOS Safari does not expose vibration).
+
 ## Deployment
 
 Run the existing migration command before starting the updated server:
@@ -15,7 +22,7 @@ cd server
 npm.cmd run migration:run
 ```
 
-The additive migrations are `MessagesAndStories1760191200000` and `StoryPostShares1760191300000`. The generated OpenAPI document, client types and gateway operation allowlist include the new routes.
+The additive migrations are `MessagesAndStories1760191200000`, `StoryPostShares1760191300000` and `StoryEngagementRequestsStickers1760191400000`. The generated OpenAPI document, client types and gateway operation allowlist include the new routes.
 
 ## Checks
 

@@ -76,6 +76,7 @@ describe('Direct messages and stories (e2e)', () => {
   });
 
   it('isolates conversations and marks only received messages through the displayed message as read', async () => {
+    await api.post(`/users/${alice.id}/follow`, {}, bob).expect(200);
     const first = (await send('hello')).body;
     const second = (await send('newer')).body;
     expect(
@@ -333,5 +334,109 @@ describe('Direct messages and stories (e2e)', () => {
     await api.post(`/messages/${bob.id}`, { content: 'hey' }, alice).expect(201);
     expect(await folder('requests')).toHaveLength(0);
     expect((await folder('primary'))[0].user.id).toBe(bob.id);
+  });
+
+  it('holds a stranger to one request message until it is accepted, and can delete requests', async () => {
+    await api.post(`/messages/${alice.id}`, { content: 'hi' }, bob).expect(201);
+    await api
+      .post(`/messages/${alice.id}`, { content: 'again?' }, bob)
+      .expect(403);
+    expect((await api.get(`/messages/${alice.id}/status`, bob)).body).toEqual({
+      isRequest: false,
+      awaitingAcceptance: true,
+      canSend: false,
+    });
+    expect((await api.get(`/messages/${bob.id}/status`, alice)).body).toEqual({
+      isRequest: true,
+      awaitingAcceptance: false,
+      canSend: true,
+    });
+    await api.delete(`/messages/${bob.id}/request`, alice).expect(204);
+    expect((await api.get('/messages', alice)).body.items).toHaveLength(0);
+    await api.post(`/messages/${alice.id}`, { content: 'sorry' }, bob).expect(201);
+    await api.post(`/messages/${outsider.id}/accept`, {}, alice).expect(404);
+    await api.post(`/messages/${bob.id}/accept`, {}, alice).expect(204);
+    await api.post(`/messages/${bob.id}/accept`, {}, alice).expect(204);
+    expect((await api.get('/messages?folder=primary', alice)).body.items).toHaveLength(1);
+    await api.post(`/messages/${alice.id}`, { content: 'thanks!' }, bob).expect(201);
+    await api.post(`/messages/${alice.id}`, { content: 'more' }, bob).expect(201);
+    await api.delete(`/messages/${bob.id}/request`, alice).expect(409);
+    expect((await api.get(`/messages/${alice.id}/status`, bob)).body.canSend).toBe(true);
+  });
+
+  it('records views, likes and replies on stories and lists viewers only to the author', async () => {
+    const created = (await story()).body;
+    await api.post(`/users/${alice.id}/follow`, {}, bob).expect(200);
+    await api.post(`/stories/${created.id}/like`, {}, outsider).expect(404);
+    await api.post(`/stories/${created.id}/like`, {}, alice).expect(400);
+    await api.post(`/stories/${created.id}/like`, {}, bob).expect(204);
+    await api.post(`/stories/${created.id}/like`, {}, bob).expect(204);
+    const mine = (await api.get('/stories', alice)).body.items[0];
+    expect(mine).toMatchObject({ viewCount: 1, likeCount: 1 });
+    expect((await api.get('/stories', bob)).body.items[0]).toMatchObject({
+      isLiked: true,
+      isViewed: true,
+      likeCount: 0,
+      viewCount: 0,
+    });
+    const viewers = (await api.get(`/stories/${created.id}/viewers`, alice)).body;
+    expect(viewers.items).toHaveLength(1);
+    expect(viewers.items[0]).toMatchObject({ user: { id: bob.id }, liked: true });
+    await api.get(`/stories/${created.id}/viewers`, bob).expect(404);
+    await api.delete(`/stories/${created.id}/like`, bob).expect(204);
+    expect((await api.get(`/stories/${created.id}/viewers`, alice)).body.items[0].liked).toBe(false);
+    const reply = (
+      await api.post(`/stories/${created.id}/reply`, { content: 'Love this' }, bob).expect(201)
+    ).body;
+    expect(reply.storyReply.storyId).toBe(created.id);
+    const received = (await api.get(`/messages/${bob.id}`, alice)).body.items[0];
+    expect(received.storyReply.media.type).toBe('IMAGE');
+    await api.post(`/stories/${created.id}/reply`, { content: '' }, bob).expect(400);
+    await db.query("UPDATE stories SET expires_at = now() - interval '1 second' WHERE id = $1", [created.id]);
+    expect((await api.get(`/messages/${bob.id}`, alice)).body.items[0].storyReply).toEqual({
+      storyId: created.id,
+      media: null,
+    });
+    await api.post(`/stories/${created.id}/reply`, { content: 'late' }, bob).expect(404);
+  });
+
+  it('sends built-in and custom stickers in comments and keeps used stickers after deletion', async () => {
+    const stickers = (await api.get('/stickers', alice)).body;
+    expect(stickers.length).toBeGreaterThanOrEqual(20);
+    const builtIn = stickers[0];
+    expect(builtIn).toMatchObject({ isOwn: false, url: null });
+    expect(builtIn.emoji).toBeTruthy();
+    const post = await api.createPost(bob, { content: 'sticker me' });
+    await api.post(`/posts/${post.id}/comments`, {}, alice).expect(400);
+    const plain = (
+      await api.post(`/posts/${post.id}/comments`, { stickerId: builtIn.id }, alice).expect(201)
+    ).body;
+    expect(plain).toMatchObject({ content: '', sticker: { id: builtIn.id }, stickerUnavailable: false });
+    const custom = (
+      await api.post('/stickers', { mediaId: (await image()).id, name: 'Me' }, alice).expect(201)
+    ).body;
+    expect(custom).toMatchObject({ name: 'Me', isOwn: true, emoji: null });
+    expect(custom.url).toContain('/media/files/');
+    expect((await api.get('/stickers', alice)).body.at(-1).id).toBe(custom.id);
+    expect((await api.get('/stickers', bob)).body.some((s: any) => s.id === custom.id)).toBe(false);
+    await api.post(`/posts/${post.id}/comments`, { stickerId: custom.id }, bob).expect(404);
+    const used = (
+      await api.post(`/posts/${post.id}/comments`, { stickerId: custom.id, content: 'look' }, alice).expect(201)
+    ).body;
+    expect(used.sticker.url).toBeTruthy();
+    await api.delete(`/stickers/${custom.id}`, bob).expect(404);
+    await api.delete(`/stickers/${custom.id}`, alice).expect(204);
+    expect((await api.get('/stickers', alice)).body.some((s: any) => s.id === custom.id)).toBe(false);
+    const listed = (await api.get(`/posts/${post.id}/comments`, bob)).body.items;
+    expect(listed.find((c: any) => c.id === used.id).sticker.id).toBe(custom.id);
+    await api.post(`/posts/${post.id}/comments`, { stickerId: custom.id }, alice).expect(404);
+    const unused = (
+      await api.post('/stickers', { mediaId: (await image()).id }, alice).expect(201)
+    ).body;
+    const media = (await db.query('SELECT media_id FROM stickers WHERE id = $1', [unused.id]))[0].media_id;
+    await api.post('/stickers', { mediaId: media }, alice).expect(409);
+    await api.delete(`/stickers/${unused.id}`, alice).expect(204);
+    expect((await db.query('SELECT 1 FROM media WHERE id = $1', [media])).length).toBe(0);
+    await api.post('/stickers', { mediaId: (await api.uploadVideo(alice)).id }, alice).expect(400);
   });
 });

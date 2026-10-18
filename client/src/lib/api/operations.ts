@@ -475,6 +475,21 @@ export const endpoints = {
     "method": "POST",
     "authenticated": true
   },
+  "messagesStatus": {
+    "path": "/api/messages/{id}/status",
+    "method": "GET",
+    "authenticated": true
+  },
+  "messagesAccept": {
+    "path": "/api/messages/{id}/accept",
+    "method": "POST",
+    "authenticated": true
+  },
+  "messagesDecline": {
+    "path": "/api/messages/{id}/request",
+    "method": "DELETE",
+    "authenticated": true
+  },
   "messagesRead": {
     "path": "/api/messages/{id}/read",
     "method": "POST",
@@ -495,8 +510,43 @@ export const endpoints = {
     "method": "POST",
     "authenticated": true
   },
+  "storiesLike": {
+    "path": "/api/stories/{id}/like",
+    "method": "POST",
+    "authenticated": true
+  },
+  "storiesUnlike": {
+    "path": "/api/stories/{id}/like",
+    "method": "DELETE",
+    "authenticated": true
+  },
+  "storiesReply": {
+    "path": "/api/stories/{id}/reply",
+    "method": "POST",
+    "authenticated": true
+  },
+  "storiesViewers": {
+    "path": "/api/stories/{id}/viewers",
+    "method": "GET",
+    "authenticated": true
+  },
   "storiesDelete": {
     "path": "/api/stories/{id}",
+    "method": "DELETE",
+    "authenticated": true
+  },
+  "stickersList": {
+    "path": "/api/stickers",
+    "method": "GET",
+    "authenticated": true
+  },
+  "stickersCreate": {
+    "path": "/api/stickers",
+    "method": "POST",
+    "authenticated": true
+  },
+  "stickersDelete": {
+    "path": "/api/stickers/{id}",
     "method": "DELETE",
     "authenticated": true
   },

@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { AppException, ErrorCode } from '../../common/errors/app.exception.js';
 import { decodeCursor, iso, toPage } from '../../common/utils/cursor.js';
 import { notBlockedSql, sqlOne, sqlRows } from '../../common/utils/sql.js';
+import { ContentDeletionService } from '../media/content-deletion.service.js';
 import { MediaService } from '../media/media.service.js';
 import { PostsQueryService } from '../posts/posts-query.service.js';
 import {
@@ -11,7 +12,20 @@ import {
   USER_SUMMARY_COLUMNS,
   UsersService,
 } from '../users/users.service.js';
-import { DirectMessageDto, SendMessageDto } from './social.dto.js';
+import {
+  DirectMessageDto,
+  MessageStatusDto,
+  SendMessageDto,
+} from './social.dto.js';
+
+/**
+ * A thread from `peer` is a request for `owner` until the owner follows them, writes to them
+ * or accepts it. Arguments are SQL expressions.
+ */
+const requestSql = (owner: string, peer: string) => `(
+  NOT EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${owner} AND f.following_id = ${peer})
+  AND NOT EXISTS (SELECT 1 FROM direct_messages r WHERE r.sender_id = ${owner} AND r.recipient_id = ${peer})
+  AND NOT EXISTS (SELECT 1 FROM message_request_acceptances a WHERE a.user_id = ${owner} AND a.peer_id = ${peer}))`;
 
 @Injectable()
 export class MessagesService {
@@ -20,7 +34,23 @@ export class MessagesService {
     private readonly users: UsersService,
     private readonly media: MediaService,
     private readonly posts: PostsQueryService,
+    private readonly deletion: ContentDeletionService,
   ) {}
+
+  /** Whether `owner` still treats `peer` as a message request, and whether `peer` already wrote. */
+  private async requestState(
+    m: DataSource | EntityManager,
+    ownerId: string,
+    peerId: string,
+  ) {
+    const row = await sqlOne<{ request: boolean; sent: boolean }>(
+      m,
+      `SELECT ${requestSql('$1::uuid', '$2::uuid')} AS request,
+        EXISTS (SELECT 1 FROM direct_messages d WHERE d.sender_id = $2 AND d.recipient_id = $1) AS sent`,
+      [ownerId, peerId],
+    );
+    return { request: !!row?.request, sent: !!row?.sent };
+  }
 
   private async assertPeer(viewerId: string, peerId: string, sending = false) {
     if (viewerId === peerId)
@@ -69,6 +99,41 @@ export class MessagesService {
           throw e;
       }
     }
+    // Story replies show the story while it is live; expired stories never expose media again.
+    const storyIds = [
+      ...new Set(
+        rows.filter((r) => r.story_reply && r.story_id).map((r) => r.story_id),
+      ),
+    ];
+    const stories = storyIds.length
+      ? await sqlRows(
+          this.db,
+          `SELECT s.id, s.post_id, row_to_json(md) AS media_row FROM stories s
+          LEFT JOIN media md ON md.id = s.media_id
+          WHERE s.id = ANY($1::uuid[]) AND s.expires_at > now()`,
+          [storyIds],
+        )
+      : [];
+    const storyPosts = new Map(
+      (
+        await this.posts.hydrate(
+          stories.map((s) => s.post_id).filter(Boolean),
+          viewerId,
+        )
+      ).map((p) => [p.id, p]),
+    );
+    const byStory = new Map(
+      stories.map((s) => [
+        s.id,
+        s.post_id
+          ? (storyPosts
+              .get(s.post_id)
+              ?.media.find((m) => m.type === 'VIDEO') ?? null)
+          : s.media_row
+            ? this.media.toDto(s.media_row)
+            : null,
+      ]),
+    );
     return rows.map((r) => ({
       id: r.id,
       senderId: r.sender_id,
@@ -76,12 +141,20 @@ export class MessagesService {
       content: r.content,
       media: byMedia.get(r.media_id) ?? null,
       post: byPost.get(r.post_id) ?? null,
+      storyReply: r.story_reply
+        ? { storyId: r.story_id ?? null, media: byStory.get(r.story_id) ?? null }
+        : null,
       createdAt: iso(r.created_at)!,
       readAt: iso(r.read_at),
     }));
   }
 
-  async send(senderId: string, recipientId: string, dto: SendMessageDto) {
+  async send(
+    senderId: string,
+    recipientId: string,
+    dto: SendMessageDto,
+    storyId?: string,
+  ) {
     await this.assertPeer(senderId, recipientId, true);
     if (!dto.content && !dto.mediaId && !dto.postId)
       throw AppException.badRequest(
@@ -98,6 +171,18 @@ export class MessagesService {
       await this.posts.getOne(dto.postId, recipientId);
     }
     const row = await this.db.transaction(async (m) => {
+      // One send per pair at a time, so a pending request can never slip in twice.
+      await sqlRows(
+        m,
+        'SELECT pg_advisory_xact_lock(hashtext(least($1::text, $2::text) || greatest($1::text, $2::text)))',
+        [senderId, recipientId],
+      );
+      const pending = await this.requestState(m, recipientId, senderId);
+      if (pending.request && pending.sent)
+        throw AppException.forbidden(
+          ErrorCode.INVALID_STATE,
+          'Your message request is waiting. You can write again once they accept it.',
+        );
       if (dto.mediaId) {
         const [media] = await this.media.lockAttachable(m, senderId, [
           dto.mediaId,
@@ -111,14 +196,16 @@ export class MessagesService {
       }
       return (await sqlOne(
         m,
-        `INSERT INTO direct_messages(sender_id, recipient_id, content, media_id, post_id)
-        VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+        `INSERT INTO direct_messages(sender_id, recipient_id, content, media_id, post_id, story_id, story_reply)
+        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
         [
           senderId,
           recipientId,
           dto.content || null,
           dto.mediaId ?? null,
           dto.postId ?? null,
+          storyId ?? null,
+          !!storyId,
         ],
       ))!;
     });
@@ -157,9 +244,7 @@ export class MessagesService {
     folder?: 'primary' | 'requests',
   ) {
     const cursor = decodeCursor(cursorStr, ['date', 'uuid']);
-    // Instagram-style request: you neither follow the sender nor have ever replied.
-    const isRequest = `(NOT EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.following_id = u.id)
-      AND NOT EXISTS (SELECT 1 FROM direct_messages r WHERE r.sender_id = $1 AND r.recipient_id = u.id))`;
+    const isRequest = requestSql('$1', 'u.id');
     const rows = await sqlRows(
       this.db,
       `WITH latest AS (
@@ -196,6 +281,59 @@ export class MessagesService {
         isRequest: r.is_request,
       })),
     };
+  }
+
+  async status(viewerId: string, peerId: string): Promise<MessageStatusDto> {
+    await this.assertPeer(viewerId, peerId);
+    const mine = await this.requestState(this.db, viewerId, peerId);
+    const theirs = await this.requestState(this.db, peerId, viewerId);
+    const awaitingAcceptance = theirs.request && theirs.sent;
+    let allowed = true;
+    try {
+      await this.assertPeer(viewerId, peerId, true);
+    } catch (e) {
+      if (!(e instanceof AppException)) throw e;
+      allowed = false;
+    }
+    return {
+      isRequest: mine.request && mine.sent,
+      awaitingAcceptance,
+      canSend: allowed && !awaitingAcceptance,
+    };
+  }
+
+  async accept(viewerId: string, peerId: string) {
+    await this.assertPeer(viewerId, peerId);
+    const state = await this.requestState(this.db, viewerId, peerId);
+    if (!state.sent) throw AppException.notFound();
+    await sqlRows(
+      this.db,
+      `INSERT INTO message_request_acceptances(user_id, peer_id) VALUES ($1, $2)
+      ON CONFLICT DO NOTHING`,
+      [viewerId, peerId],
+    );
+  }
+
+  /** Deletes a pending request (the peer's messages to you). They may send a new one later. */
+  async decline(viewerId: string, peerId: string) {
+    const files = await this.db.transaction(async (m) => {
+      const state = await this.requestState(m, viewerId, peerId);
+      if (!state.request || !state.sent)
+        throw AppException.conflict(
+          ErrorCode.INVALID_STATE,
+          'This conversation is not a message request',
+        );
+      const rows = await sqlRows<{ media_id: string | null }>(
+        m,
+        'DELETE FROM direct_messages WHERE sender_id = $1 AND recipient_id = $2 RETURNING media_id',
+        [peerId, viewerId],
+      );
+      return this.deletion.deleteMedia(
+        m,
+        rows.map((r) => r.media_id).filter((id): id is string => !!id),
+      );
+    });
+    await this.deletion.removeFiles(files);
   }
 
   async unread(viewerId: string) {
