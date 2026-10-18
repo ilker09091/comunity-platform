@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Files shared with Chrome: the splash image (twa_splash) and shared files (twa_shared). -->
 <paths>
-    <files-path name="shared_files" path="twa_shared/" />
+    <files-path name="twa_splash" path="twa_splash/" />
+    <files-path name="twa_shared" path="twa_shared/" />
 </paths>
