@@ -132,6 +132,8 @@ export function Modal({
   className = "",
   guardClose,
   closeOnBackdrop = true,
+  modal = true,
+  headerActions,
 }: {
   title: string;
   children: ReactNode;
@@ -140,20 +142,23 @@ export function Modal({
   /** Return false to keep the dialog open (e.g. to ask about unsaved changes first). */
   guardClose?: () => boolean;
   closeOnBackdrop?: boolean;
+  /** Keep the same media elements mounted while a call switches to a non-modal window. */
+  modal?: boolean;
+  headerActions?: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const closing = useRef(false);
   const closeTimer = useRef<number | undefined>(undefined);
   useEffect(() => {
     const dialog = ref.current;
-    dialog?.showModal();
+    if(modal)dialog?.showModal();else dialog?.show();
     const viewport=window.visualViewport;
     const resize=()=>dialog?.style.setProperty('--dialog-height',`${viewport?.height??window.innerHeight}px`);
     resize();viewport?.addEventListener('resize',resize);
     // showModal() focuses the first focusable (the close button); prefer a marked field.
     dialog?.querySelector<HTMLElement>("[data-autofocus]")?.focus();
     return () => { viewport?.removeEventListener('resize',resize);window.clearTimeout(closeTimer.current); dialog?.close(); };
-  }, []);
+  }, [modal]);
   /** Plays the exit transition before handing control back to the owner. */
   const requestClose = () => {
     const dialog = ref.current;
@@ -183,6 +188,7 @@ export function Modal({
     >
       <header>
         <h2>{title}</h2>
+        {headerActions}
         <button type="button" aria-label="Close dialog" className="icon-button" onClick={requestClose}>
           <X size={20} />
         </button>

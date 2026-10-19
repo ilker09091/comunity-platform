@@ -9,6 +9,7 @@ import { UsersService, USER_SUMMARY_COLUMNS, USER_AVATAR_JOIN, type UserSummaryR
 import { MessagesService } from './messages.service.js';
 import { PushService } from './push.service.js';
 import { CallActionDto, CallConfigDto, CallDto, CallQueryDto, CallSignalInputDto, CallStateDto, StartCallDto } from './calls.dto.js';
+import { resolveTurnSecret } from './turn-secret.js';
 
 interface CallRow {
   id: string; caller_id: string; callee_id: string; caller_device: string; callee_device: string | null;
@@ -16,13 +17,18 @@ interface CallRow {
 }
 @Injectable()
 export class CallsService {
+  private relaySecret?: string;
   constructor(@InjectDataSource() private readonly db: DataSource, private readonly users: UsersService,
     private readonly messages: MessagesService, private readonly push: PushService) {}
+
+  onModuleInit() {
+    this.relaySecret = resolveTurnSecret(process.env.CALL_TURN_SECRET, process.env.CALL_TURN_SECRET_FILE);
+  }
 
   config(userId: string): CallConfigDto {
     const stun = (process.env.CALL_STUN_URLS ?? 'stun:stun.l.google.com:19302').split(',').map(s=>s.trim()).filter(Boolean);
     const turn = (process.env.CALL_TURN_URLS ?? '').split(',').map(s=>s.trim()).filter(Boolean);
-    const secret = process.env.CALL_TURN_SECRET;
+    const secret = this.relaySecret || process.env.CALL_TURN_SECRET;
     const iceServers: CallConfigDto['iceServers'] = stun.length ? [{ urls: stun }] : [];
     if (turn.length && secret) {
       const username = `${Math.floor(Date.now()/1000)+86400}:${userId}`;

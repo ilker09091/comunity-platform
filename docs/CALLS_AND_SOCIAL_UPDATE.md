@@ -20,9 +20,16 @@ CALL_TURN_URLS=turn:turn.example.com:3478?transport=udp,turn:turn.example.com:34
 CALL_TURN_SECRET=<the relay's TURN REST shared secret>
 ```
 
-The relay must use the same shared secret (`use-auth-secret` / `static-auth-secret` in coturn), an actual reachable external address, TLS certificates for `turns:`, and open listening/relay ports. Keep its secret private. The API issues expiring HMAC credentials; browser code never receives the shared secret. A relay/domain is not provisioned automatically. STUN-only calls can work directly, but are insufficient on some networks.
+Compose includes a coturn service with an automatically generated persistent shared key;
+see [the current deployment instructions](CALL_EXPERIENCE.md). The environment example above
+is for a separately managed relay/native deployment. The relay needs an actual reachable
+external address, open listening/relay ports and TLS certificates if using `turns:`.
+The API issues expiring HMAC credentials; browser code never receives the shared key.
 
 ## Calls
+
+For the camera-off, screen-sharing, minimized window and recovery update, including
+the VPS-specific TURN setup, see [CALL_EXPERIENCE.md](CALL_EXPERIENCE.md).
 
 - One audio or video call per account. Both user locks are taken in sorted order to prevent crossing calls.
 - Start from the conversation header. Accepted message permissions, private accounts, blocks and active account status apply server-side. Pending message requests cannot place calls.

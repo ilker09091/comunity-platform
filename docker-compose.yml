@@ -65,8 +65,9 @@ services:
       MEDIA_VIDEO_CRF: ${MEDIA_VIDEO_CRF:-26}
       MEDIA_TRANSCODE_CONCURRENCY: ${MEDIA_TRANSCODE_CONCURRENCY:-1}
       CALL_STUN_URLS: ${CALL_STUN_URLS:-stun:stun.l.google.com:19302}
-      CALL_TURN_URLS: ${CALL_TURN_URLS:-}
+      CALL_TURN_URLS: ${CALL_TURN_URLS:-turn:${TURN_PUBLIC_IP:-13.140.148.251}:3478?transport=udp,turn:${TURN_PUBLIC_IP:-13.140.148.251}:3478?transport=tcp}
       CALL_TURN_SECRET: ${CALL_TURN_SECRET:-}
+      CALL_TURN_SECRET_FILE: /app/storage/turn-control/key
 
     ports:
       - "127.0.0.1:3101:3002"
@@ -74,6 +75,7 @@ services:
     volumes:
       - media_data:/app/storage/media
       - importer_control:/app/storage/importer-control
+      - turn_control:/app/storage/turn-control
 
     healthcheck:
       test: ["CMD", "node", "--input-type=module", "-e", "try{const r=await fetch('http://127.0.0.1:3002/');process.exit(r.ok?0:1)}catch{process.exit(1)}"]
@@ -104,6 +106,18 @@ services:
 
     ports:
       - "127.0.0.1:3100:3000"
+
+  turn:
+    build:
+      context: ./deploy
+      dockerfile: turn.Dockerfile
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      TURN_PUBLIC_IP: ${TURN_PUBLIC_IP:-13.140.148.251}
+      CALL_TURN_SECRET: ${CALL_TURN_SECRET:-}
+    volumes:
+      - turn_control:/run/circle-turn:ro
 
   importer:
     build:
@@ -143,3 +157,4 @@ volumes:
   media_data:
   importer_state:
   importer_control:
+  turn_control:

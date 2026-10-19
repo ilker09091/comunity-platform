@@ -1,0 +1,95 @@
+.ig-call-dialog > header { gap:8px; }
+.ig-call-dialog > header h2 { flex:1; }
+.ig-call-dialog .call-type { max-width:48%; overflow:hidden; text-overflow:ellipsis; }
+.ig-call-dialog .call-type > svg { flex-shrink:0; }
+.ig-call-dialog .call-type > span { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.ig-call-dialog .call-actions { flex-wrap:wrap; gap:12px; }
+.ig-call-dialog.viewing-screen .call-remote { object-fit:contain; }
+.ig-call-dialog.is-sharing .call-local { object-fit:contain; transform:none; aspect-ratio:16/9; background:#15151b; }
+.call-share-settings {
+  position:absolute; z-index:6; right:24px; bottom:148px; width:248px; padding:18px;
+  border:1px solid #ffffff25; border-radius:20px; background:linear-gradient(145deg,#30303aeb,#17171fed);
+  box-shadow:0 16px 48px #0004; backdrop-filter:blur(24px); color:#fff;
+}
+.call-share-heading { display:flex; justify-content:space-between; align-items:center; color:#b8b8c8; }
+.call-share-live { display:flex; align-items:center; gap:6px; color:#78edb1; font-size:11px; font-weight:600; }
+.call-share-settings h3 { margin:12px 0 4px; font-size:16px; color:#fff; }
+.call-share-settings > p { margin:0 0 14px; font-size:11px; color:#b6b6c5; }
+.call-quality-options { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.call-quality-option {
+  position:relative; display:flex; flex-direction:column; align-items:flex-start; gap:3px;
+  padding:10px 12px; border:1px solid #ffffff19; border-radius:12px; background:#ffffff07; color:#c8c8d4;
+  transition:background .15s,border-color .15s; cursor:pointer;
+}
+.call-quality-option strong { font-size:14px; color:inherit; }
+.call-quality-option > span { font-size:10px; color:inherit; opacity:.75; }
+.call-quality-option > svg { position:absolute; right:8px; top:9px; }
+.call-quality-option:hover:not(:disabled) { background:#ffffff14; border-color:#ffffff55; }
+.call-quality-option.selected { color:#fff; border-color:#73a8ff; background:linear-gradient(135deg,#3682ff50,#5651d94a); box-shadow:inset 0 0 0 1px #73a8ff20; }
+.call-quality-option:focus-visible { outline:2px solid #99bdff; outline-offset:3px; }
+.call-share-settings > small { display:block; margin-top:12px; font-size:9px; color:#a4a4b6; }
+.is-sharing .call-stage:not(:has(.call-remote[data-video-active=true])) .call-person { top:84px; left:24px; transform:none; width:45%; align-items:flex-start; text-align:left; }
+.is-sharing .call-stage:not(:has(.call-remote[data-video-active=true])) .call-person .avatar { width:56px!important; height:56px!important; font-size:20px!important; }
+.is-sharing .call-stage:not(:has(.call-remote[data-video-active=true])) .call-person h2 { font-size:15px; margin:12px 0 4px; }
+
+/* show() keeps the same audio/video elements alive without making the page inert. */
+dialog.modal.ig-call-dialog.call-minimized[open] {
+  position:fixed; inset:auto 16px calc(20px + env(safe-area-inset-bottom)) auto; margin:0;
+  width:min(320px,calc(100vw - 24px)); height:230px; max-width:calc(100vw - 24px); max-height:none;
+  border:1px solid #ffffff24; border-radius:18px; padding:0; z-index:150; overflow:hidden;
+  box-shadow:0 12px 50px #0005; animation:call-window-in .18s ease;
+}
+dialog.call-minimized > header { height:42px!important; padding:6px 10px!important; }
+.call-minimized > header .icon-button { width:30px; height:30px; }
+.call-minimized .call-type,.call-minimized .call-share-settings { display:none; }
+.ig-call-dialog.call-minimized .call-person { top:45%; width:calc(100% - 28px); }
+.ig-call-dialog.call-minimized .call-person .avatar { width:48px!important; height:48px!important; font-size:18px!important; }
+.ig-call-dialog.call-minimized .call-person h2 { max-width:100%; font-size:13px; line-height:1.2; margin:10px 0 4px; }
+.ig-call-dialog.call-minimized .call-person p { font-size:11px; }
+.ig-call-dialog.call-minimized .call-stage:has(.call-remote[data-video-active=true]) .call-person { top:50px; left:12px; width:calc(100% - 24px); }
+.ig-call-dialog.call-minimized .call-stage:has(.call-remote[data-video-active=true]) .call-person h2 { font-size:12px; max-width:100%; }
+.ig-call-dialog.call-minimized .call-actions { bottom:8px; gap:10px; padding:0 8px; flex-wrap:nowrap; }
+.ig-call-dialog.call-minimized .call-control { width:44px; min-height:42px; gap:0; }
+.ig-call-dialog.call-minimized .call-control > span:last-child { display:none; }
+.ig-call-dialog.call-minimized .call-control-icon { width:38px; height:38px; }
+.ig-call-dialog.call-minimized .call-control-icon svg { width:18px; height:18px; }
+.ig-call-dialog.call-minimized .call-advanced,.ig-call-dialog.call-minimized .call-local { display:none; }
+@keyframes call-window-in { from {opacity:0;transform:translateY(8px);} }
+@media(max-width:767px) {
+  .ig-call-dialog .call-type { left:92px; right:96px; max-width:none; transform:none; justify-content:center; }
+  .ig-call-dialog.is-incoming .call-type { left:124px; right:64px; }
+  .ig-call-dialog .call-local { width:clamp(76px,24vw,104px); }
+  .ig-call-dialog .call-share-settings { left:16px; right:16px; bottom:130px; width:auto; padding:12px; border-radius:16px; }
+  .call-share-heading { float:right; height:20px; }
+  .call-share-heading > svg { display:none; }
+  .call-share-settings h3 { margin:0 0 10px; font-size:13px; }
+  .call-share-settings > p,.call-share-settings > small { display:none; }
+  .call-quality-options { grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+  .call-quality-option { padding:10px 6px; align-items:center; }
+  .call-quality-option strong { font-size:12px; }
+  .call-quality-option > svg { display:none; }
+  .ig-call-dialog .call-actions { gap:8px; }
+  .ig-call-dialog .call-control { width:56px; min-height:78px; font-size:10px; }
+  .ig-call-dialog .call-control-icon { width:48px; height:48px; }
+  .ig-call-dialog:not(.call-minimized) .call-actions:has(.call-control:nth-child(6)) { display:grid; grid-template-columns:repeat(3,64px); }
+  dialog.modal.ig-call-dialog.call-minimized[open] { right:12px; bottom:calc(66px + env(safe-area-inset-bottom)); width:268px; height:218px; border-radius:16px; }
+}
+@media(max-width:359px) {
+  .ig-call-dialog .call-share-settings { bottom:204px; }
+  .ig-call-dialog:not(.call-minimized):not(.is-incoming) .call-actions { display:grid; grid-template-columns:repeat(3,64px); }
+}
+@media(max-height:520px) {
+  .ig-call-dialog:not(.call-minimized) .call-control { min-height:62px; }
+  .ig-call-dialog:not(.call-minimized) .call-control-icon { width:42px; height:42px; }
+}
+@media(max-height:520px) and (min-width:600px) {
+  .ig-call-dialog.is-sharing .call-local { left:50%; right:auto; top:80px; transform:translateX(-50%); width:110px; max-height:70px; }
+  .ig-call-dialog .call-share-settings { left:auto; right:16px; bottom:96px; width:280px; padding:12px; }
+  .call-share-heading { float:right; }
+  .call-share-heading > svg,.call-share-settings > p,.call-share-settings > small { display:none; }
+  .call-share-settings h3 { font-size:13px; margin:0 0 10px; }
+  .call-quality-options { grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+  .call-quality-option { padding:10px 6px; align-items:center; }
+  .call-quality-option > svg { display:none; }
+}
+@media(prefers-reduced-motion:reduce) { dialog.modal.call-minimized[open] { animation:none; } }

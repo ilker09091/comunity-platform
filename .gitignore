@@ -10,6 +10,7 @@ server/dist/
 
 # Local secrets (template .env.example IS committed)
 .env
+.env.turn
 server/.env
 client/.env
 client/.env.local
