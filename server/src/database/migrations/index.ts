@@ -24,6 +24,7 @@ import { PinnedPosts1760190900000 } from './1760190900000-PinnedPosts.js';
 import { ReelDiscoveryCycles1760191000000 } from './1760191000000-ReelDiscoveryCycles.js';
 
 /** Ordered list of migrations. Append new migrations here; never edit applied ones. */
+import { CallsAndStreaks1760191800000 } from './1760191800000-CallsAndStreaks.js';
 export const migrations = [
   CreateUsersAndAuth1760180000000,
   CreateMedia1760180100000,
@@ -49,4 +50,5 @@ export const migrations = [
   MessagingPresenceNotes1760191500000,
   NoteReplies1760191600000,
   SoundtracksAndPush1760191700000,
+  CallsAndStreaks1760191800000,
 ];

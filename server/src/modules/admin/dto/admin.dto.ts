@@ -495,6 +495,10 @@ export class BulkModerationResultDto {
   @ApiProperty() resolvedReports: number;
 }
 
+export class DeleteAccountDto extends ReasonDto {
+  @ApiProperty({description:'Exact username confirmation'}) @IsString() @MaxLength(32) confirmUsername: string;
+}
+
 export class DeleteUserContentDto extends ReasonDto {
   @ApiProperty({ enum: ['posts', 'comments', 'all'] })
   @IsIn(['posts', 'comments', 'all']) scope: 'posts' | 'comments' | 'all';

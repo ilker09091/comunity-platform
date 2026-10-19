@@ -5,6 +5,7 @@ import "./video-experience.css";
 import "./social-media.css";
 import "./messages-stories.css";
 import "./profile-ig.css";
+import "./interaction-fixes.css";
 import Providers from "@/components/providers";
 import { Suspense } from "react";
 

@@ -28,6 +28,8 @@ import {
   Smile,
   SquarePen,
   Video,
+  Phone,
+  Flame,
   X,
 } from "lucide-react";
 import { api, type Models } from "@/lib/api/client";
@@ -48,6 +50,9 @@ import { RecipientPicker } from "./social-controls";
 import { MediaVideo } from "./media-video";
 import { NotesTray } from "./notes";
 import { messageSoundsOn, setMessageSounds } from "./app-bridge";
+import { useCalls } from "./calls";
+import MessageStreak from "./message-streak";
+import { ImageViewer } from "./image-viewer";
 
 type Message = Models["DirectMessageDto"];
 type Conversation = Models["ConversationDto"];
@@ -429,6 +434,7 @@ function MessageItem({
    * in a portal so the scrolling chat can never clip them or hide them behind the composer.
    */
   const [menu, setMenu] = useState<null | { mode: "sheet" } | { mode: "popover"; top: number; left?: number; right?: number }>(null);
+  const [photoOpen,setPhotoOpen] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
   const openPopover = () => {
     const rect = bodyRef.current?.getBoundingClientRect();
@@ -437,8 +443,8 @@ function MessageItem({
     const top = window.innerHeight - rect.bottom > height + 16 ? rect.bottom + 6 : Math.max(8, rect.top - height - 6);
     setMenu(
       own
-        ? { mode: "popover", top, right: Math.max(8, window.innerWidth - rect.right) }
-        : { mode: "popover", top, left: Math.max(8, rect.left) },
+        ? { mode: "popover", top, right: Math.max(8, Math.min(window.innerWidth - 228, window.innerWidth - rect.right)) }
+        : { mode: "popover", top, left: Math.max(8, Math.min(rect.left, window.innerWidth - 228)) },
     );
   };
   const menuRef = useRef<HTMLDivElement>(null);
@@ -543,7 +549,7 @@ function MessageItem({
               preload="metadata"
             />
           ) : (
-            <a href={media.url} target="_blank" rel="noreferrer" className="dm-photo">
+            <button type="button" className="dm-photo" aria-label="Open photo in conversation" onClick={()=>setPhotoOpen(true)}>
               <img
                 className="dm-media"
                 src={media.url}
@@ -552,8 +558,9 @@ function MessageItem({
                   aspectRatio: media.width && media.height ? `${media.width}/${media.height}` : undefined,
                 }}
               />
-            </a>
+            </button>
           ))}
+        {photoOpen&&media&&<ImageViewer src={media.url} alt="Photo in conversation" onClose={()=>setPhotoOpen(false)}/>}
         {message.post && <SharedPost post={message.post} />}
         {missing && <p className="dm-bubble muted">This attachment is no longer available.</p>}
         {(hasText || message.replyTo) && !message.viewOnce && (
@@ -714,6 +721,7 @@ function EmojiButton({
 type Draft = { content?: string; mediaId?: string; viewOnce?: boolean; replyToId?: string };
 
 function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
+  const calls = useCalls();
   const { user } = useSession();
   const router = useRouter();
   const toast = useToast();
@@ -921,6 +929,8 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
             </small>
           </span>
         </Link>
+        <button type="button" className="dm-icon" aria-label="Start voice call" disabled={calls.busy||!status.data?.canSend||request} onClick={()=>calls.start(peer,"audio")}><Phone size={21}/></button>
+        <button type="button" className="dm-icon" aria-label="Start video call" disabled={calls.busy||!status.data?.canSend||request} onClick={()=>calls.start(peer,"video")}><Video size={22}/></button>
         <Link className="dm-icon dm-info" href={`/profile/${peer.username}`} aria-label="View profile">
           <Info size={24} />
         </Link>
@@ -994,6 +1004,7 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
           </p>
         )}
         {thread.error && <ErrorState error={thread.error} retry={() => void thread.refetch()} />}
+        <MessageStreak peerId={peer.id}/>
         <ol className="dm-messages" ref={messageList}>
           {messages.map((m, i) => {
             const prev = messages[i - 1];
@@ -1274,6 +1285,7 @@ function ConversationRow({
         <span className="dm-row-copy">
           <strong>
             {c.user.displayName}
+            {!!c.streakDays&&<span className={`dm-streak-badge ${c.streakFading?"fading":""}`} aria-label={`${c.streakDays} day streak`}><Flame size={14}/>{c.streakDays}</span>}
             {c.user.isVerified && <VerifiedBadge />}
           </strong>
           <span>
@@ -1324,6 +1336,7 @@ export default function Messages() {
     queryKey: ["message-peer", user?.id, to],
     queryFn: ({ signal }) => api("usersGetProfile", { params: { username: to }, signal }),
     enabled: !!to && !!user,
+    refetchInterval: 5000,
   });
   // Mobile: the inbox is pinned between the header and the bottom navigation, so the page
   // itself must not keep a scroll offset carried over from the previous page.

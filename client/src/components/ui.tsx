@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRight, AlertCircle, Compass, X, Loader2, AlertTriangle, BadgeCheck } from "lucide-react";
 import type { Models } from "@/lib/api/client";
+import { ApiError } from "@/lib/api/client";
 
 export function Avatar({
   user,
@@ -72,11 +73,12 @@ export function ErrorState({
   error: Error | null;
   retry?: () => void;
 }) {
+  const missingUser = error instanceof ApiError && error.code === "USER_NOT_FOUND";
   return (
     <div className="error-state" role="alert">
       <AlertCircle size={24} />
-      <h3>Something didn’t load</h3>
-      <p>{error?.message ?? "Please try again."}</p>
+      <h3>{missingUser ? "Kullanıcı bulunamadı" : "Something didn’t load"}</h3>
+      <p>{missingUser ? "Bu profil kullanılamıyor." : error?.message ?? "Please try again."}</p>
       {retry && (
         <button className="button secondary" onClick={retry}>
           Try again
@@ -279,6 +281,23 @@ export function Dropdown({
   summaryClassName?: string;
 }) {
   const ref = useRef<HTMLDetailsElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const positionMenu = useCallback(() => {
+    const details=ref.current,menu=menuRef.current;
+    if(!details||!menu)return;
+    if(!details.open){if(menu.hidePopover&&menu.matches(":popover-open"))menu.hidePopover();return;}
+    if(menu.showPopover&&!menu.matches(":popover-open"))menu.showPopover();
+    const anchor=details.querySelector("summary")!.getBoundingClientRect();
+    const viewport=window.visualViewport;
+    const width=viewport?.width??window.innerWidth,height=viewport?.height??window.innerHeight;
+    const offsetX=viewport?.offsetLeft??0,offsetY=viewport?.offsetTop??0;
+    const menuWidth=Math.min(260,width-16);
+    Object.assign(menu.style,{position:"fixed",inset:"auto",margin:"0",width:`${menuWidth}px`,maxWidth:"calc(100vw - 16px)",maxHeight:`${height-16}px`,overflowY:"auto"});
+    const menuHeight=menu.getBoundingClientRect().height;
+    const left=Math.max(offsetX+8,Math.min(align==="end"?anchor.right-menuWidth:anchor.left,offsetX+width-menuWidth-8));
+    const top=Math.max(offsetY+8,Math.min(anchor.bottom+6+menuHeight<=offsetY+height-8?anchor.bottom+6:anchor.top-menuHeight-6,offsetY+height-menuHeight-8));
+    menu.style.left=`${left}px`;menu.style.top=`${top}px`;
+  },[align]);
   useEffect(() => {
     const details = ref.current;
     if (!details) return;
@@ -294,17 +313,26 @@ export function Dropdown({
     };
     document.addEventListener("pointerdown", close);
     document.addEventListener("keydown", close);
+    const reposition=(event:Event)=>{if(!menuRef.current?.contains(event.target as Node))positionMenu();};
+    window.addEventListener("resize",positionMenu);
+    window.visualViewport?.addEventListener("resize",positionMenu);
+    document.addEventListener("scroll",reposition,true);
     return () => {
       document.removeEventListener("pointerdown", close);
       document.removeEventListener("keydown", close);
+      window.removeEventListener("resize",positionMenu);
+      window.visualViewport?.removeEventListener("resize",positionMenu);
+      document.removeEventListener("scroll",reposition,true);
     };
-  }, []);
+  }, [positionMenu]);
   return (
-    <details ref={ref} className={`dropdown ${className}`}>
+    <details ref={ref} className={`dropdown ${className}`} onToggle={positionMenu}>
       <summary aria-label={label} className={summaryClassName}>
         {summary}
       </summary>
       <div
+        ref={menuRef}
+        popover="manual"
         className={`dropdown-menu align-${align}`}
         onClick={(e) => {
           const target = e.target as HTMLElement;

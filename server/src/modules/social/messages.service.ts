@@ -64,6 +64,19 @@ export class MessagesService {
     return { request: !!row?.request, sent: !!row?.sent };
   }
 
+  async assertConversationPeer(viewerId: string, peerId: string) {
+    await this.assertPeer(viewerId, peerId);
+  }
+
+  async assertCallPeer(viewerId: string, peerId: string, m: DataSource | EntityManager = this.db) {
+    await this.assertPeer(viewerId, peerId, true);
+    const state = await this.requestState(m, peerId, viewerId);
+    if (state.request) throw AppException.forbidden(ErrorCode.INVALID_STATE, 'Calls are available after your message request is accepted');
+    // Recheck against the transaction too, so an existing block never authorizes signaling.
+    if (await sqlOne(m, `SELECT 1 FROM blocks WHERE (blocker_id=$1 AND blocked_id=$2) OR (blocker_id=$2 AND blocked_id=$1)`, [viewerId,peerId]))
+      throw AppException.notFound(ErrorCode.USER_NOT_FOUND, 'User not found');
+  }
+
   private async assertPeer(viewerId: string, peerId: string, sending = false) {
     if (viewerId === peerId)
       throw AppException.badRequest(
@@ -73,10 +86,7 @@ export class MessagesService {
     const peer = await this.users.getActiveTarget(peerId);
     const relationship = await this.users.relationship(viewerId, peerId);
     if (relationship.isBlocking || relationship.isBlockedBy)
-      throw AppException.forbidden(
-        ErrorCode.BLOCKED,
-        'Messaging is unavailable for this account',
-      );
+      throw AppException.notFound(ErrorCode.USER_NOT_FOUND, 'User not found');
     if (sending && peer.is_private && !relationship.isFollowing) {
       throw AppException.forbidden(
         ErrorCode.PRIVATE_ACCOUNT,
@@ -334,8 +344,11 @@ export class MessagesService {
     ) SELECT l.*, ${USER_SUMMARY_COLUMNS}, l.id AS message_id,
       (SELECT count(*)::int FROM direct_messages d WHERE d.recipient_id = $1 AND d.sender_id = u.id AND d.read_at IS NULL) AS unread,
       ${isRequest} AS is_request,
-      u.last_active_at, (u.last_active_at > now() - ${ONLINE_WINDOW_SQL}) AS online
+      u.last_active_at, (u.last_active_at > now() - ${ONLINE_WINDOW_SQL}) AS online,
+      CASE WHEN streak.days>=3 AND streak.last_completed_day>=(now() AT TIME ZONE 'UTC')::date-2 THEN streak.days ELSE 0 END AS streak_days,
+      streak.last_completed_day=(now() AT TIME ZONE 'UTC')::date-2 AS streak_fading
       FROM latest l JOIN users u ON u.id = l.peer_id ${USER_AVATAR_JOIN}
+      LEFT JOIN message_streaks streak ON streak.low_id=least($1::uuid,u.id) AND streak.high_id=greatest($1::uuid,u.id)
       WHERE u.status = 'ACTIVE' AND ${notBlockedSql('u.id', '$1')}
       ${folder ? `AND ${folder === 'requests' ? '' : 'NOT '}${isRequest}` : ''}
       ${cursor ? 'AND (l.created_at, l.id) < ($3::timestamptz, $4::uuid)' : ''}
@@ -361,6 +374,8 @@ export class MessagesService {
         isRequest: r.is_request,
         online: !!r.online,
         lastActiveAt: iso(r.last_active_at),
+        streakDays: r.streak_days ?? 0,
+        streakFading: !!r.streak_fading,
       })),
     };
   }

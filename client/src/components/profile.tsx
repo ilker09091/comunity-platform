@@ -25,6 +25,7 @@ import { Avatar, ConfirmDialog, Dropdown, EmptyState, ErrorState, LoadMore, Moda
 import FollowButton from "./follow-button";
 import Feed from "./feed";
 import ReportDialog from "./report-dialog";
+import { ProfilePhoto } from "./image-viewer";
 import { useFeatures } from "@/lib/platform-config";
 
 type Profile = Models["UserProfileDto"];
@@ -98,7 +99,7 @@ function useBlock(profile: Profile) {
   return useMutation({
     mutationFn: (block: boolean) => api(block ? "followsBlock" : "followsUnblock", { params: { id: profile.id } }),
     onSuccess: (_data, block) => {
-      for (const key of ["profile", "posts", "suggestions", "notifications", "unread", "session", "connections", "blocks", "follow-requests"])
+      for (const key of ["profile", "posts", "suggestions", "notifications", "unread", "session", "connections", "blocks", "follow-requests", "messages", "message-peer"])
         void client.invalidateQueries({ queryKey: [key] });
       toast(block ? `You blocked @${profile.username}.` : `You unblocked @${profile.username}.`);
     },
@@ -236,6 +237,7 @@ export default function Profile({ username }: { username: string }) {
   const query = useQuery({
     queryKey: ["profile", username],
     queryFn: ({ signal }) => api("usersGetProfile", { params: { username }, signal }),
+    refetchInterval: 15000,
   });
   // UI state (tab, editor) lives in the URL but is updated with the native History API,
   // which Next syncs with useSearchParams without a server round-trip.
@@ -280,7 +282,7 @@ export default function Profile({ username }: { username: string }) {
           {user.coverUrl ? <img src={user.coverUrl} alt="" /> : <div className="cover-art" aria-hidden="true" />}
         </div>
         <span className="ig-profile-avatar">
-          <Avatar user={user} size={150} />
+          <ProfilePhoto user={user} />
         </span>
         {/* Desktop: one row (username, buttons, menu). Phones: the row dissolves into the grid. */}
         <div className="ig-profile-title">

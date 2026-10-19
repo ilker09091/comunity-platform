@@ -40,10 +40,20 @@ async function latest() {
   }
 }
 
+async function incomingCall() {
+  try {
+    const response=await fetch(`${API}/calls/current?deviceId=${crypto.randomUUID()}`,{credentials:"include",cache:"no-store"});
+    if(!response.ok)return null;
+    const {call}=await response.json();
+    if(!call||call.outgoing||call.state!=="ringing")return null;
+    return {title:call.peer.displayName,body:`Incoming ${call.kind} call`,url:`/messages?to=${encodeURIComponent(call.peer.username)}`,
+      tag:`call-${call.id}`,icon:call.peer.avatarUrl||ICON,call:true};
+  }catch{return null;}
+}
 self.addEventListener("push", (event) => {
   event.waitUntil(
     (async () => {
-      const message = (await latest()) || {
+      const message = (await incomingCall()) || (await latest()) || {
         title: "Circle",
         body: "You have a new message",
         url: "/messages",
@@ -53,7 +63,7 @@ self.addEventListener("push", (event) => {
       const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       const visible = windows.filter((w) => w.visibilityState === "visible");
       if (visible.length) {
-        for (const w of visible) w.postMessage({ type: "circle:new-message", ...message });
+        for (const w of visible) w.postMessage({ type: message.call ? "circle:incoming-call" : "circle:new-message", ...message });
         return;
       }
       await self.registration.showNotification(message.title, {
@@ -62,6 +72,7 @@ self.addEventListener("push", (event) => {
         badge: BADGE,
         tag: message.tag,
         renotify: true,
+        requireInteraction: !!message.call,
         vibrate: [80, 40, 80],
         data: { url: message.url },
       });

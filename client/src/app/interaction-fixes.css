@@ -1,0 +1,73 @@
+/* Dialogs live in the top layer; every child must still fit its available width. */
+.modal { max-width:calc(100vw - 24px); max-height:calc(100dvh - 32px); overscroll-behavior:contain; }
+.modal > header { gap:12px; min-width:0; }
+.modal > header h2 { min-width:0; overflow-wrap:anywhere; }
+.modal > header .icon-button { flex:0 0 auto; }
+.modal :where(input,textarea,select,fieldset) { min-width:0; max-width:100%; }
+.modal :where(p,label,strong,h3) { overflow-wrap:anywhere; }
+.dialog-actions { flex-wrap:wrap; }
+.dialog-actions .button { min-width:0; max-width:100%; height:auto; min-height:40px; white-space:normal; overflow-wrap:anywhere; }
+.confirm-body { min-width:0; }
+.confirm-body > div { min-width:0; }
+.dropdown-menu { max-width:calc(100vw - 16px); max-height:calc(100dvh - 16px); overscroll-behavior:contain; }
+.dropdown-menu :where(a,button) { min-width:0; white-space:normal; overflow-wrap:anywhere; }
+.dropdown-menu[popover] { color:var(--text); border:1px solid var(--border); }
+.dm-message-menu.popover { width:220px; min-width:0; max-width:calc(100vw - 16px); max-height:calc(100dvh - 16px); overflow:auto; }
+.dm-thread-head { min-width:0; gap:6px; }
+.dm-thread-person { min-width:0; flex:1; }
+.dm-thread-person > span:last-child { min-width:0; }
+.dm-thread-person strong,.dm-thread-person small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dm-thread-head > .dm-icon,.dm-thread-head > .dropdown { flex:0 0 auto; }
+.dm-photo { display:block; border:0; padding:0; background:transparent; cursor:zoom-in; max-width:100%; }
+.profile-photo-button { display:block; padding:0; border:0; border-radius:50%; background:transparent; cursor:zoom-in; touch-action:pan-y; -webkit-touch-callout:none; }
+.profile-photo-button:focus-visible { outline:3px solid var(--primary,#2563eb); outline-offset:4px; }
+.image-viewer-dialog.modal { width:min(1100px,calc(100vw - 24px)); background:#11141a; color:#fff; }
+.image-viewer-dialog.modal > header { background:#11141a; color:#fff; }
+.image-viewer-dialog .icon-button { color:#fff; }
+.image-viewer-content { display:grid; place-items:center; min-height:160px; padding:12px!important; }
+.image-viewer-content img { display:block; width:auto; height:auto; max-width:100%; max-height:calc(100dvh - 130px); object-fit:contain; border-radius:8px; }
+.dm-streak,.dm-streak-building { margin:8px 12px 14px; padding:9px 12px; border-radius:14px; background:#fff5e8; color:#ad470c; font-size:12px; }
+.dm-streak { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.dm-streak strong { white-space:nowrap; }
+.dm-streak > span { flex:1; min-width:150px; }
+.dm-streak.fading,.dm-streak.expired { color:#64748b; background:#f1f5f9; }
+.dm-streak-building { background:transparent; color:var(--text-2); text-align:center; }
+.dm-streak-badge { display:inline-flex; align-items:center; gap:2px; margin-inline-start:6px; color:#d55b12; font-size:12px; }
+.dm-streak-badge.fading { color:#94a3b8; }
+.reel-slide[data-access-pending="true"] .reel-media-wrap { visibility:hidden; }
+.call-dialog.modal { width:min(760px,calc(100vw - 24px)); background:#131923; color:#f8fafc; }
+.call-dialog.modal > header { background:#131923; color:#f8fafc; border-color:#ffffff1c; }
+.call-dialog .icon-button { color:#f8fafc; }
+.call-dialog .call-stage { padding:20px; }
+.call-person { display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center; }
+.call-person h2 { font-size:20px; font-weight:600; overflow-wrap:anywhere; }
+.call-person p { color:#cbd5e1; font-variant-numeric:tabular-nums; }
+.call-video-stage { position:relative; margin-top:18px; min-height:140px; background:#070b11; border-radius:16px; overflow:hidden; }
+.call-remote { width:100%; height:min(44dvh,360px); object-fit:contain; }
+.call-local { position:absolute; bottom:12px; right:12px; width:clamp(85px,24%,150px); height:110px; object-fit:cover; border:2px solid #ffffffb0; border-radius:12px; transform:scaleX(-1); }
+.call-local.camera-off { visibility:hidden; }
+.call-remote.camera-off { visibility:hidden; }
+.call-actions { display:flex; justify-content:center; gap:12px; flex-wrap:wrap; padding-top:22px; }
+.call-control { display:flex; align-items:center; flex-direction:column; justify-content:center; gap:7px; width:86px; min-height:72px; padding:10px 5px; border:0; border-radius:18px; background:#2b3545; color:#fff; cursor:pointer; font-size:11px; }
+.call-control svg { width:24px; height:24px; }
+.call-control:disabled { opacity:.45; cursor:wait; }
+.call-control.accept { background:#16834c; }
+.call-control.hangup { background:#d82e46; }
+.call-control.selected { background:#e2e8f0; color:#131923; }
+@media(max-width:767px) {
+  .modal:has(> .admin-action-form) { width:calc(100vw - 24px); height:fit-content; max-height:calc(100dvh - 24px); margin:auto; border-radius:18px; }
+  .call-dialog.modal,.image-viewer-dialog.modal { width:100vw; max-width:100vw; height:100dvh; max-height:100dvh; margin:0; border-radius:0; }
+  .call-dialog.modal > header,.image-viewer-dialog.modal > header { padding-top:calc(14px + env(safe-area-inset-top)); }
+  .dm-thread-head .dm-icon { width:34px; height:38px; }
+  .dm-thread-head .dm-info { display:none; }
+  .dm-thread-head .dm-thread-person { gap:7px; }
+  .dm-thread-head .dm-thread-person .avatar { width:34px!important; height:34px!important; }
+  .call-dialog .call-stage { padding:14px; }
+  .call-actions { gap:8px; padding-bottom:env(safe-area-inset-bottom); }
+  .call-control { width:68px; }
+}
+@media(min-width:768px) {
+  .app-container,.main-content,.content-column,.admin-main,.admin-page,.admin-page-head,.quick-actions { min-width:0; }
+  .quick-actions { flex-wrap:wrap; }
+  .admin-page-head { flex-wrap:wrap; }
+}

@@ -188,10 +188,10 @@ describe('Direct messages and stories (e2e)', () => {
     );
     await send('approved');
     await api.post(`/users/${alice.id}/block`, {}, bob).expect(200);
-    await api.get(`/messages/${bob.id}`, alice).expect(403);
+    await api.get(`/messages/${bob.id}`, alice).expect(404);
     await api
       .post(`/messages/${bob.id}`, { content: 'blocked' }, alice)
-      .expect(403);
+      .expect(404);
     expect((await api.get('/messages', bob)).body.items).toEqual([]);
     expect((await api.get('/messages/unread-count', bob)).body.count).toBe(0);
     await db.query("UPDATE users SET status = 'DEACTIVATED' WHERE id = $1", [

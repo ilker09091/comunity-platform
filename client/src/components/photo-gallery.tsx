@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useEffectEvent, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useEffectEvent, useRef, useState, type CSSProperties } from "react";
 import { ChevronLeft, ChevronRight, Expand, Loader2, Minus, Plus, RotateCcw } from "lucide-react";
 import type { Models } from "@/lib/api/client";
 import { Modal } from "./ui";
@@ -16,7 +16,8 @@ export function PhotoViewer({ photos, initial = 0, onClose }: { photos: Photo[];
   const [failed, setFailed] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
   const viewport = useRef<HTMLDivElement>(null), image = useRef<HTMLImageElement>(null);
-  const current = useRef(transform); current.current = transform;
+  const current = useRef(transform);
+  useLayoutEffect(()=>{current.current=transform;},[transform]);
   const points = useRef(new Map<number, { x: number; y: number }>());
   const gesture = useRef<{ base: Transform; x: number; y: number; distance: number; multi: boolean; moved: boolean } | null>(null);
   const lastTap = useRef(0);

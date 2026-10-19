@@ -146,6 +146,8 @@ export class MessageStatusDto {
   peerLastActiveAt: string | null;
 }
 export class ConversationDto {
+  @ApiProperty({description:'Visible streak badge from three mutual days; zero if inactive'}) streakDays: number;
+  @ApiProperty() streakFading: boolean;
   @ApiProperty({ type: UserSummaryDto }) user: UserSummaryDto;
   @ApiProperty({ type: DirectMessageDto }) lastMessage: DirectMessageDto;
   @ApiProperty() unreadCount: number;

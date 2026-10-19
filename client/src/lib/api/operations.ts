@@ -630,6 +630,46 @@ export const endpoints = {
     "method": "POST",
     "authenticated": true
   },
+  "callsConfig": {
+    "path": "/api/calls/config",
+    "method": "GET",
+    "authenticated": true
+  },
+  "callsCurrent": {
+    "path": "/api/calls/current",
+    "method": "GET",
+    "authenticated": true
+  },
+  "callsStart": {
+    "path": "/api/calls",
+    "method": "POST",
+    "authenticated": true
+  },
+  "callsPoll": {
+    "path": "/api/calls/{id}",
+    "method": "GET",
+    "authenticated": true
+  },
+  "callsAction": {
+    "path": "/api/calls/{id}/action",
+    "method": "POST",
+    "authenticated": true
+  },
+  "callsSignal": {
+    "path": "/api/calls/{id}/signals",
+    "method": "POST",
+    "authenticated": true
+  },
+  "messagesStreak": {
+    "path": "/api/messages/{id}/streak",
+    "method": "GET",
+    "authenticated": true
+  },
+  "messagesRestoreStreak": {
+    "path": "/api/messages/{id}/streak/restore",
+    "method": "POST",
+    "authenticated": true
+  },
   "adminImporterRequest": {
     "path": "/api/admin/importer/request",
     "method": "POST",
@@ -663,6 +703,11 @@ export const endpoints = {
   "adminAnalyticsTop": {
     "path": "/api/admin/analytics/top-content",
     "method": "GET",
+    "authenticated": true
+  },
+  "adminUsersDeleteAccount": {
+    "path": "/api/admin/users/{id}/delete",
+    "method": "POST",
     "authenticated": true
   },
   "adminUsersDeleteContent": {

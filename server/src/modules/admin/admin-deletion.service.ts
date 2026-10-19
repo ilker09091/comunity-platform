@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
+import { join } from 'node:path';
 import type { UserRole } from '../../common/decorators/auth.decorators.js';
 import { AppException, ErrorCode } from '../../common/errors/app.exception.js';
 import { sqlOne, sqlRows } from '../../common/utils/sql.js';
-import { recountUserPosts } from '../../common/utils/counters.js';
+import { recountUserPosts, recountPostEngagement } from '../../common/utils/counters.js';
 import { ContentDeletionService, type PendingFiles } from '../media/content-deletion.service.js';
 import { AuditService, type RequestContext } from '../platform/audit.service.js';
 import { assertOutranks, assertPermission } from '../platform/permissions.js';
@@ -114,6 +115,45 @@ export class AdminDeletionService {
       const result = { posts: p.posts, comments: c + p.comments, files: p.files, freedBytes: p.freedBytes, resolvedReports: resolved };
       await this.audit.record(m, ctx, { action: 'user.content_deleted', targetType: 'USER', targetId: userId, metadata: { reason, scope, ...result } });
       return { result, files: p.pending };
+    });
+  }
+
+  async deleteAccount(ctx: RequestContext, userId: string, reason: string, confirmUsername: string): Promise<DeletionResultDto> {
+    await this.stepUp.assert(ctx);
+    assertPermission(ctx.actor.role, 'users.ban', 'media.manage');
+    return this.run(async m => {
+      const user=await sqlOne<{id:string;role:UserRole;username:string}>(m,'SELECT id,role,username FROM users WHERE id=$1 FOR UPDATE',[userId]);
+      if(!user) throw AppException.notFound(ErrorCode.USER_NOT_FOUND,'User not found');
+      assertOutranks(ctx.actor,user);
+      if(user.role==='SUPER_ADMIN') throw AppException.forbidden(ErrorCode.FORBIDDEN,'A super administrator cannot be deleted');
+      if(confirmUsername!==user.username) throw AppException.badRequest(ErrorCode.VALIDATION_ERROR,'Type the exact username to confirm deletion');
+      const posts=(await sqlRows<{id:string}>(m,'SELECT id FROM posts WHERE author_id=$1',[userId])).map(r=>r.id);
+      const comments=(await sqlRows<{id:string}>(m,'SELECT id FROM comments WHERE author_id=$1',[userId])).map(r=>r.id);
+      const affected=(await sqlRows<{id:string}>(m,`SELECT post_id id FROM post_likes WHERE user_id=$1 UNION SELECT post_id FROM bookmarks WHERE user_id=$1
+        UNION SELECT post_id FROM comments WHERE author_id=$1 UNION SELECT referenced_post_id FROM posts WHERE author_id=$1 AND referenced_post_id IS NOT NULL`,[userId])).map(r=>r.id);
+      const neighbors=(await sqlRows<{id:string}>(m,`SELECT follower_id id FROM follows WHERE following_id=$1 UNION SELECT following_id FROM follows WHERE follower_id=$1`,[userId])).map(r=>r.id);
+      const files=await sqlRows<{storage_key:string;size_bytes:string}>(m,'SELECT storage_key,size_bytes FROM media WHERE owner_id=$1',[userId]);
+      const clips=await sqlRows<{storage_key:string}>(m,`SELECT storage_key FROM note_audio WHERE owner_id=$1 UNION SELECT audio_key FROM notes WHERE author_id=$1 AND audio_key IS NOT NULL`,[userId]);
+      const audio=await sqlRows<{path:string}>(m,'SELECT path FROM audio_uploads WHERE owner_id=$1',[userId]);
+      const uploads=await sqlRows<{id:string}>(m,'SELECT id FROM media_upload_sessions WHERE owner_id=$1',[userId]);
+      await this.deletion.queuePrivateFiles(m,[...audio.map(a=>a.path),...uploads.map(u=>join('.incoming','uploads',u.id+'.part')),
+        ...files.map(f=>join('.incoming',f.storage_key+'.source'))]);
+      const resolved=await this.closeReports(m,ctx,[userId,...posts,...comments],reason);
+      const deleted=await this.deletion.deletePosts(m,posts);
+      const removedComments=await this.deletion.deleteComments(m,comments);
+      // Cascades remove account data. The media DELETE trigger durably queues its files.
+      await m.query('DELETE FROM users WHERE id=$1',[userId]);
+      await recountPostEngagement(m,affected);
+      if(affected.length) await m.query(`UPDATE posts p SET like_count=(SELECT count(*) FROM post_likes l WHERE l.post_id=p.id),
+        bookmark_count=(SELECT count(*) FROM bookmarks b WHERE b.post_id=p.id) WHERE p.id=ANY($1::uuid[])`,[affected]);
+      if(neighbors.length) await m.query(`UPDATE users u SET follower_count=(SELECT count(*) FROM follows f WHERE f.following_id=u.id),
+        following_count=(SELECT count(*) FROM follows f WHERE f.follower_id=u.id) WHERE u.id=ANY($1::uuid[])`,[neighbors]);
+      const keys=[...new Set([...files.map(f=>f.storage_key),...clips.map(f=>f.storage_key),...deleted.pending.keys])];
+      const pending=await this.deletion.queueFiles(m,keys);
+      const result={posts:deleted.posts,comments:removedComments+deleted.comments,files:keys.length,
+        freedBytes:files.reduce((sum,f)=>sum+Number(f.size_bytes),0),resolvedReports:resolved};
+      await this.audit.record(m,ctx,{action:'user.deleted',targetType:'USER',targetId:userId,metadata:{reason,...result}});
+      return {result,files:pending};
     });
   }
 

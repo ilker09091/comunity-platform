@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ban, ExternalLink, Flag, MailWarning, MoreHorizontal, PauseCircle, PlayCircle, RotateCcw, ShieldPlus, Trash2, Undo2, UserRound, BadgeCheck } from "lucide-react";
 import { api, type Models } from "@/lib/api/client";
@@ -43,7 +43,7 @@ export const ROLE_INFO: Record<Role, string> = {
 const PAGE_SIZE = 20;
 
 type Target = Pick<Models["AdminUserRowDto"], "id" | "username" | "displayName" | "role" | "status">;
-type ActionKey = "warn" | "suspend" | "reinstate" | "ban" | "unban" | "role" | "purge";
+type ActionKey = "warn" | "suspend" | "reinstate" | "ban" | "unban" | "role" | "purge" | "delete-account";
 
 /** Which account actions the signed-in staff member may take on `user` (the API enforces the same rules). */
 export function useAllowedUserActions(user: Target) {
@@ -60,10 +60,12 @@ export function useAllowedUserActions(user: Target) {
   if (outranks && can("posts.moderate", "reels.moderate", "comments.moderate")) keys.push("purge");
   if (outranks && can("users.ban") && user.status !== "BANNED") keys.push("ban");
   if (outranks && can("users.ban") && user.status === "BANNED") keys.push("unban");
+  if (outranks && can("users.ban", "media.manage")) keys.push("delete-account");
   return { keys, self, outranks, roleOptions };
 }
 
 const ACTIONS: Record<ActionKey, { label: string; icon: typeof Ban; danger?: boolean }> = {
+  "delete-account": { label: "Delete account permanently", icon: Trash2, danger: true },
   warn: { label: "Send warning", icon: MailWarning },
   suspend: { label: "Suspend", icon: PauseCircle },
   reinstate: { label: "Lift suspension", icon: PlayCircle },
@@ -115,6 +117,7 @@ export function UserActions({ user, variant }: { user: Target; variant: "buttons
 }
 
 export function UserActionDialog({ user, action, onClose }: { user: Target; action: ActionKey; onClose: () => void }) {
+  const router = useRouter();
   const client = useQueryClient();
   const toast = useToast();
   const sensitive = useSensitive();
@@ -128,6 +131,17 @@ export function UserActionDialog({ user, action, onClose }: { user: Target; acti
     await client.invalidateQueries({ queryKey: ["admin"] });
   };
   switch (action) {
+    case "delete-account":
+      return <ActionDialog title={`Delete @${user.username} permanently`}
+        description="Deletes the account from the database, including sessions, posts, comments, messages, stories and uploaded media. This cannot be undone."
+        confirmLabel="Delete account permanently" confirmPhrase={user.username} tone="danger"
+        presets={["Account deletion requested", "Spam account", "Repeated rule violations"]} onClose={onClose}
+        onSubmit={async reason => {
+          await sensitive(headers => api("adminUsersDeleteAccount", {params:{id},body:{reason,confirmUsername:user.username},headers}));
+          router.replace("/admin/users");
+          await client.invalidateQueries();
+          toast("Account and its content permanently deleted.");
+        }} />;
     case "warn":
       return (
         <ActionDialog

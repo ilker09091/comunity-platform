@@ -21,6 +21,7 @@ import {
   BulkModerateUserContentDto,
   BulkModerationResultDto,
   DeleteUserContentDto,
+  DeleteAccountDto,
   DeletionResultDto,
   ChangeRoleDto,
   ReasonDto,
@@ -48,6 +49,18 @@ export class AdminUsersController {
     private readonly stepUp: StepUpService,
     private readonly deletion: AdminDeletionService,
   ) {}
+
+  @Post(':id/delete')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('users.ban','media.manage')
+  @ApiStepUp()
+  @Throttle({default:{limit:5,ttl:60000}})
+  @ApiOperation({operationId:'adminUsersDeleteAccount',summary:'Permanently delete an account, its database rows and uploaded media'})
+  @ApiOkResponse({type:DeletionResultDto})
+  @ApiErrors(400,403,404)
+  deleteAccount(@ReqContext() ctx:RequestContext,@Param('id',UuidPipe) id:string,@Body() dto:DeleteAccountDto) {
+    return this.deletion.deleteAccount(ctx,id,dto.reason,dto.confirmUsername);
+  }
 
   @Post(':id/content/delete')
   @HttpCode(HttpStatus.OK)

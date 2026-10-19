@@ -196,7 +196,7 @@ describe('Persistent recommendations and attachment classification (e2e)',()=>{
   it('bounds candidate queries and validates their PostgreSQL execution plan',async()=>{
     await fixture(a,'VIDEO',360);await fixture(b,'VIDEO',120);
     const queries:{sql:string;parameters:any[]}[]=[];
-    const spy=vi.spyOn(db.logger,'logQuery').mockImplementation((sql,parameters)=>{queries.push({sql,parameters:parameters??[]});});
+    const spy=vi.spyOn(db.logger,'logQuery').mockImplementation((sql,parameters)=>{queries.push({sql,parameters:Array.isArray(parameters)?parameters:[]});});
     try {expect((await page('?limit=15')).items).toHaveLength(15);} finally {spy.mockRestore();}
     const ranked=queries.find(q=>q.sql.startsWith('WITH recent AS'));expect(ranked).toBeDefined();
     expect(queries.length).toBeLessThan(30);expect(ranked!.sql).toContain('LIMIT 320');

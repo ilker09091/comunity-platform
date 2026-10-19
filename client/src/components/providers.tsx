@@ -18,6 +18,7 @@ import VideoPlaybackBoundary from "./video-playback-boundary";
 import { X, CheckCircle2, AlertCircle } from "lucide-react";
 import { changeSession } from "@/lib/session-cache";
 import AppBridge from "./app-bridge";
+import CallsProvider from "./calls";
 import { haptic } from "@/lib/haptics";
 export { changeSession } from "@/lib/session-cache";
 
@@ -137,7 +138,7 @@ export default function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={client}>
       <ToastContext.Provider value={showToast}>
-        <Session><VideoPlaybackBoundary /><AppBridge />{children}</Session>
+        <Session><CallsProvider><VideoPlaybackBoundary /><AppBridge />{children}</CallsProvider></Session>
         {toast && (
           <div
             className={`toast ${toast.error ? "toast-error" : ""}`}

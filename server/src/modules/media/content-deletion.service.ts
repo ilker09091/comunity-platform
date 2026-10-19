@@ -2,6 +2,10 @@ import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
+import { rm } from 'node:fs/promises';
+import { resolve, relative, sep } from 'node:path';
+import { appConfig } from '../../config/app.config.js';
+import type { ConfigType } from '@nestjs/config';
 import { recountPostEngagement, recountReplies, recountUserPosts } from '../../common/utils/counters.js';
 import { sqlRows } from '../../common/utils/sql.js';
 import { JobRegistryService } from '../platform/job-registry.service.js';
@@ -35,6 +39,7 @@ export class ContentDeletionService implements OnModuleInit {
     @InjectDataSource() private readonly db: DataSource,
     @Inject(STORAGE_DRIVER) private readonly storage: StorageDriver,
     private readonly jobs: JobRegistryService,
+    @Inject(appConfig.KEY) private readonly config: ConfigType<typeof appConfig>,
   ) {}
 
   async onModuleInit() {
@@ -139,6 +144,26 @@ export class ContentDeletionService implements OnModuleInit {
     for (let start = 0; start < files.keys.length; start += 100) {
       await this.flushFiles(files.keys.slice(start, start + 100));
     }
+    await this.removePrivateFiles();
+  }
+
+  async queuePrivateFiles(m: EntityManager, paths: string[]) {
+    const root=resolve(this.config.media.localDir);
+    const normalized=paths.map(path=>relative(root,resolve(root,path)));
+    if(normalized.some(path=>!path.startsWith('.incoming'+sep)||path.split(sep).includes('..')))
+      throw new Error('Private deletion path must stay inside media/.incoming');
+    if(normalized.length)await m.query('INSERT INTO media_private_deletions(path) SELECT unnest($1::text[]) ON CONFLICT DO NOTHING',[normalized]);
+  }
+
+  private async removePrivateFiles() {
+    const root=resolve(this.config.media.localDir);
+    const rows=await sqlRows<{path:string}>(this.db,'SELECT path FROM media_private_deletions ORDER BY created_at LIMIT 100');
+    for(const row of rows){
+      const path=resolve(root,row.path),inside=relative(root,path);
+      if(!inside.startsWith('.incoming'+sep)||inside.split(sep).includes('..'))continue;
+      try {await rm(path,{force:true});await this.db.query('DELETE FROM media_private_deletions WHERE path=$1',[row.path]);}
+      catch {this.logger.warn('Private media deletion queued for retry');}
+    }
   }
 
   private async flushFiles(keys?: string[]): Promise<{ removed: number; failed: number }> {
@@ -175,6 +200,7 @@ export class ContentDeletionService implements OnModuleInit {
 
   @Cron(CronExpression.EVERY_MINUTE, { name: 'media-file-deletion', waitForCompletion: true })
   async retryFiles(): Promise<void> {
+    await this.removePrivateFiles();
     try {
       const { removed, failed } = await this.flushFiles();
       this.jobs.record('media-file-deletion', failed ? 'FAILED' : 'OK', `${removed} file(s) removed, ${failed} retrying`);

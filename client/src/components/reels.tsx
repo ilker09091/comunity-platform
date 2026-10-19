@@ -3,7 +3,7 @@ import { bindReelGestures } from '@/lib/reel-gestures';
 import { nextReelCursor,readReelRestore,writeReelRestore } from '@/lib/reel-queue';
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useCallback, useEffect, useLayoutEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -71,7 +71,7 @@ function preferredPreload(): PreloadLevel {
   const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } })
     .connection;
   if (connection?.saveData || /(^|-)2g$/.test(connection?.effectiveType ?? "")) return "none";
-  return "metadata";
+  return "auto";
 }
 
 function count(n: number) {
@@ -413,13 +413,14 @@ export default function Reels() {
   const toast = useToast();
   const cache = useQueryClient();
   const [cycle, setCycle] = useState({ id: 0, rewatch: false });
-  const generation=useRef(cycle.id);generation.current=cycle.id;
+  const generation=useRef(cycle.id);
+  useLayoutEffect(()=>{generation.current=cycle.id;},[cycle.id]);
   const viewer = user?.id ?? 'guest';
   const [restoration,setRestoration]=useState<{viewer:string;state?:ReturnType<typeof readReelRestore>}>({viewer:''});
   const restore=restoration.viewer===viewer?restoration.state:undefined;
   const owner = useRef(viewer);
   const sessionRef = useRef(cache.getQueryData<{pages: {sessionId: string}[]}>(['posts','reels',viewer,0,false])?.pages[0]?.sessionId??restore?.sessionId);
-  if (owner.current !== viewer) { owner.current = viewer; sessionRef.current = undefined; }
+  useLayoutEffect(()=>{if(owner.current!==viewer){owner.current=viewer;sessionRef.current=undefined;}},[viewer]);
   const params = useSearchParams();
   const startId = params.get("start");
   const startMedia = params.get("media");
@@ -427,12 +428,6 @@ export default function Reels() {
   const target = `${startId ?? ""}:${startMedia ?? ""}`;
   const [requestedStart, setRequestedStart] = useState(target);
   if (requestedStart !== target) { setRequestedStart(target); setSelection({ id: null, index: 0 }); }
-  useEffect(()=>{
-    const state=params.get("user")?undefined:readReelRestore(viewer);
-    sessionRef.current=cache.getQueryData<{pages:{sessionId:string}[]}>(['posts','reels',viewer,0,false])?.pages[0]?.sessionId??state?.sessionId;
-    if(state)setSelection({id:state.selected??null,index:state.index});else setSelection({id:null,index:0});
-    setUnavailable(new Set());setValidatedKey(null);setRestoration({viewer,state});
-  },[viewer]);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [reporting, setReporting] = useState<ReelPost | null>(null);
   const [deleting, setDeleting] = useState<ReelPost | null>(null);
@@ -442,7 +437,6 @@ export default function Reels() {
   const [stageSize, setStageSize] = useState({ width: 960, height: 760 });
   const shell = useRef<HTMLDivElement>(null);
   const workspace=useRef<HTMLDivElement>(null);
-  const [validatedKey,setValidatedKey]=useState<string|null>(null);
   const [unavailable,setUnavailable]=useState<Set<string>>(()=>new Set());
   const [dragOffset, setDragOffset] = useState(0);
   const [preload] = useState<PreloadLevel>(preferredPreload);
@@ -461,6 +455,13 @@ export default function Reels() {
 
   // Opened from a profile: only that person's Reels, newest first. Otherwise: everyone's recommended Reels.
   const profileUserId = params.get("user");
+  const restoreSession=useEffectEvent(()=>{
+    const state=profileUserId?undefined:readReelRestore(viewer);
+    sessionRef.current=cache.getQueryData<{pages:{sessionId:string}[]}>(['posts','reels',viewer,0,false])?.pages[0]?.sessionId??state?.sessionId;
+    setSelection({id:state?.selected??null,index:state?.index??0});
+    setUnavailable(new Set());setRestoration({viewer,state});
+  });
+  useEffect(()=>{let cancelled=false;queueMicrotask(()=>{if(!cancelled)restoreSession();});return()=>{cancelled=true;};},[viewer,profileUserId]);
   const feed = useInfiniteQuery({
     queryKey: ["posts", "reels", profileUserId ? `user:${profileUserId}` : (user?.id ?? "guest"), cycle.id, cycle.rewatch],
     queryFn: async ({ pageParam, signal }): Promise<{ items: Post[]; entries?: Models["ReelEntryDto"][]; nextCursor?: string | null; hasMore: boolean; sessionId?: string;sessionEnded?:boolean }> => {
@@ -574,10 +575,17 @@ export default function Reels() {
   const selectedIndex = selection.id === "end" ? reels.length : reels.findIndex((reel) => reel.key === selection.id);
   const index = Math.min(selectedIndex >= 0 ? selectedIndex : selection.index, Math.max(0, slideCount - 1));
   const current = reels[index];
-  const access=useQuery({queryKey:['post',current?.post.id,viewer,'reel-access',current?.key],queryFn:({signal})=>api('postsGet',{params:{id:current!.post.id},signal}),enabled:!!current,retry:false,staleTime:0});
-  const accessAllowed=!!current&&!access.isError&&(validatedKey===current.key||!!access.data&&!access.isFetching);
-  useEffect(()=>{if(current&&access.data&&!access.isFetching&&!access.isError)setValidatedKey(current.key);},[current,access.data,access.isFetching,access.isError]);
-  useEffect(()=>{if(current&&access.error instanceof ApiError&&[403,404].includes(access.error.status))setUnavailable(previous=>new Set([...previous,current.post.id]));},[access.error,current]);
+  const access=useQuery({queryKey:['post',current?.post.id,viewer,'reel-access',current?.key],queryFn:({signal})=>api('postsGet',{params:{id:current!.post.id},signal}),enabled:!!current,retry:false,staleTime:5000});
+  useEffect(()=>{
+    const next=reels[index+1];
+    if(!next||preload==='none')return;
+    // Validate the imminent entry while the current one plays. Keys remain occurrence/account scoped.
+    void cache.prefetchQuery({queryKey:['post',next.post.id,viewer,'reel-access',next.key],
+      queryFn:({signal})=>api('postsGet',{params:{id:next.post.id},signal}),staleTime:5000,retry:false});
+  },[cache,reels,index,viewer,preload]);
+  const accessAllowed=!!current&&!access.isError&&!!access.data;
+  if(current&&access.error instanceof ApiError&&[403,404].includes(access.error.status)&&!unavailable.has(current.post.id))
+    setUnavailable(previous=>new Set([...previous,current.post.id]));
   useEffect(()=>{
     if(!current||profileUserId||!feed.data)return;
     const pageIndex=feed.data.pages.findIndex(p=>p.entries?.some(e=>e.key===current.key));
@@ -632,9 +640,10 @@ export default function Reels() {
   }, []);
 
   // Prefetch the next page before the viewer reaches the end.
+  const {hasNextPage,isFetchingNextPage,isFetchNextPageError,fetchNextPage}=feed;
   useEffect(() => {
-    if (index >= reels.length - 4 && feed.hasNextPage && !feed.isFetchingNextPage && !feed.isFetchNextPageError) void feed.fetchNextPage({cancelRefetch:false});
-  }, [index,reels.length,feed.hasNextPage,feed.isFetchingNextPage,feed.isFetchNextPageError,feed.fetchNextPage]);
+    if (index >= reels.length - 4 && hasNextPage && !isFetchingNextPage && !isFetchNextPageError) void fetchNextPage({cancelRefetch:false});
+  }, [index,reels.length,hasNextPage,isFetchingNextPage,isFetchNextPageError,fetchNextPage]);
 
   const go = useCallback(
     (delta: 1 | -1) => {
@@ -750,22 +759,23 @@ export default function Reels() {
                     <section
                       key={reel.key}
                       className="reel-slide"
+                      data-access-pending={i===index&&!accessAllowed}
                       style={style}
                       aria-hidden={i !== index}
                       inert={i !== index}
                       aria-label={`Reel ${i + 1} by @${source.author.username}`}
                     >
-                      {(i!==index||accessAllowed)&&<ReelMedia
+                      <ReelMedia
                         reel={reel}
                         index={i}
                         selected={i === index}
                         active={i === index && accessAllowed && !reporting && !creating && !deleting}
-                        preload={i === index ? "auto" : preload}
+                        preload={i === index ? "auto" : i === index + 1 ? preload : "metadata"}
                         sessionId={reel.sessionId}
                         position={reel.position}
                         onAspectRatio={ratio => setRatios(previous => previous[reel.video.id] === ratio ? previous : { ...previous, [reel.video.id]: ratio })}
                         onRefreshSource={async () => { await Promise.all([feed.refetch({ throwOnError: true }), ...(startId ? [start.refetch({ throwOnError: true })] : [])]); }}
-                      />}
+                      />
                       <ReelInfo post={reel.post} active={i === index} />
                     </section>
                   );

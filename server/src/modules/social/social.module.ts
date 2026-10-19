@@ -61,6 +61,9 @@ import {
   StoryViewerDto,
 } from './social.dto.js';
 import { MessagesService } from './messages.service.js';
+import { CallsController, StreaksController } from './calls.controller.js';
+import { CallsService } from './calls.service.js';
+import { StreaksService } from './streaks.service.js';
 import { NotesService } from './notes.service.js';
 import { PushService } from './push.service.js';
 import { StickersService } from './stickers.service.js';
@@ -468,7 +471,7 @@ export class PushController {
 }
 @Module({
   imports: [MediaModule, UsersModule, PostsModule, UploadsMulterModule],
-  controllers: [MessagesController, StoriesController, StickersController, NotesController, PushController],
-  providers: [MessagesService, StoriesService, StickersService, NotesService, PushService],
+  controllers: [MessagesController, StoriesController, StickersController, NotesController, PushController, CallsController, StreaksController],
+  providers: [MessagesService, StoriesService, StickersService, NotesService, PushService, CallsService, StreaksService],
 })
 export class SocialModule {}

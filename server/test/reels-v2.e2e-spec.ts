@@ -102,7 +102,7 @@ describe('Smart Reels V2',()=>{
  });
  it('keeps every stored ranking score normalized, with bounded SQL candidates',async()=>{
   await fixture(a,1200);await fixture(b,300);
-  const queries:{sql:string;parameters:any[]}[]=[];const spy=vi.spyOn(db.logger,'logQuery').mockImplementation((sql,parameters)=>{queries.push({sql,parameters:parameters??[]});});
+  const queries:{sql:string;parameters:any[]}[]=[];const spy=vi.spyOn(db.logger,'logQuery').mockImplementation((sql,parameters)=>{queries.push({sql,parameters:Array.isArray(parameters)?parameters:[]});});
   try{await page('?limit=15');}finally{spy.mockRestore();}
   const rank=queries.find(x=>x.sql.startsWith('WITH recent AS'))!;
   const plan=(await db.query('EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) '+rank.sql,rank.parameters))[0]['QUERY PLAN'][0];
