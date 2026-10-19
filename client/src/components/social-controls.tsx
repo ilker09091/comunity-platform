@@ -158,7 +158,7 @@ function SendSheet({
   const following=useQuery({
     queryKey:['share-following',user?.id],
     queryFn:({signal})=>api('followsFollowing',{params:{id:user!.id},query:{limit:24},signal}),
-    enabled:!!user&&reel,
+    enabled:!!user,
   });
   useEffect(() => {
     const timer = setTimeout(() => setTerm(search.trim()), 250);
@@ -225,13 +225,13 @@ function SendSheet({
   const busy = send.isPending || addStory.isPending;
   return (
     <Modal title={reel?'Share Reel':'Send to'} onClose={onClose} guardClose={() => !busy} className={`send-sheet ${reel?'reel-share-sheet':''} ${expanded?'expanded':''}`}>
-      {reel&&<button ref={handle} type="button" className="share-sheet-handle" aria-label={expanded?'Collapse share sheet':'Expand share sheet'} aria-expanded={expanded}
+      <button ref={handle} type="button" className="share-sheet-handle" aria-label={expanded?'Collapse share sheet':'Expand share sheet'} aria-expanded={expanded}
         onPointerDown={e=>{drag.current={y:e.clientY,id:e.pointerId,moved:false};e.currentTarget.setPointerCapture(e.pointerId);}}
         onPointerMove={e=>{const start=drag.current;if(!start||start.id!==e.pointerId)return;const dy=e.clientY-start.y;if(Math.abs(dy)>6)start.moved=true;setDragY(dy);}}
         onPointerUp={e=>{const start=drag.current;if(!start||start.id!==e.pointerId)return;const dy=e.clientY-start.y;setDragY(0);
           if(dy>90){if(expanded)setExpanded(false);else if(!busy)onClose();}else if(dy<-40)setExpanded(true);}}
         onPointerCancel={()=>{drag.current=null;setDragY(0);}}
-        onClick={()=>{const moved=drag.current?.moved;drag.current=null;if(!moved)setExpanded(value=>!value);}}><span/></button>}
+        onClick={()=>{const moved=drag.current?.moved;drag.current=null;if(!moved)setExpanded(value=>!value);}}><span/></button>
       <label className="send-search">
         <Search size={16} aria-hidden="true" />
         <input
@@ -240,7 +240,7 @@ function SendSheet({
           maxLength={100}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          onFocus={()=>{if(reel)setExpanded(true);}}
+          onFocus={()=>setExpanded(true)}
         />
       </label>
       <div className="send-grid" role="listbox" aria-label="People" aria-multiselectable="true">
@@ -258,7 +258,7 @@ function SendSheet({
               onClick={() => toggle(person)}
             >
               <span className="send-avatar">
-                <Avatar user={person} size={reel ? 72 : 58} />
+                <Avatar user={person} size={72} />
                 {on && (
                   <span className="send-check" aria-hidden="true">
                     <Check size={13} strokeWidth={3} />
@@ -285,7 +285,7 @@ function SendSheet({
         >
           <input
             aria-label="Add a message"
-            placeholder={reel ? "Write a message..." : "Add a message..."}
+            placeholder="Write a message..."
             maxLength={1500}
             value={note}
             onChange={(e) => setNote(e.target.value)}
