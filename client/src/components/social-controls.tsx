@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   useInfiniteQuery,
@@ -11,6 +11,7 @@ import { Send, Link2, CirclePlus, Check, Search, Share2 } from "lucide-react";
 import { haptic } from "@/lib/haptics";
 import { api, type User } from "@/lib/api/client";
 import { sharePath } from "@/lib/use-post-engagement";
+import { fetchMessageUnread } from "@/lib/message-delivery";
 import { useSession, useToast } from "./providers";
 import { Avatar, EmptyState, ErrorState, LoadMore, Modal } from "./ui";
 
@@ -18,9 +19,9 @@ export function useMessageUnread() {
   const { user } = useSession();
   return useQuery({
     queryKey: ["messages", user?.id, "unread"],
-    queryFn: ({ signal }) => api("messagesUnread", { signal }),
+    queryFn: ({ signal }) => fetchMessageUnread({ signal }),
     enabled: !!user,
-    refetchInterval: 15000,
+    refetchInterval: 5000,
   });
 }
 
@@ -58,7 +59,7 @@ export function RecipientPicker({
   });
   const people = term
     ? (results.data?.pages.flatMap((p) => p.items) ?? [])
-    : (recent.data?.items.map((c) => c.user) ?? []);
+    : (recent.data?.items.filter(c=>!c.isUnavailable).map((c) => c.user) ?? []);
   const error = term ? results.error : recent.error;
   const pending = term ? results.isFetching : recent.isFetching;
   return (
@@ -128,10 +129,12 @@ export function RecipientPicker({
 function SendSheet({
   postId,
   story,
+  reel,
   onClose,
 }: {
   postId: string;
   story: boolean;
+  reel:boolean;
   onClose: () => void;
 }) {
   const { user } = useSession();
@@ -141,6 +144,22 @@ function SendSheet({
   const [term, setTerm] = useState("");
   const [selected, setSelected] = useState<User[]>([]);
   const [note, setNote] = useState("");
+  const [expanded,setExpanded]=useState(false);
+  /** Reels: Instagram-style sheet that follows the finger on its handle (down closes, up expands). */
+  const handle=useRef<HTMLButtonElement>(null);
+  const drag=useRef<{y:number;id:number;moved:boolean}|null>(null);
+  const [dragY,setDragY]=useState(0);
+  useEffect(()=>{
+    const dialog=handle.current?.closest('dialog');
+    if(!dialog)return;
+    dialog.style.setProperty('--sheet-drag',`${Math.max(0,dragY)}px`);
+    dialog.classList.toggle('dragging',dragY!==0);
+  },[dragY]);
+  const following=useQuery({
+    queryKey:['share-following',user?.id],
+    queryFn:({signal})=>api('followsFollowing',{params:{id:user!.id},query:{limit:24},signal}),
+    enabled:!!user&&reel,
+  });
   useEffect(() => {
     const timer = setTimeout(() => setTerm(search.trim()), 250);
     return () => clearTimeout(timer);
@@ -155,7 +174,9 @@ function SendSheet({
     queryFn: ({ signal }) => api("searchUsers", { query: { q: term, limit: 24 }, signal }),
     enabled: !!user && !!term,
   });
-  const people = (term ? (results.data?.items ?? []) : (recent.data?.items.map((c) => c.user) ?? [])).filter(
+  const people = (term ? (results.data?.items ?? []) : [...new Map([
+    ...(recent.data?.items.filter(c=>!c.isUnavailable).map(c=>c.user)??[]),...(following.data?.items??[])
+  ].map(person=>[person.id,person])).values()]).filter(
     (p) => p.id !== user?.id,
   );
   // Keep picked people visible even when a search hides them.
@@ -203,7 +224,14 @@ function SendSheet({
   const link = () => `${window.location.origin}/post/${postId}`;
   const busy = send.isPending || addStory.isPending;
   return (
-    <Modal title="Send to" onClose={onClose} guardClose={() => !busy} className="send-sheet">
+    <Modal title={reel?'Share Reel':'Send to'} onClose={onClose} guardClose={() => !busy} className={`send-sheet ${reel?'reel-share-sheet':''} ${expanded?'expanded':''}`}>
+      {reel&&<button ref={handle} type="button" className="share-sheet-handle" aria-label={expanded?'Collapse share sheet':'Expand share sheet'} aria-expanded={expanded}
+        onPointerDown={e=>{drag.current={y:e.clientY,id:e.pointerId,moved:false};e.currentTarget.setPointerCapture(e.pointerId);}}
+        onPointerMove={e=>{const start=drag.current;if(!start||start.id!==e.pointerId)return;const dy=e.clientY-start.y;if(Math.abs(dy)>6)start.moved=true;setDragY(dy);}}
+        onPointerUp={e=>{const start=drag.current;if(!start||start.id!==e.pointerId)return;const dy=e.clientY-start.y;setDragY(0);
+          if(dy>90){if(expanded)setExpanded(false);else if(!busy)onClose();}else if(dy<-40)setExpanded(true);}}
+        onPointerCancel={()=>{drag.current=null;setDragY(0);}}
+        onClick={()=>{const moved=drag.current?.moved;drag.current=null;if(!moved)setExpanded(value=>!value);}}><span/></button>}
       <label className="send-search">
         <Search size={16} aria-hidden="true" />
         <input
@@ -212,6 +240,7 @@ function SendSheet({
           maxLength={100}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          onFocus={()=>{if(reel)setExpanded(true);}}
         />
       </label>
       <div className="send-grid" role="listbox" aria-label="People" aria-multiselectable="true">
@@ -225,10 +254,11 @@ function SendSheet({
               aria-selected={on}
               className={`send-person ${on ? "on" : ""}`}
               disabled={busy}
+              aria-label={`Send to ${person.displayName}`}
               onClick={() => toggle(person)}
             >
               <span className="send-avatar">
-                <Avatar user={person} size={58} />
+                <Avatar user={person} size={reel ? 72 : 58} />
                 {on && (
                   <span className="send-check" aria-hidden="true">
                     <Check size={13} strokeWidth={3} />
@@ -244,6 +274,7 @@ function SendSheet({
           <p className="send-hint">{term ? "No people found. Try a different name." : "Search for someone to send this to."}</p>
         )}
       </div>
+      {results.error&&term&&<ErrorState error={results.error} retry={()=>void results.refetch()}/>}
       {selected.length > 0 ? (
         <form
           className="send-compose"
@@ -254,7 +285,7 @@ function SendSheet({
         >
           <input
             aria-label="Add a message"
-            placeholder="Add a message..."
+            placeholder={reel ? "Write a message..." : "Add a message..."}
             maxLength={1500}
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -337,7 +368,7 @@ export function SendPostButton({
           <Send size={17} />
         )}
       </button>
-      {open && <SendSheet postId={postId} story={story} onClose={() => setOpen(false)} />}
+      {open && <SendSheet postId={postId} story={story} reel={reel} onClose={() => setOpen(false)} />}
     </>
   );
 }

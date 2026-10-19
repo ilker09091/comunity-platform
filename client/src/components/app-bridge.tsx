@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, Download, X } from "lucide-react";
 import { api, type Models } from "@/lib/api/client";
+import { fetchMessageUnread } from "@/lib/message-delivery";
 import { haptic } from "@/lib/haptics";
 import { useSession, useToast } from "./providers";
 import { Avatar } from "./ui";
@@ -14,6 +15,8 @@ function preview(message: Models["DirectMessageDto"]) {
   if (message.noteReply) return `Replied to your note: ${message.content ?? ""}`;
   if (message.storyReply) return `Replied to your story: ${message.content ?? ""}`;
   if (message.content) return message.content;
+  if (message.audioUrl) return "Sent a voice message";
+  if (message.hasSticker) return "Sent a sticker";
   if (message.viewOnce) return "Sent a view once photo";
   if (message.media) return message.media.type === "IMAGE" ? "Sent a photo" : "Sent a video";
   if (message.post) return "Shared a post";
@@ -229,9 +232,9 @@ export default function AppBridge() {
   // Sound when the unread count goes up (works with or without push).
   const unread = useQuery({
     queryKey: ["messages", user?.id, "unread"],
-    queryFn: ({ signal }) => api("messagesUnread", { signal }),
+    queryFn: ({ signal }) => fetchMessageUnread({ signal }),
     enabled: !!user,
-    refetchInterval: 8000,
+    refetchInterval: 5000,
   });
   const count = unread.data?.count;
   const me = user?.id;

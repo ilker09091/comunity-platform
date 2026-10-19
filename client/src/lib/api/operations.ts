@@ -465,6 +465,31 @@ export const endpoints = {
     "method": "POST",
     "authenticated": true
   },
+  "messagesPendingDelivery": {
+    "path": "/api/messages/delivery",
+    "method": "GET",
+    "authenticated": true
+  },
+  "messagesDelivered": {
+    "path": "/api/messages/delivery",
+    "method": "POST",
+    "authenticated": true
+  },
+  "messagesUploadAudio": {
+    "path": "/api/messages/audio",
+    "method": "POST",
+    "authenticated": true
+  },
+  "messagesDeleteAudio": {
+    "path": "/api/messages/audio/{id}",
+    "method": "DELETE",
+    "authenticated": true
+  },
+  "messagesPeer": {
+    "path": "/api/messages/peer/{username}",
+    "method": "GET",
+    "authenticated": true
+  },
   "messagesConversations": {
     "path": "/api/messages",
     "method": "GET",
@@ -567,6 +592,16 @@ export const endpoints = {
   },
   "storiesDelete": {
     "path": "/api/stories/{id}",
+    "method": "DELETE",
+    "authenticated": true
+  },
+  "stickersFavorite": {
+    "path": "/api/stickers/{id}/favorite",
+    "method": "POST",
+    "authenticated": true
+  },
+  "stickersUnfavorite": {
+    "path": "/api/stickers/{id}/favorite",
     "method": "DELETE",
     "authenticated": true
   },

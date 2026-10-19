@@ -7,6 +7,7 @@ import { decodeCursor, iso, toPage } from '../../common/utils/cursor.js';
 import { notBlockedSql, sqlOne, sqlRows } from '../../common/utils/sql.js';
 import { NotificationTypeEnum } from '../notifications/dto/notification.dto.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { ContentDeletionService } from '../media/content-deletion.service.js';
 import { UserListItemDto } from '../users/dto/user.dto.js';
 import {
   USER_AVATAR_JOIN,
@@ -24,6 +25,7 @@ export class FollowsService {
     @InjectDataSource() private readonly db: DataSource,
     private readonly users: UsersService,
     private readonly notifications: NotificationsService,
+    private readonly deletion: ContentDeletionService,
   ) {}
 
   /** Locks both user rows in a stable order so concurrent graph changes serialise per pair. */
@@ -230,6 +232,16 @@ export class FollowsService {
       if (!exists) throw AppException.notFound(ErrorCode.USER_NOT_FOUND, 'User not found');
       await this.lockPair(m, userId, targetId);
       await sqlRows(m, `INSERT INTO blocks (blocker_id, blocked_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [userId, targetId]);
+      await sqlRows(m, `UPDATE calls SET state='ended',ended_at=now(),end_reason='unavailable' WHERE state<>'ended'
+        AND ((caller_id=$1 AND callee_id=$2) OR (caller_id=$2 AND callee_id=$1))`, [userId, targetId]);
+      await sqlRows(m, `DELETE FROM typing_status WHERE (user_id=$1 AND peer_id=$2) OR (user_id=$2 AND peer_id=$1)`, [userId, targetId]);
+      const likes = await sqlRows<{post_id:string}>(m, `DELETE FROM post_likes l USING posts p
+        WHERE l.post_id=p.id AND p.author_id=$1 AND l.user_id=$2 RETURNING l.post_id`, [userId, targetId]);
+      if (likes.length) await sqlRows(m, `UPDATE posts p SET like_count=(SELECT count(*) FROM post_likes l WHERE l.post_id=p.id)
+        WHERE p.id=ANY($1::uuid[])`, [likes.map(l => l.post_id)]);
+      const comments = await sqlRows<{id:string}>(m, `SELECT c.id FROM comments c JOIN posts p ON p.id=c.post_id
+        WHERE p.author_id=$1 AND c.author_id=$2 AND c.deleted_at IS NULL`, [userId, targetId]);
+      await this.deletion.deleteComments(m, comments.map(c => c.id));
       // Blocking severs the relationship in both directions.
       await this.deleteFollow(m, userId, targetId);
       await this.deleteFollow(m, targetId, userId);

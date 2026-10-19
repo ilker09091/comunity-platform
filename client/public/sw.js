@@ -15,6 +15,12 @@ function preview(message) {
   if (message.noteReply) return `Replied to your note: ${message.content || ""}`;
   if (message.storyReply) return `Replied to your story: ${message.content || ""}`;
   if (message.content) return message.content;
+  if (message.call) {
+    const kind = message.call.kind === "video" ? "video" : "voice";
+    return message.call.status === "completed" ? `Ended a ${kind} call` : `Missed ${kind} call`;
+  }
+  if (message.audioUrl) return "Sent a voice message";
+  if (message.hasSticker) return "Sent a sticker";
   if (message.viewOnce) return "Sent a view once photo";
   if (message.media) return message.media.type === "IMAGE" ? "Sent a photo" : "Sent a video";
   if (message.post) return "Shared a post";
@@ -26,6 +32,13 @@ async function latest() {
     const response = await fetch(`${API}/messages?limit=1`, { credentials: "include", cache: "no-store" });
     if (!response.ok) return null;
     const data = await response.json();
+    // Only a successful fetch on the recipient's device may produce a second tick.
+    try {
+      const pending=await fetch(`${API}/messages/delivery`,{credentials:"include",cache:"no-store"});
+      if(pending.ok){const body=await pending.json();if(body.messageIds?.length)await fetch(`${API}/messages/delivery`,{
+        method:"POST",credentials:"include",headers:{"Content-Type":"application/json","X-Social-Client":"web"},body:JSON.stringify(body)
+      });}
+    }catch{}
     const conversation = data.items && data.items[0];
     if (!conversation) return null;
     return {
@@ -60,6 +73,11 @@ self.addEventListener("push", (event) => {
         tag: "dm",
         icon: ICON,
       };
+      // The call stopped ringing: drop its "Incoming call" notification.
+      if (!message.call) {
+        for (const shown of await self.registration.getNotifications())
+          if (shown.tag && shown.tag.startsWith("call-")) shown.close();
+      }
       const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       const visible = windows.filter((w) => w.visibilityState === "visible");
       if (visible.length) {

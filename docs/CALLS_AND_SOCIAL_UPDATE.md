@@ -26,6 +26,8 @@ The relay must use the same shared secret (`use-auth-secret` / `static-auth-secr
 
 - One audio or video call per account. Both user locks are taken in sorted order to prevent crossing calls.
 - Start from the conversation header. Accepted message permissions, private accounts, blocks and active account status apply server-side. Pending message requests cannot place calls.
+- Call history (`CallMessages1760192000000`): every finished call is written once into the conversation, from the caller, with kind, outcome (`completed`, `missed`, `declined`, `cancelled`) and talk time. Missed/cancelled calls stay unread for the callee and push a notification; call entries never count toward streaks. Tap an entry to call again.
+- Incoming calls ring with `client/public/sounds/ring.mp3` (looped, with vibration where supported) until answered, declined or missed. Browsers that block autoplay start it on the first tap; the short generated tone is the fallback.
 - Incoming calls appear globally. Answer/decline, hang up, mute, camera toggle, camera switching and audio-to-video upgrade are supported. A camera is never enabled on the other participant's behalf.
 - SDP/ICE signaling uses authenticated, device-owned, ordered polling through the existing HttpOnly-cookie gateway. Perfect negotiation supports simultaneous camera changes. Audio/video travel through WebRTC, directly or through TURN, and are not recorded/stored by this application.
 - A single browser tab/device owns each participant's call. Answering elsewhere cannot hijack the connection. Ringing expires at 60 seconds; abandoned accepted calls expire after a 45-second heartbeat gap. Connection failures release media. Maximum call duration is four hours; signaling records expire after one day.
@@ -40,10 +42,13 @@ All successful message types count: text, images, video, post shares and story/n
 
 ## Privacy, deletion and UI
 
-- A blocked viewer gets `404 USER_NOT_FOUND` for the blocker profile and message/call attempts. The frontend shows “Kullanıcı bulunamadı” and removes cached profile content on refetch; open profiles poll every 15 seconds, open DM peers every 5 seconds. Old messages remain in the database and do not authorize new contact.
+- A blocked viewer gets `404 USER_NOT_FOUND` for the blocker profile and new message/call attempts. The frontend shows “Kullanıcı bulunamadı” and removes cached profile content on refetch; open profiles poll every 15 seconds, open DM peers every 5 seconds and contact status every 2 seconds.
+- Existing blocked DM threads remain readable through a separate conversation identity endpoint. Names/photos, online/typing status and streak badges are hidden there; message delivery/read acknowledgments stop. No history means no conversation identity endpoint access. Blocking ends current calls and removes typing signals immediately. Sending rechecks blocks while holding the same ordered user locks as graph changes, preventing a queued send from slipping through after a block commits.
+- Blocking severs follows and pending requests in both directions. The blocked person's likes/comments on the blocker's posts are removed, with counters repaired and other people's comment replies preserved. Unblocking does not restore these interactions or follows. Privacy rules still apply after unblocking.
 - Admin user actions include **Delete account permanently**. Requires a lower-ranked target, `users.ban` + `media.manage`, step-up password verification and exact username confirmation. Self-deletion and deleting a super administrator are rejected.
 - Account deletion transactionally erases the user and dependent sessions, social relationships, content, DMs, stories, media, calls and streak data. Neighbor counters are repaired. Storage deletion is queued durably and runs after commit, including note clips, staged audio and incomplete uploads. The existing append-only administration audit keeps an ID-only deletion record and reason; it is not a recoverable user account.
-- Profile photos enlarge with a desktop click / touch hold (keyboard activation also works). DM photos open inside an accessible modal. Escape, close and outside clicks return to the same conversation.
+- Calls use a dark Instagram-inspired overlay, full-stage video, a local picture-in-picture preview and floating circular controls. Mobile calls fill the screen, including compact/landscape layouts. Clicking the backdrop cannot hang up a call; use the end/decline or close control.
+- Profile photos enlarge into a circular preview over a blurred backdrop with a desktop click / touch hold (keyboard activation also works). DM and post photos use the same black fullscreen viewer with pinch, pan, double-tap, wheel and button zoom. Escape and close return to the same conversation/page.
 - Menus use native top-layer popovers, positioned within the viewport. Dialog headers, long usernames and action buttons wrap within the available width. Message popovers are clamped at the viewport edges.
 - Reels retains the preloaded player when selecting it, buffers the next video, and prevalidates its access shortly before navigation. Previous video uses metadata preloading. Save-Data / slow connections retain restricted preloading. Access checks still gate actual playback and visibility; preloading does not create an impression.
 
@@ -57,10 +62,10 @@ The signaling/media negotiation follows [WebRTC perfect negotiation](https://dev
 
 Verified on 2026-10-19:
 
-- Backend production build, complete TypeScript check, 16 unit tests, and 7 new PostgreSQL integration tests passed. Existing messaging/stories, social graph, permanent deletion, administration and importer administration suites passed (one pre-existing skip).
-- Frontend production build, TypeScript and ESLint passed; 23 gateway/contract checks, 12 Reels V2 checks and 14 video experience groups passed.
+- Backend production build and complete TypeScript check passed. The calls/streaks/account, messaging/stories and social graph PostgreSQL suites passed **40 tests**, including preserved blocked history, hidden presence, interaction removal and a deterministically queued send rejected after blocking.
+- Frontend production build, TypeScript and ESLint passed; 23 gateway/contract checks and 6 media/discovery groups passed, including simulated pinch, pan, wheel zoom, swipe and focus restoration.
 - Native Chrome passed bidirectional RTP audio, bidirectional decoded video, direct video calls, audio-to-video upgrade, mute/unmute, camera off/on, switching, answer/decline and remote hangup. The test uses synthetic camera/microphone devices, not physical phones.
-- Photo viewing stayed in the thread; profile click/hold and a blocked open profile were checked. Menus/deletion dialogs fit all four viewport widths and screenshots were inspected.
-- Native Reels decoding retained the warmed video DOM element across selection: **187 ms** in the local three-video fixture. This measures the isolated fixture, not production network latency.
+- Photo viewing stayed in the thread; profile click/hold, a blocked open profile, read-only blocked chats, unblocking and the chat block confirmation were checked. Menus/deletion dialogs fit all four viewport widths. Call controls also fit 320px screens and 844x390 landscape. Desktop/mobile screenshots were inspected.
+- Native Reels decoding retained the warmed video DOM element across selection: **186 ms** in the local three-video fixture. This measures the isolated fixture, not production network latency.
 
 Real TURN relay deployment, cross-network calling and physical iOS/Android microphone/camera behavior still need deployment/device verification. The test databases are isolated; no production database migration was applied during this work.

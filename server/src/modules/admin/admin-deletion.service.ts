@@ -133,7 +133,10 @@ export class AdminDeletionService {
         UNION SELECT post_id FROM comments WHERE author_id=$1 UNION SELECT referenced_post_id FROM posts WHERE author_id=$1 AND referenced_post_id IS NOT NULL`,[userId])).map(r=>r.id);
       const neighbors=(await sqlRows<{id:string}>(m,`SELECT follower_id id FROM follows WHERE following_id=$1 UNION SELECT following_id FROM follows WHERE follower_id=$1`,[userId])).map(r=>r.id);
       const files=await sqlRows<{storage_key:string;size_bytes:string}>(m,'SELECT storage_key,size_bytes FROM media WHERE owner_id=$1',[userId]);
-      const clips=await sqlRows<{storage_key:string}>(m,`SELECT storage_key FROM note_audio WHERE owner_id=$1 UNION SELECT audio_key FROM notes WHERE author_id=$1 AND audio_key IS NOT NULL`,[userId]);
+      const clips=await sqlRows<{storage_key:string}>(m,`SELECT storage_key FROM note_audio WHERE owner_id=$1
+        UNION SELECT audio_key FROM notes WHERE author_id=$1 AND audio_key IS NOT NULL
+        UNION SELECT storage_key FROM message_audio_uploads WHERE owner_id=$1
+        UNION SELECT audio_key FROM direct_messages WHERE (sender_id=$1 OR recipient_id=$1) AND audio_key IS NOT NULL`,[userId]);
       const audio=await sqlRows<{path:string}>(m,'SELECT path FROM audio_uploads WHERE owner_id=$1',[userId]);
       const uploads=await sqlRows<{id:string}>(m,'SELECT id FROM media_upload_sessions WHERE owner_id=$1',[userId]);
       await this.deletion.queuePrivateFiles(m,[...audio.map(a=>a.path),...uploads.map(u=>join('.incoming','uploads',u.id+'.part')),

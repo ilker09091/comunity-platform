@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -19,6 +21,9 @@ import { PostDto } from '../posts/dto/post.dto.js';
 import { UserSummaryDto } from '../users/dto/user.dto.js';
 
 export class SendMessageDto {
+  @ApiPropertyOptional({format:'uuid'}) @IsOptional() @IsUUID('all') stickerId?: string;
+  @ApiPropertyOptional({format:'uuid',description:'A recorded voice clip uploaded by this account'})
+  @IsOptional() @IsUUID('all') audioId?: string;
   @ApiPropertyOptional({ maxLength: 2000 })
   @IsOptional()
   @IsString()
@@ -54,9 +59,9 @@ export class MessageReplyRefDto {
   @ApiProperty({ format: 'uuid' }) id: string;
   @ApiProperty({ format: 'uuid' }) senderId: string;
   @ApiProperty({
-    enum: ['TEXT', 'PHOTO', 'VIDEO', 'POST', 'STORY', 'VIEW_ONCE', 'UNAVAILABLE'],
+    enum: ['TEXT', 'PHOTO', 'VIDEO', 'POST', 'STORY', 'VIEW_ONCE', 'STICKER', 'AUDIO', 'CALL', 'UNAVAILABLE'],
   })
-  kind: 'TEXT' | 'PHOTO' | 'VIDEO' | 'POST' | 'STORY' | 'VIEW_ONCE' | 'UNAVAILABLE';
+  kind: 'TEXT' | 'PHOTO' | 'VIDEO' | 'POST' | 'STORY' | 'VIEW_ONCE' | 'STICKER' | 'AUDIO' | 'CALL' | 'UNAVAILABLE';
   @ApiProperty({ type: String, nullable: true, description: 'Up to 140 characters' })
   preview: string | null;
 }
@@ -79,7 +84,23 @@ export class NoteReplyRefDto {
   @ApiProperty({ description: 'The note text when the reply was sent' }) text: string;
   @ApiProperty({ type: String, nullable: true }) songTitle: string | null;
 }
+export class CallLogDto {
+  @ApiProperty({ enum: ['audio', 'video'] }) kind: 'audio' | 'video';
+  @ApiProperty({
+    enum: ['completed', 'missed', 'declined', 'cancelled'],
+    description: 'completed: answered; cancelled: the caller hung up before an answer',
+  })
+  status: 'completed' | 'missed' | 'declined' | 'cancelled';
+  @ApiProperty({ type: Number, nullable: true, description: 'Talk time of an answered call' })
+  durationSeconds: number | null;
+}
 export class DirectMessageDto {
+  @ApiProperty({ type: CallLogDto, nullable: true, description: 'Set on call history entries; the sender is the caller' })
+  call: CallLogDto | null;
+  @ApiProperty({type:()=>StickerDto,nullable:true}) sticker: StickerDto|null;
+  @ApiProperty() hasSticker: boolean;
+  @ApiProperty({type:String,nullable:true}) audioUrl: string|null;
+  @ApiProperty({type:Number,nullable:true}) audioDurationMs: number|null;
   @ApiProperty({ format: 'uuid' }) id: string;
   @ApiProperty({ format: 'uuid' }) senderId: string;
   @ApiProperty({ format: 'uuid' }) recipientId: string;
@@ -126,7 +147,26 @@ export class DirectMessageDto {
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) readAt:
     string | null;
 }
+export class MessagePeerDto extends UserSummaryDto {
+  @ApiProperty() isUnavailable: boolean;
+  @ApiProperty() isBlocking: boolean;
+  @ApiProperty() isFollowing: boolean;
+}
+export class MessageDeliveryDto {
+  @ApiProperty({type:String,isArray:true,format:'uuid'})
+  @IsArray() @ArrayMaxSize(100) @IsUUID('all',{each:true}) messageIds: string[];
+}
+export class MessageAudioDto {
+  @ApiProperty({format:'uuid'}) id: string;
+  @ApiProperty() url: string;
+  @ApiProperty() durationMs: number;
+}
+export class MessageAudioUploadDto {
+  @ApiProperty({type:'string',format:'binary',description:'Recorded audio, up to two minutes / 10 MB'}) file: unknown;
+}
 export class MessageStatusDto {
+  @ApiProperty({description:'Conversation history is available, but contact is unavailable'}) isUnavailable: boolean;
+  @ApiProperty({description:'The viewer can unblock this account'}) isBlocking: boolean;
   @ApiProperty({
     description: 'They sent you a message request you have not accepted',
   })
@@ -146,6 +186,7 @@ export class MessageStatusDto {
   peerLastActiveAt: string | null;
 }
 export class ConversationDto {
+  @ApiProperty() isUnavailable: boolean;
   @ApiProperty({description:'Visible streak badge from three mutual days; zero if inactive'}) streakDays: number;
   @ApiProperty() streakFading: boolean;
   @ApiProperty({ type: UserSummaryDto }) user: UserSummaryDto;
@@ -229,6 +270,7 @@ export class StoryReplyDto {
   content: string;
 }
 export class StickerDto {
+  @ApiProperty() isFavorite: boolean;
   @ApiProperty({ format: 'uuid' }) id: string;
   @ApiProperty() name: string;
   @ApiProperty({

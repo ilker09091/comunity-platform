@@ -46,6 +46,10 @@ import {
   CreateStoryDto,
   DirectMessageDto,
   MessageStatusDto,
+  MessagePeerDto,
+  MessageDeliveryDto,
+  MessageAudioDto,
+  MessageAudioUploadDto,
   NoteAudioDto,
   NoteAudioFieldsDto,
   NoteAudioUploadDto,
@@ -61,6 +65,7 @@ import {
   StoryViewerDto,
 } from './social.dto.js';
 import { MessagesService } from './messages.service.js';
+import { MessageAudioService } from './message-audio.service.js';
 import { CallsController, StreaksController } from './calls.controller.js';
 import { CallsService } from './calls.service.js';
 import { StreaksService } from './streaks.service.js';
@@ -74,7 +79,27 @@ import { StoriesService } from './stories.service.js';
 @ApiErrors(400, 401, 403, 404)
 @Controller('messages')
 export class MessagesController {
-  constructor(private readonly messages: MessagesService) {}
+  constructor(private readonly messages: MessagesService,private readonly audio:MessageAudioService) {}
+  @Get('delivery')
+  @ApiOperation({operationId:'messagesPendingDelivery',summary:'IDs awaiting device acknowledgment; does not change receipts'})
+  @ApiOkResponse({type:MessageDeliveryDto})
+  pendingDelivery(@CurrentUser() u:AuthUser){return this.messages.pendingDelivery(u.id);}
+  @Post('delivery') @HttpCode(204)
+  @ApiOperation({operationId:'messagesDelivered',summary:'Acknowledge only messages this recipient device has received'})
+  @ApiNoContentResponse()
+  delivered(@CurrentUser() u:AuthUser,@Body() dto:MessageDeliveryDto){return this.messages.delivered(u.id,dto.messageIds);}
+  @Post('audio') @UseInterceptors(FileInterceptor('file',{limits:{fileSize:10*1024*1024,files:1,fields:0}}))
+  @ApiConsumes('multipart/form-data') @ApiBody({type:MessageAudioUploadDto})
+  @ApiOperation({operationId:'messagesUploadAudio',summary:'Normalize a voice recording for a direct message'})
+  @ApiCreatedResponse({type:MessageAudioDto})
+  uploadAudio(@CurrentUser() u:AuthUser,@UploadedFile() file:Express.Multer.File|undefined){return this.audio.upload(u.id,file);}
+  @Delete('audio/:id') @HttpCode(204)
+  @ApiOperation({operationId:'messagesDeleteAudio',summary:'Discard an unsent voice recording'}) @ApiNoContentResponse()
+  removeAudio(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string){return this.audio.remove(u.id,id);}
+  @Get('peer/:username')
+  @ApiOperation({operationId:'messagesPeer',summary:'Conversation identity; a blocked historical thread exposes no profile details'})
+  @ApiOkResponse({type:MessagePeerDto})
+  peer(@CurrentUser() u:AuthUser,@Param('username') username:string) {return this.messages.peer(u.id,username);}
   @Get()
   @ApiOperation({
     operationId: 'messagesConversations',
@@ -343,6 +368,12 @@ export class StoriesController {
 @Controller('stickers')
 export class StickersController {
   constructor(private readonly stickers: StickersService) {}
+  @Post(':id/favorite') @HttpCode(204)
+  @ApiOperation({operationId:'stickersFavorite',summary:'Save your own or a received sticker to favorites'}) @ApiNoContentResponse()
+  favorite(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string){return this.stickers.favorite(u.id,id);}
+  @Delete(':id/favorite') @HttpCode(204)
+  @ApiOperation({operationId:'stickersUnfavorite',summary:'Remove a sticker from your favorites'}) @ApiNoContentResponse()
+  unfavorite(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string){return this.stickers.unfavorite(u.id,id);}
   @Get()
   @ApiOperation({
     operationId: 'stickersList',
@@ -472,6 +503,6 @@ export class PushController {
 @Module({
   imports: [MediaModule, UsersModule, PostsModule, UploadsMulterModule],
   controllers: [MessagesController, StoriesController, StickersController, NotesController, PushController, CallsController, StreaksController],
-  providers: [MessagesService, StoriesService, StickersService, NotesService, PushService, CallsService, StreaksService],
+  providers: [MessagesService, MessageAudioService, StoriesService, StickersService, NotesService, PushService, CallsService, StreaksService],
 })
 export class SocialModule {}

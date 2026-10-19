@@ -25,6 +25,8 @@ import { ReelDiscoveryCycles1760191000000 } from './1760191000000-ReelDiscoveryC
 
 /** Ordered list of migrations. Append new migrations here; never edit applied ones. */
 import { CallsAndStreaks1760191800000 } from './1760191800000-CallsAndStreaks.js';
+import { DirectMessageAttachments1760191900000 } from './1760191900000-DirectMessageAttachments.js';
+import { CallMessages1760192000000 } from './1760192000000-CallMessages.js';
 export const migrations = [
   CreateUsersAndAuth1760180000000,
   CreateMedia1760180100000,
@@ -51,4 +53,6 @@ export const migrations = [
   NoteReplies1760191600000,
   SoundtracksAndPush1760191700000,
   CallsAndStreaks1760191800000,
+  DirectMessageAttachments1760191900000,
+  CallMessages1760192000000,
 ];

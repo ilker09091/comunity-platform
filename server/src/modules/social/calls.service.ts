@@ -31,13 +31,37 @@ export class CallsService {
     return { iceServers, relayConfigured: !!(turn.length && secret) };
   }
   private async expire(m: DataSource|EntityManager, userId: string) {
-    await sqlRows(m, `UPDATE calls SET state='ended',ended_at=now(),end_reason=CASE WHEN state='ringing' THEN 'missed' ELSE 'disconnected' END
+    const ended=await sqlRows<{id:string}>(m, `UPDATE calls SET state='ended',ended_at=now(),end_reason=CASE WHEN state='ringing' THEN 'missed' ELSE 'disconnected' END
       WHERE state<>'ended' AND (caller_id=$1 OR callee_id=$1) AND (
         (state='ringing' AND created_at<now()-interval '60 seconds') OR
         (state='accepted' AND (caller_seen_at<now()-interval '45 seconds' OR callee_seen_at<now()-interval '45 seconds')) OR
         created_at<now()-interval '4 hours' OR
         EXISTS(SELECT 1 FROM blocks b WHERE (b.blocker_id=caller_id AND b.blocked_id=callee_id) OR (b.blocker_id=callee_id AND b.blocked_id=caller_id)) OR
-        EXISTS(SELECT 1 FROM users u WHERE u.id IN(caller_id,callee_id) AND u.status<>'ACTIVE'))`,[userId]);
+        EXISTS(SELECT 1 FROM users u WHERE u.id IN(caller_id,callee_id) AND u.status<>'ACTIVE'))
+      RETURNING id`,[userId]);
+    await this.record(m,ended.map(r=>r.id));
+  }
+  /**
+   * Instagram-style call history: each finished call becomes one entry in the conversation, from
+   * the caller, with its outcome and length. Answered/declined calls need no attention, so they
+   * arrive already read; a missed call stays unread for the person who missed it.
+   */
+  private async record(m: DataSource|EntityManager, ids: string[]) {
+    if(!ids.length) return;
+    const missed=await sqlRows<{recipient_id:string;read_at:Date|null}>(m,`INSERT INTO direct_messages
+        (sender_id,recipient_id,created_at,call_id,call_kind,call_status,call_duration_s,delivered_at,read_at)
+      SELECT c.caller_id,c.callee_id,c.ended_at,c.id,c.kind,o.status,
+        CASE WHEN o.status='completed' THEN GREATEST(0,round(extract(epoch FROM c.ended_at-c.accepted_at)))::int END,
+        CASE WHEN o.status IN('completed','declined') THEN c.ended_at END,
+        CASE WHEN o.status IN('completed','declined') THEN c.ended_at END
+      FROM calls c CROSS JOIN LATERAL (SELECT CASE WHEN c.accepted_at IS NOT NULL THEN 'completed'
+        WHEN c.end_reason IN('declined','cancelled') THEN c.end_reason ELSE 'missed' END AS status) o
+      WHERE c.id=ANY($1::uuid[]) AND c.state='ended' AND c.ended_at IS NOT NULL
+        AND NOT EXISTS(SELECT 1 FROM blocks b WHERE (b.blocker_id=c.caller_id AND b.blocked_id=c.callee_id) OR (b.blocker_id=c.callee_id AND b.blocked_id=c.caller_id))
+      ON CONFLICT (call_id) DO NOTHING
+      RETURNING recipient_id,read_at`,[ids]);
+    // A missed call notifies like a message; the ringing notification is replaced by it.
+    for(const row of missed) if(!row.read_at) this.push.notifyUser(row.recipient_id);
   }
   private async row(m: DataSource|EntityManager, id: string, userId: string, lock=false) {
     const row = await sqlOne<CallRow>(m,`SELECT * FROM calls WHERE id=$1 AND (caller_id=$2 OR callee_id=$2)${lock?' FOR UPDATE':''}`,[id,userId]);
@@ -89,7 +113,9 @@ export class CallsService {
       }
       if(input.action==='reject' ? row.callee_id!==userId||row.state!=='ringing' : !this.owns(row,userId,input.deviceId))
         throw AppException.forbidden(ErrorCode.FORBIDDEN,'This call belongs to another device');
-      return (await sqlOne<CallRow>(m,`UPDATE calls SET state='ended',ended_at=now(),end_reason=$2 WHERE id=$1 RETURNING *`,[id,input.action==='reject'?'declined':row.state==='ringing'?'cancelled':'hangup']))!;
+      const ended=(await sqlOne<CallRow>(m,`UPDATE calls SET state='ended',ended_at=now(),end_reason=$2 WHERE id=$1 RETURNING *`,[id,input.action==='reject'?'declined':row.state==='ringing'?'cancelled':'hangup']))!;
+      await this.record(m,[ended.id]);
+      return ended;
     });
     return this.dto(row,userId,input.deviceId);
   }

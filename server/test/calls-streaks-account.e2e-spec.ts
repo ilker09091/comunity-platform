@@ -54,6 +54,29 @@ describe('Calls, streaks, block privacy and account erasure',()=>{
     await db.query(`UPDATE calls SET callee_seen_at=now()-interval '46 seconds' WHERE id=$1`,[live.id]);
     expect((await api.get(`/calls/${live.id}?deviceId=${ad}`,a)).body.call.state).toBe('ended');
   });
+  it('drops each finished call into the conversation once, with its outcome and length, without streak credit',async()=>{
+    await allow();
+    const talk=await start('video');await action(talk.id,b,bd,'accept').expect(200);
+    await db.query(`UPDATE calls SET accepted_at=now()-interval '125 seconds' WHERE id=$1`,[talk.id]);
+    await action(talk.id,a,ad,'end').expect(200);await action(talk.id,a,ad,'end').expect(200);
+    const declined=await start();await action(declined.id,b,bd,'reject').expect(200);
+    const cancelled=await start();await action(cancelled.id,a,ad,'end').expect(200);
+    await start();await db.query(`UPDATE calls SET created_at=now()-interval '61 seconds' WHERE state='ringing'`);
+    expect((await api.get(`/calls/current?deviceId=${bd}`,b)).body.call).toBeNull();
+    const items=(await api.get(`/messages/${a.id}?limit=10`,b).expect(200)).body.items.reverse();
+    expect(items.map((m:any)=>m.call)).toEqual([
+      {kind:'video',status:'completed',durationSeconds:125},
+      {kind:'audio',status:'declined',durationSeconds:null},
+      {kind:'audio',status:'cancelled',durationSeconds:null},
+      {kind:'audio',status:'missed',durationSeconds:null},
+    ]);
+    expect(items.every((m:any)=>m.senderId===a.id&&m.content===null)).toBe(true);
+    // Only missed/cancelled calls wait for the callee; none of them counts toward a streak.
+    expect((await api.get('/messages/unread-count',b).expect(200)).body.count).toBe(2);
+    await api.post(`/messages/${a.id}`,{content:'Call me later',replyToId:items[0].id},b).expect(201);
+    expect((await api.get(`/messages/${a.id}?limit=1`,b)).body.items[0].replyTo.kind).toBe('CALL');
+    expect((await db.query('SELECT low_sent_day IS NULL OR high_sent_day IS NULL AS partial FROM message_streaks'))[0].partial).toBe(true);
+  });
   it('hides blocked profiles, closes calls and keeps historical messages in the database',async()=>{
     await allow();await api.post(`/messages/${b.id}`,{content:'Old message'},a).expect(201);
     const call=await start();await action(call.id,b,bd,'accept').expect(200);
@@ -64,6 +87,63 @@ describe('Calls, streaks, block privacy and account erasure',()=>{
     const ended=(await api.get(`/calls/${call.id}?deviceId=${ad}`,a)).body.call;
     expect(ended.state).toBe('ended');expect(ended.peer.avatarUrl).toBeNull();expect(ended.peer.username).toBe('');
     expect((await db.query('SELECT count(*)::int n FROM direct_messages'))[0].n).toBe(1);
+    expect((await db.query('SELECT state FROM calls WHERE id=$1',[call.id]))[0].state).toBe('ended');
+    const history=(await api.get(`/messages/${b.id}`,a).expect(200)).body;
+    expect(history.items[0].content).toBe('Old message');
+    const identity=(await api.get(`/messages/peer/${b.username}`,a).expect(200)).body;
+    expect(identity).toMatchObject({id:b.id,isUnavailable:true,isBlocking:false,displayName:'Circle user',avatarUrl:null});
+    expect(identity).not.toHaveProperty('bio');
+    expect((await api.get(`/messages/${b.id}/status`,a)).body).toMatchObject({isUnavailable:true,canSend:false,peerOnline:false,peerTyping:false,peerLastActiveAt:null});
+    expect((await api.get('/messages',a)).body.items[0]).toMatchObject({isUnavailable:true,unreadCount:0,user:{avatarUrl:null}});
+    await api.post(`/users/${c.id}/block`,{},b).expect(200);
+    await api.get(`/messages/peer/${b.username}`,c).expect(404);
+    await api.get(`/messages/${b.id}`,c).expect(404);
+  });
+  it('blocking removes the blocked account interactions and unblocking does not restore them',async()=>{
+    await allow();await api.post(`/messages/${b.id}`,{content:'keep this chat'},a).expect(201);
+    await api.post(`/messages/${a.id}`,{content:'old reply'},b).expect(201);
+    await api.patch('/users/me',{bio:'Private biography'},a).expect(200);
+    const post=await api.createPost(a,{content:'My post'});
+    await api.post(`/posts/${post.id}/like`,{},b).expect(200);
+    const comment=(await api.post(`/posts/${post.id}/comments`,{content:'Remove my old comment'},b).expect(201)).body;
+    await api.post(`/comments/${comment.id}/replies`,{content:'Keep my reply'},c).expect(201);
+    await api.post(`/users/${b.id}/block`,{},a).expect(200);
+    const mine=(await api.get(`/users/${b.username}`,a)).body;
+    expect(mine).toMatchObject({isBlocking:true,canViewContent:false,bio:null,coverUrl:null,followerCount:0,followingCount:0,postCount:0});
+    const ownPost=(await api.get(`/posts/${post.id}`,a)).body;
+    expect(ownPost.likeCount).toBe(0);expect(ownPost.commentCount).toBe(1);
+    expect((await db.query('SELECT content FROM comments WHERE id=$1',[comment.id]))[0].content).toBe('');
+    expect((await api.get(`/messages/${b.id}/status`,a)).body).toMatchObject({isBlocking:true,isUnavailable:true,canSend:false});
+    await api.delete(`/users/${b.id}/block`,a).expect(200);
+    expect((await api.get(`/users/${b.username}`,a)).body).toMatchObject({isFollowing:false,followsYou:false,isBlocking:false});
+    expect((await api.get(`/posts/${post.id}`,a)).body).toMatchObject({likeCount:0,commentCount:1});
+    expect((await api.get(`/messages/${b.id}/status`,a)).body).toMatchObject({isUnavailable:false,canSend:true});
+    await api.post(`/messages/${b.id}`,{content:'after unblock'},a).expect(201);
+  });
+  it('rejects a send that passed its first permission check before a concurrent block committed',async()=>{
+    await allow();
+    const lock=db.createQueryRunner();await lock.connect();await lock.startTransaction();
+    let send:Promise<{status:number}>|undefined;
+    try {
+      await lock.query('SELECT pg_advisory_xact_lock(hashtext(least($1::text, $2::text) || greatest($1::text, $2::text)))',[a.id,b.id]);
+      send=api.post(`/messages/${b.id}`,{content:'must not slip through'},a).then(response=>response);
+      let waiting=false;
+      for(let attempt=0;attempt<150;attempt++){
+        waiting=!!(await db.query(`SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock'
+          AND query LIKE '%SELECT pg_advisory_xact_lock%'`)).length;
+        if(waiting)break;
+        await new Promise(resolve=>setTimeout(resolve,20));
+      }
+      expect(waiting).toBe(true);
+      await api.post(`/users/${a.id}/block`,{},b).expect(200);
+      await lock.commitTransaction();
+      expect((await send).status).toBe(404);
+      expect((await db.query('SELECT count(*)::int n FROM direct_messages'))[0].n).toBe(0);
+    } finally {
+      if(lock.isTransactionActive)await lock.rollbackTransaction();
+      await lock.release();
+      await send;
+    }
   });
   it('counts reciprocal days once, and an unsend cannot manufacture extra streak days',async()=>{
     await allow();

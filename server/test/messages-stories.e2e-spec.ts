@@ -188,11 +188,11 @@ describe('Direct messages and stories (e2e)', () => {
     );
     await send('approved');
     await api.post(`/users/${alice.id}/block`, {}, bob).expect(200);
-    await api.get(`/messages/${bob.id}`, alice).expect(404);
+    expect((await api.get(`/messages/${bob.id}`, alice).expect(200)).body.items.length).toBeGreaterThan(0);
     await api
       .post(`/messages/${bob.id}`, { content: 'blocked' }, alice)
       .expect(404);
-    expect((await api.get('/messages', bob)).body.items).toEqual([]);
+    expect((await api.get('/messages', bob)).body.items[0]).toMatchObject({isUnavailable:true,user:{displayName:'Circle user',avatarUrl:null},online:false});
     expect((await api.get('/messages/unread-count', bob)).body.count).toBe(0);
     await db.query("UPDATE users SET status = 'DEACTIVATED' WHERE id = $1", [
       outsider.id,
@@ -474,6 +474,8 @@ describe('Direct messages and stories (e2e)', () => {
     const hi = (await send('hi')).body;
     expect(hi).toMatchObject({ deliveredAt: null, readAt: null, replyTo: null, viewOnce: false });
     await api.get('/messages/unread-count', bob).expect(200);
+    const pending=(await api.get('/messages/delivery',bob).expect(200)).body;
+    await api.post('/messages/delivery',pending,bob).expect(204);
     const delivered = (await api.get(`/messages/${bob.id}`, alice)).body.items[0];
     expect(delivered.deliveredAt).not.toBeNull();
     expect(delivered.readAt).toBeNull();

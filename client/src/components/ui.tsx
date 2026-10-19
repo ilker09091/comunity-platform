@@ -131,6 +131,7 @@ export function Modal({
   onClose,
   className = "",
   guardClose,
+  closeOnBackdrop = true,
 }: {
   title: string;
   children: ReactNode;
@@ -138,6 +139,7 @@ export function Modal({
   className?: string;
   /** Return false to keep the dialog open (e.g. to ask about unsaved changes first). */
   guardClose?: () => boolean;
+  closeOnBackdrop?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const closing = useRef(false);
@@ -145,9 +147,12 @@ export function Modal({
   useEffect(() => {
     const dialog = ref.current;
     dialog?.showModal();
+    const viewport=window.visualViewport;
+    const resize=()=>dialog?.style.setProperty('--dialog-height',`${viewport?.height??window.innerHeight}px`);
+    resize();viewport?.addEventListener('resize',resize);
     // showModal() focuses the first focusable (the close button); prefer a marked field.
     dialog?.querySelector<HTMLElement>("[data-autofocus]")?.focus();
-    return () => { window.clearTimeout(closeTimer.current); dialog?.close(); };
+    return () => { viewport?.removeEventListener('resize',resize);window.clearTimeout(closeTimer.current); dialog?.close(); };
   }, []);
   /** Plays the exit transition before handing control back to the owner. */
   const requestClose = () => {
@@ -172,13 +177,13 @@ export function Modal({
         requestClose();
       }}
       onClick={(e) => {
-        if (e.target === ref.current) requestClose();
+        if (closeOnBackdrop && e.target === ref.current) requestClose();
       }}
       aria-label={title}
     >
       <header>
         <h2>{title}</h2>
-        <button aria-label="Close dialog" className="icon-button" onClick={requestClose}>
+        <button type="button" aria-label="Close dialog" className="icon-button" onClick={requestClose}>
           <X size={20} />
         </button>
       </header>
@@ -194,6 +199,7 @@ export function ConfirmDialog({
   pending,
   confirmLabel = "Confirm",
   tone = "danger",
+  className = "",
 }: {
   title: string;
   description: ReactNode;
@@ -202,9 +208,10 @@ export function ConfirmDialog({
   pending?: boolean;
   confirmLabel?: string;
   tone?: "danger" | "primary";
+  className?: string;
 }) {
   return (
-    <Modal title={title} onClose={onClose} className="confirm-dialog">
+    <Modal title={title} onClose={onClose} className={`confirm-dialog ${className}`}>
       <div className="confirm-body">
         {tone === "danger" && (
           <span className="confirm-icon" aria-hidden="true">
@@ -214,10 +221,10 @@ export function ConfirmDialog({
         <div>{description}</div>
       </div>
       <div className="dialog-actions">
-        <button className="button secondary" onClick={onClose} disabled={pending}>
+        <button type="button" className="button secondary" onClick={onClose} disabled={pending}>
           Cancel
         </button>
-        <button className={`button ${tone === "danger" ? "danger" : ""}`} disabled={pending} onClick={onConfirm}>
+        <button type="button" className={`button ${tone === "danger" ? "danger" : ""}`} disabled={pending} onClick={onConfirm}>
           {pending && <Loader2 className="spin" size={16} />}
           {confirmLabel}
         </button>

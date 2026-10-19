@@ -1,13 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Avatar, Modal } from "./ui";
+import { Avatar } from "./ui";
+import { PhotoViewer } from "./photo-gallery";
 import type { Models } from "@/lib/api/client";
 
-export function ImageViewer({src,alt,onClose}:{src:string;alt:string;onClose:()=>void}) {
-  const [failed,setFailed]=useState(false);
-  return <Modal title={alt} onClose={onClose} className="image-viewer-dialog">
-    <div className="image-viewer-content">{failed?<p role="alert">This image is no longer available. Close and reopen it to refresh.</p>:<img src={src} alt={alt} onError={()=>setFailed(true)} draggable={false}/>}</div>
-  </Modal>;
+export function ImageViewer({src,alt,onClose,profile=false}:{src:string;alt:string;onClose:()=>void;profile?:boolean}) {
+  return <PhotoViewer photos={[{id:src,url:src,width:null,height:null}]} title={alt} alt={alt} onClose={onClose}
+    className={`image-viewer-dialog ${profile?'profile-photo-viewer':''}`}/>;
 }
 export function ProfilePhoto({user}:{user:Models["UserProfileDto"]}) {
   const [open,setOpen]=useState(false),timer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
@@ -29,6 +28,6 @@ export function ProfilePhoto({user}:{user:Models["UserProfileDto"]}) {
       onClick={event=>{if(held.current){event.preventDefault();held.current=false;return;}if(touched.current&&event.detail>0)return;setOpen(true);}}>
       <Avatar user={user} size={150}/>
     </button>
-    {open&&user.avatarUrl&&<ImageViewer src={user.avatarUrl} alt={`${user.displayName}'s profile photo`} onClose={()=>setOpen(false)}/>}
+    {open&&user.avatarUrl&&<ImageViewer src={user.avatarUrl} alt={`${user.displayName}'s profile photo`} profile onClose={()=>setOpen(false)}/>}
   </>;
 }

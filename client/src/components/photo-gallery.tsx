@@ -4,12 +4,12 @@ import { ChevronLeft, ChevronRight, Expand, Loader2, Minus, Plus, RotateCcw } fr
 import type { Models } from "@/lib/api/client";
 import { Modal } from "./ui";
 
-type Photo = Models["MediaDto"];
+type Photo = Pick<Models["MediaDto"],"id"|"url"|"width"|"height">;
 type Transform = { scale: number; x: number; y: number };
 const original: Transform = { scale: 1, x: 0, y: 0 };
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
-export function PhotoViewer({ photos, initial = 0, onClose }: { photos: Photo[]; initial?: number; onClose: () => void }) {
+export function PhotoViewer({ photos, initial = 0, onClose, title, className="", alt }: { photos: Photo[]; initial?: number; onClose: () => void; title?:string;className?:string;alt?:string }) {
   const [index, setIndex] = useState(initial);
   const [transform, setTransform] = useState(original);
   const [loaded, setLoaded] = useState<string | null>(null);
@@ -67,7 +67,7 @@ export function PhotoViewer({ photos, initial = 0, onClose }: { photos: Photo[];
       distance: b ? Math.hypot(a.x-b.x,a.y-b.y) : 0, multi: !!b, moved: false };
   };
   const photo = photos[index];
-  return <Modal title={`Photo ${index+1} of ${photos.length}`} onClose={onClose} className="photo-viewer">
+  return <Modal title={title??`Photo ${index+1} of ${photos.length}`} onClose={onClose} className={`photo-viewer ig-photo-viewer ${photos.length===1?'single-photo':''} ${className}`}>
     <div className="photo-stage" ref={viewport} tabIndex={0} aria-label="Photo, pinch or use plus and minus to zoom"
       onDoubleClick={() => { if (pointerType.current === "touch") return; zoom(current.current.scale > 1 ? 1 : 2.5); }}
       onPointerDown={event => { pointerType.current=event.pointerType;event.currentTarget.setPointerCapture(event.pointerId); points.current.set(event.pointerId,{x:event.clientX,y:event.clientY}); begin(); }}
@@ -97,7 +97,7 @@ export function PhotoViewer({ photos, initial = 0, onClose }: { photos: Photo[];
       onPointerCancel={() => {points.current.clear();gesture.current=null;}}>
       {loaded !== photo.id && failed !== photo.id && <Loader2 className="photo-loader spin" aria-label="Loading photo" />}
       {failed===photo.id ? <p role="alert">This photo could not load. <button className="button secondary small" onClick={() => {setFailed(null);setRetry(n=>n+1);}}>Retry</button></p> : null}
-      <img key={`${photo.id}:${retry}`} ref={image} src={photo.url} alt={`Photo ${index+1}`} width={photo.width??undefined} height={photo.height??undefined}
+      <img key={`${photo.id}:${retry}`} ref={image} src={photo.url} alt={alt??`Photo ${index+1}`} width={photo.width??undefined} height={photo.height??undefined}
         draggable={false} onLoad={() => setLoaded(photo.id)} onError={() => setFailed(photo.id)}
         style={{transform:`translate3d(${transform.x}px,${transform.y}px,0) scale(${transform.scale})`,opacity:loaded===photo.id?1:0,cursor:transform.scale>1?'grab':'zoom-in'}} />
     </div>

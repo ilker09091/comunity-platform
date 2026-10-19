@@ -284,7 +284,9 @@ export class MediaService implements OnModuleInit {
             AND NOT EXISTS (SELECT 1 FROM direct_messages d WHERE d.media_id = m.id AND d.view_once
                               AND d.opened_at < now() - interval '2 minutes'))
         OR EXISTS (SELECT 1 FROM notes n WHERE n.audio_key = $1 AND n.expires_at > now())
-        OR EXISTS (SELECT 1 FROM note_audio a WHERE a.storage_key = $1)`,
+        OR EXISTS (SELECT 1 FROM note_audio a WHERE a.storage_key = $1)
+        OR EXISTS (SELECT 1 FROM direct_messages d WHERE d.audio_key = $1)
+        OR EXISTS (SELECT 1 FROM message_audio_uploads a WHERE a.storage_key = $1)`,
       [storageKey],
     );
     if (!row) return null;

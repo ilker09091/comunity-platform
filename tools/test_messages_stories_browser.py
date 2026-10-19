@@ -39,6 +39,14 @@ def api(route):
  elif path=='messages/unread-count': body={'count':sum(not m['readAt'] and m['recipientId']==ME['id'] for m in messages)}
  elif path=='messages' and parse_qs(urlparse(request.url).query).get('folder')==['requests']: body=page([dict(user=STRANGER,lastMessage=dict(messages[0],id='40000000-0000-4000-8000-000000000099',senderId=STRANGER['id'],content='Hi, can we talk?',media=None,readAt=now()),unreadCount=0,isRequest=True,online=False,lastActiveAt=None)])
  elif path=='messages': body=page([dict(user=PEER,lastMessage=messages[-1],unreadCount=sum(not m['readAt'] and m['recipientId']==ME['id'] for m in messages),isRequest=False,online=True,lastActiveAt=now())])
+ elif path=='messages/delivery' and method=='GET':
+  body={'messageIds':[m['id'] for m in messages if m['recipientId']==ME['id'] and not m.get('deliveredAt')]}
+ elif path=='messages/delivery' and method=='POST':
+  for m in messages:
+   if m['recipientId']==ME['id'] and m['id'] in data.get('messageIds',[]):m['deliveredAt']=m.get('deliveredAt') or now()
+  return route.fulfill(status=204)
+ elif path.startswith('messages/peer/'):
+  body={**(STRANGER if path.endswith(STRANGER['username']) else PEER),'isUnavailable':False,'isBlocking':False}
  elif path.startswith('messages/') and path.endswith('/typing'): return route.fulfill(status=204)
  elif path=='notes' and method=='GET': body=notes
  elif path=='notes/audio':

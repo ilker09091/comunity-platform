@@ -176,7 +176,11 @@ export class ContentDeletionService implements OnModuleInit {
       let failed = 0;
       for (const { storage_key: key } of rows) {
         // Never delete a currently referenced object, even if a stale key was queued.
-        const inUse = await sqlRows(m, `SELECT 1 FROM media WHERE storage_key = $1`, [key]);
+        const inUse = await sqlRows(m, `SELECT 1 WHERE EXISTS(SELECT 1 FROM media WHERE storage_key=$1)
+          OR EXISTS(SELECT 1 FROM notes WHERE audio_key=$1 AND expires_at>now())
+          OR EXISTS(SELECT 1 FROM note_audio WHERE storage_key=$1)
+          OR EXISTS(SELECT 1 FROM direct_messages WHERE audio_key=$1)
+          OR EXISTS(SELECT 1 FROM message_audio_uploads WHERE storage_key=$1)`, [key]);
         if (inUse.length) {
           await sqlRows(m, `DELETE FROM media_file_deletions WHERE storage_key = $1`, [key]);
           continue;

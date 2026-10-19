@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { AppException, ErrorCode } from '../../common/errors/app.exception.js';
 import { sqlOne, sqlRows } from '../../common/utils/sql.js';
 import { ContentDeletionService } from '../media/content-deletion.service.js';
@@ -26,6 +26,7 @@ export function toStickerDto(
     emoji: r.sticker_emoji ?? null,
     url: urls.url(r.sticker_key ?? null),
     isOwn: !!viewerId && r.sticker_owner_id === viewerId,
+    isFavorite: !!r.is_favorite,
   };
 }
 
@@ -42,12 +43,38 @@ export class StickersService {
   async list(viewerId: string): Promise<StickerDto[]> {
     const rows = await sqlRows(
       this.db,
-      `SELECT ${STICKER_COLUMNS} FROM stickers sk LEFT JOIN media skm ON skm.id = sk.media_id
-      WHERE sk.deleted_at IS NULL AND (sk.owner_id IS NULL OR sk.owner_id = $1)
+      `SELECT ${STICKER_COLUMNS}, (sf.user_id IS NOT NULL) AS is_favorite FROM stickers sk LEFT JOIN media skm ON skm.id = sk.media_id
+      LEFT JOIN sticker_favorites sf ON sf.sticker_id=sk.id AND sf.user_id=$1
+      WHERE (sk.deleted_at IS NULL AND (sk.owner_id IS NULL OR sk.owner_id = $1)) OR sf.user_id IS NOT NULL
       ORDER BY sk.owner_id IS NOT NULL, sk.position, sk.created_at DESC, sk.id`,
       [viewerId],
     );
     return rows.map((r) => toStickerDto(r, this.urls, viewerId));
+  }
+
+  async hydrate(ids:string[],viewerId:string) {
+    if(!ids.length)return new Map<string,StickerDto>();
+    const rows=await sqlRows(this.db,`SELECT ${STICKER_COLUMNS}, EXISTS(SELECT 1 FROM sticker_favorites f WHERE f.sticker_id=sk.id AND f.user_id=$2) AS is_favorite
+      FROM stickers sk LEFT JOIN media skm ON skm.id=sk.media_id WHERE sk.id=ANY($1::uuid[])`,[ids,viewerId]);
+    return new Map(rows.map(r=>[r.sticker_id,toStickerDto(r,this.urls,viewerId)]));
+  }
+
+  async assertAvailable(viewerId:string,id:string,m:DataSource|EntityManager=this.db) {
+    const row=await sqlOne(m,`SELECT sk.id FROM stickers sk WHERE sk.id=$2 AND (
+      (sk.deleted_at IS NULL AND (sk.owner_id IS NULL OR sk.owner_id=$1))
+      OR EXISTS(SELECT 1 FROM sticker_favorites f WHERE f.user_id=$1 AND f.sticker_id=sk.id)
+      OR EXISTS(SELECT 1 FROM direct_messages d WHERE d.recipient_id=$1 AND d.sticker_id=sk.id)) FOR SHARE`,[viewerId,id]);
+    if(!row)throw AppException.notFound(ErrorCode.NOT_FOUND,'Sticker not found');
+  }
+
+  async favorite(viewerId:string,id:string) {
+    await this.db.transaction(async m=>{
+      await this.assertAvailable(viewerId,id,m);
+      await sqlRows(m,'INSERT INTO sticker_favorites(user_id,sticker_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[viewerId,id]);
+    });
+  }
+  async unfavorite(viewerId:string,id:string) {
+    await sqlRows(this.db,'DELETE FROM sticker_favorites WHERE user_id=$1 AND sticker_id=$2',[viewerId,id]);
   }
 
   async create(ownerId: string, dto: CreateStickerDto): Promise<StickerDto> {
@@ -92,7 +119,9 @@ export class StickersService {
     const files = await this.db.transaction(async (m) => {
       const sticker = await sqlOne<{ media_id: string; used: boolean }>(
         m,
-        `SELECT media_id, EXISTS (SELECT 1 FROM comments c WHERE c.sticker_id = s.id) AS used
+        `SELECT media_id, (EXISTS (SELECT 1 FROM comments c WHERE c.sticker_id = s.id)
+          OR EXISTS(SELECT 1 FROM direct_messages d WHERE d.sticker_id=s.id)
+          OR EXISTS(SELECT 1 FROM sticker_favorites f WHERE f.sticker_id=s.id)) AS used
         FROM stickers s WHERE s.id = $1 AND s.owner_id = $2 AND s.deleted_at IS NULL FOR UPDATE`,
         [stickerId, ownerId],
       );

@@ -1,0 +1,83 @@
+/* Content dialogs fill the phone viewport; short confirmation prompts keep their compact layout. */
+@media(max-width:767px) {
+  dialog.modal[open]:not(.confirm-dialog):not(.profile-photo-viewer) {
+    width:100vw; max-width:100vw; height:var(--dialog-height,100dvh); max-height:var(--dialog-height,100dvh);
+    inset:0; margin:0; border-radius:0; padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  dialog.modal[open]:not(.confirm-dialog):not(.photo-viewer):not(.call-dialog) { display:flex; flex-direction:column; overflow:auto; }
+  dialog.modal[open]:not(.photo-viewer):not(.call-dialog) > header { flex:0 0 auto; padding-top:max(14px,env(safe-area-inset-top,0px)); }
+  dialog.modal[open] > :not(header) { min-width:0; }
+  .modal.send-sheet .send-grid { flex:1 1 auto; max-height:none; min-height:0; overflow:auto; }
+  .modal.send-sheet .send-footer { flex:0 0 auto; margin-top:auto; }
+  .modal .composer-modal-body { flex:1 0 auto; min-height:0; max-height:none; overflow:visible; padding-bottom:24px; }
+  dialog.ibuilder-dialog[open] { width:100vw; max-width:100vw; height:100dvh; max-height:100dvh; inset:0; margin:0; border-radius:0; }
+  .ibuilder-dialog .ibuilder-sheet { min-height:100%; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+}
+
+/* Receipt colors must remain distinct on every outgoing bubble. */
+.dm-message.own .dm-bubble { background:#e7f1ff; color:#172334; }
+.dm-message.own .dm-bubble .dm-stamp { color:#64748b; }
+.dm-message.own .dm-quote { background:#d6e7fc; border-left-color:#3283d5; }
+.dm-message.own .dm-quote strong { color:#1c568e; }
+.dm-ticks,.dm-message.own .dm-bubble .dm-ticks { color:#7a8594; }
+.dm-ticks.read,.dm-row .dm-ticks.read,.dm-message.own .dm-bubble .dm-ticks.read,.dm-message.own .dm-stamp.standalone .dm-ticks.read {
+  color:#0757bc; filter:none;
+}
+.dm-composer { position:relative; }
+.dm-compose-row > .sticker-picker-anchor { position:static; inset:auto; flex:0 0 auto; align-self:center; }
+.dm-compose-row .comment-sticker-button { display:grid; place-items:center; width:32px; height:40px; padding:0; border:0; background:transparent; color:var(--text); }
+.dm-compose-row > .dm-icon { flex:0 0 auto; width:34px; }
+.dm-attachment-preview { display:block; padding:8px; background:var(--input,#f5f7fa); border:1px solid var(--border); max-height:42dvh; overflow:auto; }
+.dm-draft-media { display:flex; justify-content:center; height:min(240px,28dvh); min-height:80px; border-radius:12px; overflow:hidden; background:#14161b; }
+.dm-draft-media button { width:100%; height:100%; padding:0; border:0; background:transparent; cursor:zoom-in; }
+.dm-draft-media img,.dm-draft-media video { display:block; width:100%; height:100%; object-fit:contain; }
+.dm-draft-details { display:flex; align-items:center; gap:8px; padding:8px 4px 0; }
+.dm-draft-details > span { flex:1; min-width:0; font-size:12px; }
+.dm-stickers-dialog.modal { width:min(520px,calc(100vw - 24px)); }
+.dm-sticker-library { flex:1; min-height:0; overflow:auto; }
+.dm-sticker-library .sticker-grid { max-height:none; grid-template-columns:repeat(4,minmax(0,1fr)); padding:16px 0; }
+.dm-sticker-library .sticker-tabs { position:sticky; top:0; z-index:1; background:var(--surface,#fff); }
+.dm-sticker-library .sticker-tabs button { flex:1; white-space:normal; }
+.dm-sticker-message { display:flex; align-items:center; gap:6px; }
+.dm-sticker-message .dm-icon { width:30px; height:30px; color:#657589; }
+.dm-sticker-message .dm-icon[aria-pressed=true] { color:#cc8800; }
+.dm-voice-message { position:relative; width:264px; max-width:100%; padding:10px 12px; border-radius:18px; background:#f0f2f5; }
+.dm-message.own .dm-voice-message { background:#e7f1ff; }
+.dm-voice-message > span { display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:0 2px 6px; }
+.dm-voice-message audio { display:block; width:100%; height:38px; }
+.dm-voice-rate { display:block; margin:4px 0 0 auto; padding:2px 8px; border-radius:10px; background:#ffffffb3; border:0; font-size:11px; color:#38526d; }
+.dm-voice-capture { position:absolute; left:12px; right:12px; bottom:calc(100% + 8px); z-index:6; padding:16px; border:1px solid var(--border); border-radius:18px; background:var(--surface,#fff); box-shadow:0 8px 40px #0002; }
+.dm-voice-capture-title { display:flex; gap:12px; justify-content:space-between; align-items:center; font-size:12px; }
+.dm-voice-capture-title time { color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.dm-voice-capture audio { width:100%; height:42px; margin:12px 0; }
+.dm-voice-capture-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.dm-voice-capture-actions .button { min-width:0; white-space:normal; }
+.dm-recording-bars { display:flex; justify-content:center; align-items:center; gap:4px; height:65px; color:#ed4956; }
+.dm-recording-bars i { width:3px; border-radius:2px; background:currentColor; animation:voice-pulse .7s infinite alternate; }
+@keyframes voice-pulse { to { transform:scaleY(.35); } }
+@media(prefers-reduced-motion:reduce) { .dm-recording-bars i { animation:none; } }
+
+/* WhatsApp-style sticker tray: replaces the keyboard below the composer, at the keyboard's height. */
+.dm-sticker-dock { flex:0 0 auto; }
+.dm-sticker-tray { overflow:hidden; background:var(--surface,#fff); border-top:1px solid var(--border); transition:height .18s ease-out; }
+.dm-sticker-tray-inner { display:flex; flex-direction:column; padding:0 12px env(safe-area-inset-bottom,0px); }
+.dm-sticker-tray .dm-sticker-library { overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+.dm-sticker-tray .sticker-tabs { padding:8px 0 6px; margin:0; border-bottom:1px solid var(--border); }
+.dm-sticker-tray .sticker-grid { grid-template-columns:repeat(auto-fill,minmax(72px,1fr)); gap:6px; padding:10px 0 16px; }
+.dm-sticker-tray .sticker-option { width:100%; aspect-ratio:1; }
+.dm-compose-row .comment-sticker-button[aria-expanded=true] { color:var(--primary,#0095f6); }
+@media(prefers-reduced-motion:reduce) { .dm-sticker-tray { transition:none; } }
+
+/* Call history entries (Instagram-style): icon disc, title and length; tap to call again. */
+.dm-call-log { display:flex; align-items:center; gap:10px; min-width:184px; max-width:100%; padding:10px 16px 10px 10px; border:0; border-radius:18px; background:#f0f2f5; color:var(--text); text-align:left; }
+.dm-message.own .dm-call-log { background:#e7f1ff; color:#172334; }
+.dm-call-log:not(:disabled) { cursor:pointer; }
+.dm-call-log:not(:disabled):active { transform:scale(.98); }
+.dm-call-log:disabled { opacity:1; }
+.dm-call-log-icon { display:grid; place-items:center; flex:0 0 auto; width:36px; height:36px; border-radius:50%; background:#0000000f; color:inherit; }
+.dm-call-log.missed .dm-call-log-icon { background:#ed49561a; color:#ed4956; }
+.dm-call-log-text { display:flex; flex-direction:column; min-width:0; line-height:1.25; }
+.dm-call-log-text strong { font-size:14px; font-weight:600; }
+.dm-call-log.missed .dm-call-log-text strong { color:#ed4956; }
+.dm-call-log-text small { font-size:12px; color:var(--muted); }
+.dm-message.own .dm-call-log-text small { color:#64748b; }

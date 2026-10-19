@@ -5,6 +5,7 @@ export class CallConnection {
   readonly remote = new MediaStream();
   private local: MediaStream;
   private videoSender?: RTCRtpSender;
+  private audioSender?: RTCRtpSender;
   private closed = false;
   private makingOffer = false;
   private ignoreOffer = false;
@@ -22,7 +23,7 @@ export class CallConnection {
     this.local = stream;
     this.negotiated = outgoing;
     this.pc = new RTCPeerConnection(config);
-    for (const track of stream.getAudioTracks()) this.pc.addTrack(track, stream);
+    for (const track of stream.getAudioTracks()) this.audioSender = this.pc.addTrack(track, stream);
     if(outgoing)this.videoSender = this.pc.addTransceiver(stream.getVideoTracks()[0] ?? "video", {direction:"sendrecv",streams:[stream]}).sender;
     this.pc.onicecandidate = event => {
       if (event.candidate) this.emit({kind:"ice",payload:JSON.stringify(event.candidate.toJSON())});
@@ -86,6 +87,8 @@ export class CallConnection {
     }
     this.negotiated = true;
   }
+  /** Sends a re-opened microphone (earpiece/speaker switch) without renegotiating. */
+  async replaceAudio(track: MediaStreamTrack) { if (!this.closed) await this.audioSender?.replaceTrack(track); }
   mute(muted: boolean) { this.local.getAudioTracks().forEach(track => { track.enabled = !muted; }); }
   async camera(enabled: boolean, facingMode: "user" | "environment" = "user") {
     if (this.closed) return;

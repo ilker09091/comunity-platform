@@ -29,7 +29,13 @@ import {
   SquarePen,
   Video,
   Phone,
+  PhoneIncoming,
+  PhoneMissed,
+  PhoneOutgoing,
+  Ban,
+  ShieldOff,
   Flame,
+  Star,
   X,
 } from "lucide-react";
 import { api, type Models } from "@/lib/api/client";
@@ -53,6 +59,8 @@ import { messageSoundsOn, setMessageSounds } from "./app-bridge";
 import { useCalls } from "./calls";
 import MessageStreak from "./message-streak";
 import { ImageViewer } from "./image-viewer";
+import { StickerButton, StickerView } from './sticker-picker';
+import { VoiceMessage, VoiceRecorder } from './voice-message';
 
 type Message = Models["DirectMessageDto"];
 type Conversation = Models["ConversationDto"];
@@ -182,7 +190,47 @@ function StoryReplyPreview({
   );
 }
 
+/** Instagram-style call history: "Video call · 12 min", "Missed voice call", "No answer". */
+function callDuration(seconds: number) {
+  if (seconds < 60) return `${seconds} sec`;
+  const hours = Math.floor(seconds / 3600), minutes = Math.floor((seconds % 3600) / 60);
+  return hours ? `${hours} hr${minutes ? ` ${minutes} min` : ""}` : `${minutes} min`;
+}
+function callSummary(call: NonNullable<Message["call"]>, own: boolean) {
+  const kind = call.kind === "video" ? "Video call" : "Voice call";
+  if (call.status === "completed")
+    return { title: kind, detail: call.durationSeconds != null ? callDuration(call.durationSeconds) : "Ended", missed: false };
+  if (own)
+    return { title: kind, detail: call.status === "declined" ? "Declined" : call.status === "cancelled" ? "Cancelled" : "No answer", missed: false };
+  return call.status === "declined"
+    ? { title: kind, detail: "You declined", missed: false }
+    : { title: `Missed ${call.kind === "video" ? "video" : "voice"} call`, detail: "Tap to call back", missed: true };
+}
+function CallBubble({ message, own, onCall }: { message: Message; own: boolean; onCall?: (kind: "audio" | "video") => void }) {
+  const call = message.call!;
+  const summary = callSummary(call, own);
+  const Icon = summary.missed ? PhoneMissed : call.kind === "video" ? Video : own ? PhoneOutgoing : PhoneIncoming;
+  return (
+    <button
+      type="button"
+      className={`dm-call-log ${summary.missed ? "missed" : ""}`}
+      disabled={!onCall}
+      aria-label={`${summary.title}, ${summary.detail}. Call again`}
+      onClick={() => onCall?.(call.kind)}
+    >
+      <span className="dm-call-log-icon" aria-hidden="true"><Icon size={18} /></span>
+      <span className="dm-call-log-text">
+        <strong>{summary.title}</strong>
+        <small>{summary.detail === "Tap to call back" && !onCall ? clock(message.createdAt) : summary.detail}</small>
+      </span>
+    </button>
+  );
+}
+
 function attachmentLabel(message: Message) {
+  if(message.call){const summary=callSummary(message.call,false);return summary.missed?summary.title:`${summary.title}${message.call.status==='completed'&&message.call.durationSeconds!=null?` · ${callDuration(message.call.durationSeconds)}`:''}`;}
+  if(message.audioUrl)return 'Voice message';
+  if(message.hasSticker)return 'Sticker';
   if (message.viewOnce) return message.viewOnceType === "VIDEO" ? "Video" : "Photo";
   if (message.media) return message.media.type === "IMAGE" ? "Photo" : "Video";
   if (message.post) return "Shared a post";
@@ -235,6 +283,9 @@ const REPLY_KIND: Record<Models["MessageReplyRefDto"]["kind"], string> = {
   POST: "Shared post",
   STORY: "Story reply",
   VIEW_ONCE: "View once",
+  STICKER: "Sticker",
+  AUDIO: "Voice message",
+  CALL: "Call",
   UNAVAILABLE: "Message unavailable",
 };
 
@@ -408,6 +459,19 @@ function ViewOnceBubble({ message, own }: { message: Message; own: boolean }) {
   );
 }
 
+function MessageSticker({sticker}:{sticker:Models['StickerDto']}) {
+  const client=useQueryClient(),toast=useToast();
+  const favorite=useMutation({
+    mutationFn:()=>api(sticker.isFavorite?'stickersUnfavorite':'stickersFavorite',{params:{id:sticker.id}}),
+    onSuccess:()=>{void client.invalidateQueries({queryKey:['stickers']});void client.invalidateQueries({queryKey:['messages']});},
+    onError:error=>toast(error.message,true)
+  });
+  return <div className="dm-sticker-message"><StickerView sticker={sticker} size={136}/>
+    <button type="button" className="dm-icon" aria-label={`${sticker.isFavorite?'Remove':'Add'} ${sticker.name} sticker ${sticker.isFavorite?'from':'to'} favorites`}
+      aria-pressed={sticker.isFavorite} disabled={favorite.isPending} onClick={()=>favorite.mutate()}><Star size={18} fill={sticker.isFavorite?'currentColor':'none'}/></button>
+  </div>;
+}
+
 function MessageItem({
   message,
   own,
@@ -417,15 +481,18 @@ function MessageItem({
   onReply,
   onJump,
   onUnsend,
+  onCall,
 }: {
   message: Message;
   own: boolean;
-  peer: Models["UserProfileDto"];
+  peer: Models["MessagePeerDto"];
   first: boolean;
   last: boolean;
   onReply: (message: Message) => void;
   onJump: (id: string) => void;
   onUnsend: (message: Message) => void;
+  /** Calls the peer again from a call history entry; absent while calling is unavailable. */
+  onCall?: (kind: "audio" | "video") => void;
 }) {
   const toast = useToast();
   /**
@@ -469,7 +536,7 @@ function MessageItem({
   useEffect(() => () => window.clearTimeout(press.current), []);
   const media = message.viewOnce ? null : message.media;
   const missing =
-    !message.content && !media && !message.post && !message.storyReply && !message.viewOnce;
+    !message.content && !media && !message.post && !message.storyReply && !message.viewOnce && !message.hasSticker && !message.audioUrl && !message.call;
   const swipe = useRef<{ x: number; y: number; id: number } | null>(null);
   const [drag, setDrag] = useState(0);
   const { user } = useSession();
@@ -536,6 +603,9 @@ function MessageItem({
         {message.storyReply && <StoryReplyPreview reply={message.storyReply} own={own} />}
         {message.noteReply && <NoteReplyPreview reply={message.noteReply} own={own} />}
         {message.viewOnce && <ViewOnceBubble message={message} own={own} />}
+        {message.call&&<CallBubble message={message} own={own} onCall={onCall}/>}
+        {message.audioUrl&&<VoiceMessage src={message.audioUrl} durationMs={message.audioDurationMs}/>}
+        {message.sticker?<MessageSticker sticker={message.sticker}/>:message.hasSticker?<p className="dm-bubble muted">Sticker unavailable</p>:null}
         {media &&
           (media.type === "VIDEO" ? (
             <MediaVideo
@@ -579,7 +649,7 @@ function MessageItem({
         {!hasText && !message.replyTo && !message.viewOnce && (
           <span className="dm-stamp standalone">
             <time dateTime={message.createdAt}>{clock(message.createdAt)}</time>
-            {own && <Ticks message={message} />}
+            {own && !message.call && <Ticks message={message} />}
           </span>
         )}
       </div>
@@ -718,17 +788,30 @@ function EmojiButton({
   );
 }
 
-type Draft = { content?: string; mediaId?: string; viewOnce?: boolean; replyToId?: string };
+type Draft = { content?: string; mediaId?: string; stickerId?:string;audioId?:string;viewOnce?: boolean; replyToId?: string };
 
-function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
+function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
   const calls = useCalls();
   const { user } = useSession();
+  const status = useQuery({
+    queryKey: ["messages", user?.id, "status", initialPeer.id],
+    queryFn: ({ signal }) => api("messagesStatus", { params: { id: initialPeer.id }, signal }),
+    // Fast enough for a live "typing..." indicator.
+    refetchInterval: 2000,
+  });
+  const unavailable=status.data?.isUnavailable??initialPeer.isUnavailable;
+  const peer={...initialPeer,isUnavailable:unavailable,isBlocking:status.data?.isBlocking??initialPeer.isBlocking,
+    ...(unavailable?{displayName:"Circle user",avatarUrl:null,isVerified:false}: {})};
+
   const router = useRouter();
   const toast = useToast();
   const client = useQueryClient();
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [viewOnce, setViewOnce] = useState(false);
+  const [voiceActive,setVoiceActive]=useState(false);
+  const [previewOpen,setPreviewOpen]=useState(false);
+  const [stickerDock,setStickerDock]=useState<HTMLDivElement|null>(null);
   const attachment = useMediaAttachment();
   const inputRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
@@ -752,19 +835,11 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
     new Map((thread.data?.pages.flatMap((p) => p.items) ?? []).map((m) => [m.id, m])).values(),
   ).reverse();
   const latest = messages.at(-1)?.id;
-  const unreadId = [...messages]
-    .reverse()
-    .find((m) => m.recipientId === user?.id && !m.readAt)?.id;
-  const status = useQuery({
-    queryKey: ["messages", user?.id, "status", peer.id],
-    queryFn: ({ signal }) => api("messagesStatus", { params: { id: peer.id }, signal }),
-    // Fast enough for a live "typing..." indicator.
-    refetchInterval: 2000,
-  });
   const request = !!status.data?.isRequest;
+  const canCall = !voiceActive && !calls.busy && !!status.data?.canSend && !request;
   const awaiting = !!status.data?.awaitingAcceptance;
   const typing = !!status.data?.peerTyping;
-  const subtitle = typing
+  const subtitle = unavailable ? "This account is unavailable" : typing
     ? "typing..."
     : (presence(!!status.data?.peerOnline, status.data?.peerLastActiveAt) ?? peer.username);
   const accept = useMutation({
@@ -812,27 +887,44 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
     onSuccess: () => void client.invalidateQueries({ queryKey: ["messages"] }),
   });
   const markRead = read.mutate;
+  const lastAcknowledged=useRef<string|null>(null);
   useEffect(() => {
-    // Like Instagram, a request is not marked seen until it is accepted.
+    // A loaded thread behind another dialog, in a background tab or scrolled away from
+    // new messages is not a read receipt. Observe the bubbles within this thread's viewport.
+    const pending=thread.data?.pages.flatMap(page=>page.items).filter(message=>message.recipientId===user?.id&&!message.readAt)
+      .sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||b.id.localeCompare(a.id))??[];
+    if(!pending.length)return;
     const acknowledge = () => {
-      if (unreadId && status.data && !status.data.isRequest && document.visibilityState === "visible")
-        markRead(unreadId);
+      if(!status.data||status.data.isRequest||status.data.isUnavailable||document.visibilityState!=='visible'||!document.hasFocus()||document.querySelector('dialog[open]'))return;
+      const frame=scroller.current?.getBoundingClientRect();if(!frame)return;
+      const visible=pending.find(message=>{
+        const node=document.getElementById(`msg-${message.id}`),box=node?.getBoundingClientRect();
+        if(!box||Math.min(box.bottom,frame.bottom)-Math.max(box.top,frame.top)<Math.min(box.height*.6,80))return false;
+        const top=Math.max(box.top,frame.top),bottom=Math.min(box.bottom,frame.bottom);
+        return node!.contains(document.elementFromPoint((Math.max(box.left,frame.left)+Math.min(box.right,frame.right))/2,(top+bottom)/2));
+      });
+      if(visible&&lastAcknowledged.current!==visible.id){lastAcknowledged.current=visible.id;markRead(visible.id,{onError:()=>{lastAcknowledged.current=null;}});}
     };
-    acknowledge();
+    const observer=new IntersectionObserver(acknowledge,{root:scroller.current,threshold:[0,.6,1]});
+    for(const message of pending){const node=document.getElementById(`msg-${message.id}`);if(node)observer.observe(node);}
+    const dialogs=new MutationObserver(acknowledge);dialogs.observe(document.body,{subtree:true,attributes:true,attributeFilter:['open'],childList:true});
+    const frame=requestAnimationFrame(acknowledge);
     document.addEventListener("visibilitychange", acknowledge);
-    return () => document.removeEventListener("visibilitychange", acknowledge);
-  }, [unreadId, markRead, status.data]); // Read only through messages actually loaded in this thread.
+    window.addEventListener('focus',acknowledge);
+    return () => {observer.disconnect();dialogs.disconnect();cancelAnimationFrame(frame);document.removeEventListener("visibilitychange", acknowledge);window.removeEventListener('focus',acknowledge);};
+  }, [thread.data, user?.id, markRead, status.data]);
   useEffect(() => {
     const observer = new ResizeObserver(() => {
       if (pinned.current && scroller.current)
         scroller.current.scrollTop = scroller.current.scrollHeight;
     });
     if (messageList.current) observer.observe(messageList.current);
+    // The sticker tray and keyboard resize the chat itself; keep the latest message in view.
+    if (scroller.current) observer.observe(scroller.current);
     return () => observer.disconnect();
   }, []);
   useEffect(() => {
-    pinned.current = true;
-    if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
+    if (pinned.current&&scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
   }, [latest]);
   // Grow the composer with its content, Instagram-style, up to the CSS max-height.
   useEffect(() => {
@@ -863,6 +955,7 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
     onSuccess: () => {
       attachment.attached();
       setViewOnce(false);
+      setReplyTo(null);
       void client.invalidateQueries({ queryKey: ["messages"] });
     },
     onError: (e, draft) => {
@@ -872,12 +965,22 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
       void status.refetch();
     },
   });
-  const canMessage = status.data
+  const [contactAction,setContactAction]=useState<"block"|"unblock"|null>(null);
+  const contact=useMutation({
+    mutationFn:(block:boolean)=>api(block?"followsBlock":"followsUnblock",{params:{id:peer.id}}),
+    onSuccess:(_data,blocked)=>{
+      setContactAction(null);
+      void client.invalidateQueries();
+      toast(blocked?"Account blocked.":"Account unblocked. Previous follows have not been restored.");
+    },onError:error=>toast(error.message,true)
+  });
+  const canMessage = !unavailable && (status.data
     ? status.data.canSend
-    : !peer.isBlocking && (!peer.isPrivate || peer.isFollowing);
+    : !peer.isBlocking && (!peer.isPrivate || peer.isFollowing));
   const canSend =
     canMessage &&
     !send.isPending &&
+    !voiceActive &&
     !attachment.busy &&
     !attachment.error &&
     (!!text.trim() || !!attachment.media);
@@ -929,15 +1032,18 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
             </small>
           </span>
         </Link>
-        <button type="button" className="dm-icon" aria-label="Start voice call" disabled={calls.busy||!status.data?.canSend||request} onClick={()=>calls.start(peer,"audio")}><Phone size={21}/></button>
-        <button type="button" className="dm-icon" aria-label="Start video call" disabled={calls.busy||!status.data?.canSend||request} onClick={()=>calls.start(peer,"video")}><Video size={22}/></button>
-        <Link className="dm-icon dm-info" href={`/profile/${peer.username}`} aria-label="View profile">
+        <button type="button" className="dm-icon" aria-label="Start voice call" disabled={!canCall} onClick={()=>calls.start(peer,"audio")}><Phone size={21}/></button>
+        <button type="button" className="dm-icon" aria-label="Start video call" disabled={!canCall} onClick={()=>calls.start(peer,"video")}><Video size={22}/></button>
+        {!unavailable&&<Link className="dm-icon dm-info" href={`/profile/${peer.username}`} aria-label="View profile">
           <Info size={24} />
-        </Link>
+        </Link>}
         <Dropdown label="Chat options" className="dm-chat-menu" summaryClassName="dm-icon" summary={<MoreHorizontal size={24} />}>
-          <Link href={`/profile/${peer.username}`}>
+          {!unavailable&&<Link href={`/profile/${peer.username}`}>
             <Info size={16} /> View profile
-          </Link>
+          </Link>}
+          <button type="button" className={peer.isBlocking?"":"danger-text"} onClick={()=>setContactAction(peer.isBlocking?"unblock":"block")}>
+            {peer.isBlocking?<ShieldOff size={16}/>:<Ban size={16}/>} {peer.isBlocking?"Unblock account":"Block account"}
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -952,6 +1058,10 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
           </button>
         </Dropdown>
       </header>
+      {contactAction&&<ConfirmDialog className="ig-block-dialog" title={contactAction==="block"?"Block this account?":"Unblock this account?"}
+        description={contactAction==="block"?"You won't be able to message or call each other. Your previous messages will stay in this chat. Follows are removed; their likes and comments on your posts are removed. They won't be notified.":"You can contact each other again, subject to account privacy. Previous follows, likes and comments are not restored."}
+        confirmLabel={contactAction==="block"?"Block":"Unblock"} tone={contactAction==="block"?"danger":"primary"}
+        pending={contact.isPending} onClose={()=>setContactAction(null)} onConfirm={()=>contact.mutate(contactAction==="block")}/>}
       {unsending && (
         <ConfirmDialog
           title="Unsend message?"
@@ -988,9 +1098,9 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
               {peer.isVerified && <VerifiedBadge />}
             </strong>
             <span>{peer.username} · Circle</span>
-            <Link className="dm-button secondary" href={`/profile/${peer.username}`}>
+            {!unavailable&&<Link className="dm-button secondary" href={`/profile/${peer.username}`}>
               View profile
-            </Link>
+            </Link>}
           </div>
         )}
         <LoadMore
@@ -1004,7 +1114,7 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
           </p>
         )}
         {thread.error && <ErrorState error={thread.error} retry={() => void thread.refetch()} />}
-        <MessageStreak peerId={peer.id}/>
+        {!unavailable&&<MessageStreak peerId={peer.id}/>}
         <ol className="dm-messages" ref={messageList}>
           {messages.map((m, i) => {
             const prev = messages[i - 1];
@@ -1038,6 +1148,7 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
                   onReply={startReply}
                   onJump={jumpTo}
                   onUnsend={setUnsending}
+                  onCall={canCall ? (kind) => calls.start(peer, kind) : undefined}
                 />
               </Fragment>
             );
@@ -1056,7 +1167,11 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
           )}
         </ol>
       </div>
-      {request ? (
+      {unavailable ? <div className="dm-blocked-state" role="status">
+        <Ban size={22}/><strong>{peer.isBlocking?"You blocked this account":"You can't message this account"}</strong>
+        <p>Your previous messages are still here. New messages and calls are unavailable.</p>
+        {peer.isBlocking&&<button type="button" className="button secondary small" onClick={()=>setContactAction("unblock")}>Unblock</button>}
+      </div> : request ? (
         <div className="dm-request">
           <strong>Accept message request from {peer.username}?</strong>
           <p>
@@ -1122,25 +1237,25 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
               </button>
             </div>
           )}
-          {media && (
-            <div className="dm-attachment">
-              {media.status === "READY" && media.type === "IMAGE" ? (
-                <img src={media.url} alt="" className="dm-attachment-thumb" />
-              ) : media.type === "IMAGE" ? (
-                <ImageIcon size={18} />
-              ) : (
-                <Video size={18} />
-              )}
+          {(media||attachment.previewUrl) && (
+            <div className="dm-attachment dm-attachment-preview">
+              <div className="dm-draft-media">
+                {(media?.type??attachment.previewType)==='IMAGE'?<button type="button" aria-label="Enlarge photo preview" onClick={()=>setPreviewOpen(true)}>
+                  <img src={attachment.previewUrl??media?.url} alt="Photo preview before sending"/>
+                </button>:<video src={attachment.previewUrl??media?.url} controls playsInline preload="metadata" aria-label="Video preview before sending"/>}
+              </div>
+              {previewOpen&&(attachment.previewUrl??media?.url)&&<ImageViewer src={(attachment.previewUrl??media?.url)!} alt="Photo preview" onClose={()=>setPreviewOpen(false)}/>}
+              <div className="dm-draft-details">
               <span>
-                {media.status === "READY"
-                  ? `${media.type === "IMAGE" ? "Photo" : "Video"} ready to send`
-                  : "Processing video..."}
+                {attachment.uploading?`Uploading… ${attachment.progress}%`:media?.status === "READY"
+                  ? `${media.type === "IMAGE" ? "Photo" : "Video"} ready to send` : "Processing video..."}
               </span>
               <button
                 type="button"
                 className={`dm-once-toggle ${viewOnce ? "on" : ""}`}
                 aria-pressed={viewOnce}
                 aria-label="View once"
+                disabled={!media}
                 title={viewOnce ? "View once: on" : "View once: off"}
                 onPointerDown={(e) => e.preventDefault()}
                 onClick={() => {
@@ -1158,10 +1273,12 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
                 onClick={() => {
                   attachment.clear();
                   setViewOnce(false);
+                  setPreviewOpen(false);
                 }}
               >
                 <X size={16} />
               </button>
+              </div>
             </div>
           )}
           {viewOnce && media && (
@@ -1179,7 +1296,7 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
           )}
           <div className="dm-compose-row">
             <EmojiButton
-              disabled={!canMessage}
+              disabled={!canMessage||voiceActive}
               onPick={(emoji) => {
                 const el = textRef.current;
                 const start = el?.selectionStart ?? text.length;
@@ -1193,6 +1310,9 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
                 });
               }}
             />
+            <StickerButton conversation dock={stickerDock} disabled={!canMessage||voiceActive||send.isPending||attachment.busy||!!media} onPick={sticker=>send.mutate({stickerId:sticker.id,replyToId:replyTo?.id})}/>
+            {!calls.busy&&<VoiceRecorder disabled={!canMessage||attachment.busy||!!media||send.isPending} onActiveChange={setVoiceActive}
+              onSend={id=>send.mutateAsync({audioId:id,replyToId:replyTo?.id})}/>}
             <textarea
               ref={textRef}
               aria-label="Message"
@@ -1236,7 +1356,7 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
                 type="button"
                 className="dm-icon"
                 aria-label="Attach photo or video"
-                disabled={!canMessage || attachment.busy}
+                disabled={!canMessage || attachment.busy||voiceActive}
                 onClick={() => inputRef.current?.click()}
               >
                 <ImageIcon size={24} />
@@ -1256,6 +1376,7 @@ function Thread({ peer }: { peer: Models["UserProfileDto"] }) {
           </div>
         </form>
       )}
+      <div className="dm-sticker-dock" ref={setStickerDock}/>
     </section>
   );
 }
@@ -1289,7 +1410,7 @@ function ConversationRow({
             {c.user.isVerified && <VerifiedBadge />}
           </strong>
           <span>
-            {own && <Ticks message={c.lastMessage} />}
+            {own && !c.lastMessage.call && <Ticks message={c.lastMessage} />}
             <span className="dm-row-preview">{preview(c.lastMessage, own)}</span>
             <span aria-hidden="true">·</span>
             <time dateTime={c.lastMessage.createdAt}>{shortTime(c.lastMessage.createdAt)}</time>
@@ -1334,7 +1455,7 @@ export default function Messages() {
   const conversations = folder === "primary" ? primary : requests;
   const peer = useQuery({
     queryKey: ["message-peer", user?.id, to],
-    queryFn: ({ signal }) => api("usersGetProfile", { params: { username: to }, signal }),
+    queryFn: ({ signal }) => api("messagesPeer", { params: { username: to }, signal }),
     enabled: !!to && !!user,
     refetchInterval: 5000,
   });

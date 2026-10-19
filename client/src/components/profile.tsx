@@ -99,8 +99,7 @@ function useBlock(profile: Profile) {
   return useMutation({
     mutationFn: (block: boolean) => api(block ? "followsBlock" : "followsUnblock", { params: { id: profile.id } }),
     onSuccess: (_data, block) => {
-      for (const key of ["profile", "posts", "suggestions", "notifications", "unread", "session", "connections", "blocks", "follow-requests", "messages", "message-peer"])
-        void client.invalidateQueries({ queryKey: [key] });
+      void client.invalidateQueries();
       toast(block ? `You blocked @${profile.username}.` : `You unblocked @${profile.username}.`);
     },
     onError: (error) => toast(error.message, true),
@@ -157,6 +156,7 @@ function ProfileMenu({ profile }: { profile: Profile }) {
       </Dropdown>
       {confirmBlock && (
         <ConfirmDialog
+          className="ig-block-dialog"
           title={`Block @${profile.username}?`}
           confirmLabel="Block"
           pending={block.isPending}
@@ -166,6 +166,7 @@ function ProfileMenu({ profile }: { profile: Profile }) {
             <ul className="block-explainer">
               <li>They won’t be able to see your profile, posts or reels, or interact with you.</li>
               <li>You’ll unfollow each other, and pending follow requests are removed.</li>
+              <li>Your old chat stays available. Their likes and comments on your posts are removed.</li>
               <li>They won’t be notified. You can unblock them at any time.</li>
             </ul>
           }

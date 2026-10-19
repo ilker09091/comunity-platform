@@ -6,6 +6,8 @@ import "./social-media.css";
 import "./messages-stories.css";
 import "./profile-ig.css";
 import "./interaction-fixes.css";
+import "./instagram-overlays.css";
+import "./mobile-messaging.css";
 import Providers from "@/components/providers";
 import { Suspense } from "react";
 

@@ -18,10 +18,11 @@ window.HTMLElement.prototype.setPointerCapture=function(){};
 const host=document.getElementById('root'),root=createRoot(host);
 let groups=0;const pass=label=>{groups++;console.log('PASS '+label);};
 try {
-  for(const name of ['components/ui','components/photo-gallery','components/profile-grid','lib/profile-layout','lib/reel-watch']) {
+  for(const name of ['components/ui','components/photo-gallery','components/profile-grid','lib/profile-layout','lib/reel-watch','lib/api/client','lib/api/operations']) {
     let code=await readFile(join(directory,'src',name+(name.startsWith('lib')?'.ts':'.tsx')),'utf8');
-    code=code.replace('from "next/link"','from "./link.mjs"').replace("from 'next/link'",'from "./link.mjs"').replace('from "./ui"','from "./ui.mjs"');
-    await writeFile(join(temp,name.split('/')[1]+'.mjs'),ts.transpileModule(code,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText);
+    code=code.replace('from "next/link"','from "./link.mjs"').replace("from 'next/link'",'from "./link.mjs"').replace('from "./ui"','from "./ui.mjs"')
+      .replaceAll('from "@/lib/api/client"','from "./client.mjs"').replace('from "./operations"','from "./operations.mjs"');
+    await writeFile(join(temp,name.split('/').at(-1)+'.mjs'),ts.transpileModule(code,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText);
   }
   await writeFile(join(temp,'link.mjs'),'import React from "react";export default function Link({children,...props}){return React.createElement("a",props,children);}');
   const {ReelWatchObserver}=await import(pathToFileURL(join(temp,'reel-watch.mjs')));
