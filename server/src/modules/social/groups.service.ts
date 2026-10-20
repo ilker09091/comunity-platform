@@ -58,9 +58,9 @@ export class GroupsService {
     return this.get(viewer,id);
   }
   private summary(r:Record<string,any>):GroupDto {
-    return {id:r.id,name:r.name,ownerId:r.owner_id,memberCount:r.member_count,unreadCount:r.unread_count??0,lastMessage:r.last_message??null,updatedAt:iso(r.updated_at)!};
+    return {id:r.id,name:r.name,avatarUrl:this.urls.url(r.avatar_key??null),ownerId:r.owner_id,memberCount:r.member_count,unreadCount:r.unread_count??0,lastMessage:r.last_message??null,updatedAt:iso(r.updated_at)!};
   }
-  private columns=`g.*,(SELECT count(*)::int FROM chat_group_members x WHERE x.group_id=g.id) member_count,
+  private columns=`g.*,(SELECT storage_key FROM media WHERE id=g.avatar_media_id) avatar_key,(SELECT count(*)::int FROM chat_group_members x WHERE x.group_id=g.id) member_count,
     (SELECT count(*)::int FROM group_messages msg WHERE msg.group_id=g.id AND msg.seq>gm.read_seq AND msg.sender_id<>$1 AND ${notBlockedSql('msg.sender_id','$1')}) unread_count,
     (SELECT coalesce(msg.content,CASE WHEN msg.gif IS NOT NULL THEN 'GIF' WHEN msg.has_sticker THEN 'Sticker' WHEN msg.audio_key IS NOT NULL THEN 'Voice message' ELSE 'Attachment' END)
       FROM group_messages msg WHERE msg.group_id=g.id AND ${notBlockedSql('msg.sender_id','$1')} ORDER BY msg.created_at DESC,msg.id DESC LIMIT 1) last_message`;
@@ -97,6 +97,17 @@ export class GroupsService {
     await this.db.transaction(async m=>{this.owner(await this.member(m,id,viewer,true),viewer);await sqlRows(m,'UPDATE chat_groups SET name=$2,updated_at=now() WHERE id=$1',[id,name.trim()]);});
     return this.get(viewer,id);
   }
+  async setAvatar(viewer:string,id:string,mediaId:string|null) {
+    const files=await this.db.transaction(async m=>{
+      const group=await this.member(m,id,viewer,true);this.owner(group,viewer);
+      if(group.avatar_media_id===mediaId)return null;
+      if(mediaId)await this.media.lockAttachable(m,viewer,[mediaId],{imagesOnly:true});
+      await sqlRows(m,'UPDATE chat_groups SET avatar_media_id=$2 WHERE id=$1',[id,mediaId]);
+      return this.deletion.deleteMedia(m,group.avatar_media_id?[group.avatar_media_id]:[]);
+    });
+    if(files)await this.deletion.removeFiles(files);
+    return this.get(viewer,id);
+  }
   async removeMember(viewer:string,id:string,target:string) {
     if(viewer===target)return this.leave(viewer,id);
     await this.db.transaction(async m=>{this.owner(await this.member(m,id,viewer,true),viewer);await sqlRows(m,'DELETE FROM chat_group_members WHERE group_id=$1 AND user_id=$2',[id,target]);});
@@ -109,7 +120,7 @@ export class GroupsService {
       if(next){if(group.owner_id===viewer)await sqlRows(m,'UPDATE chat_groups SET owner_id=$2 WHERE id=$1',[id,next.user_id]);return null;}
       const rows=await sqlRows<{media_id:string;audio_key:string}>(m,'SELECT media_id,audio_key FROM group_messages WHERE group_id=$1',[id]);
       await sqlRows(m,'DELETE FROM chat_groups WHERE id=$1',[id]);
-      return [await this.deletion.deleteMedia(m,rows.map(r=>r.media_id).filter(Boolean)),await this.deletion.queueFiles(m,rows.map(r=>r.audio_key).filter(Boolean))];
+      return [await this.deletion.deleteMedia(m,[group.avatar_media_id,...rows.map(r=>r.media_id)].filter(Boolean)),await this.deletion.queueFiles(m,rows.map(r=>r.audio_key).filter(Boolean))];
     });if(files)for(const pending of files)await this.deletion.removeFiles(pending);
   }
   private async hydrate(rows:Record<string,any>[],viewer:string):Promise<GroupMessageDto[]> {

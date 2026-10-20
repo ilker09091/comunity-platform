@@ -17,11 +17,18 @@ Mevcut veritabanı çalışırken güncelleme:
 docker compose up -d --build --no-deps web api turn
 docker compose ps web api turn
 docker compose logs --tail=50 turn
+docker compose exec -T api npm run gifs:check
 ```
 
 Yeni kurulumda veritabanı dahil tüm servisleri başlatın; `--no-deps` yalnızca
 mevcut kurulumun uygulama servislerini yenilemek içindir. TURN portları ve canlı
 ağ kontrolü [arama belgesinde](CALL_EXPERIENCE.md) açıklanır.
+
+`.env.giphy` yerel Git deposundan VPS'e kendiliğinden gitmez. Özel dosyayı
+VPS'teki proje köküne ayrıca kopyalayın; [dağıtım belgesinde](../DEPLOY.md)
+kopyalama ve kontrol komutları vardır. Ortam değişince `restart` yerine `up -d`
+ile API konteynerini yeniden oluşturun. `gifs:check`, konteynerin gerçekten
+anahtarı aldığını ve GIPHY'den kullanılabilir GIF döndüğünü doğrular.
 
 ## Davranış
 
@@ -61,6 +68,14 @@ Yalnızca grup sahibi ad değiştirebilir ve üye ekleyip çıkarabilir. Ayrıla
 çıkarılan kişinin gruba erişimi hemen kesilir. Sahip ayrılırsa sahiplik kalan
 en eski üyeye geçer; son üye ayrılınca grup ve sahipsiz ekler temizlenir.
 Sahibin hesabı tamamen silinirse sahibi olduğu grup da silinir.
+
+Grup sahibi **Group details → Add group photo / Change group photo** üzerinden
+resim ekleyip değiştirebilir veya kaldırabilir. Fotoğraf sohbet listesinde,
+başlıkta ve Circle daveti gönderilecek grup seçiminde görünür. Yalnızca sahibin
+kendi yüklediği, başka içeriğe bağlı olmayan görsel kabul edilir; grup fotoğrafı
+temizlik işlemlerinden korunur. `1760192500000-GroupAvatars` migration'ı API
+başlangıcında otomatik uygulanır. Gönderen adı ile mesaj arasındaki ek üst
+boşluk kaldırıldı; mesajı olan grupta büyük karşılama alanı gösterilmez.
 
 Sonradan engellenen grup üyesinin profili, mesajları, son mesaj önizlemesi ve
 alıntı metni o kişiye gizlenir. Mesaj teslimi cihazın aldığı kimlikleri açıkça

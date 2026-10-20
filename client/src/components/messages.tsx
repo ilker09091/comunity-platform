@@ -16,6 +16,7 @@ import {
   Image as ImageIcon,
   Mic,
   Camera,
+  ImagePlus,
   Eye,
   Sticker as StickerIcon,
   Music2,
@@ -26,14 +27,11 @@ import {
   BellOff,
   Reply,
   Clapperboard,
-  Info,
+  ContactRound as Info,
   Search,
-  ArrowUp as Send,
+  Send,
   FaceSlightlySmilingPlus as Smile,
   MessageSquarePlus as SquarePen,
-  MessagesSquare,
-  ImagePlus,
-  EllipsisVertical,
   Pencil,
   UsersRound as Users,
   Video,
@@ -71,7 +69,7 @@ import { ImageViewer } from "./image-viewer";
 import { GifView, StickerButton, StickerView } from './sticker-picker';
 import { VoiceMessage, VoiceRecorder } from './voice-message';
 import { MessageText } from './message-text';
-import { CreateGroup, GroupThread, useGroups } from './group-chat';
+import { CreateGroup, GroupAvatar, GroupThread, useGroups } from './group-chat';
 
 type Message = Models["DirectMessageDto"];
 type Conversation = Models["ConversationDto"];
@@ -1100,7 +1098,7 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
         {!unavailable&&<Link className="dm-icon dm-info" href={`/profile/${peer.username}`} aria-label="View profile">
           <Info size={24} />
         </Link>}
-        <Dropdown label="Chat options" className="dm-chat-menu" summaryClassName="dm-icon" summary={<EllipsisVertical size={21} />}>
+        <Dropdown label="Chat options" className="dm-chat-menu" summaryClassName="dm-icon" summary={<MoreHorizontal size={22} />}>
           {!unavailable&&<Link href={`/profile/${peer.username}`}>
             <Info size={16} /> View profile
           </Link>}
@@ -1442,7 +1440,7 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
                 // Keep focus in the textarea so the phone keyboard stays open after sending.
                 onPointerDown={(e) => e.preventDefault()}
               >
-                <Send size={21}/><span className="sr-only">{editing?'Save edit':'Send'}</span>
+                <span>{editing?'Save':'Send'}</span>
               </button>
             )}
           </div>
@@ -1586,7 +1584,7 @@ export default function Messages() {
       <h1 className="sr-only">Messages</h1>
       <aside className="dm-sidebar" aria-label="Conversations">
         <header className="dm-sidebar-head">
-          <div className="dm-inbox-heading"><strong>Messages</strong><small>@{user.username}</small></div>
+          <strong>{user.username}</strong>
           <div className="dm-inbox-actions">
           <button type="button" className="dm-icon" aria-label="New group chat" title="New group chat" onClick={()=>setCreatingGroup(true)}><Users size={21}/></button>
           <button
@@ -1645,7 +1643,7 @@ export default function Messages() {
             />
           )}
           <ul className="dm-list">
-            {groupItems.map(group=><li key={group.id}><Link href={`/messages?group=${group.id}`} className={`dm-row dm-group-row ${groupId===group.id?'active':''}`} aria-current={groupId===group.id?'page':undefined}><span className="group-avatar"><Users size={23}/></span><span className="dm-row-copy"><strong>{group.name}</strong><span className="dm-row-preview">{group.lastMessage??`${group.memberCount} members`}</span></span>{group.unreadCount>0&&<span className="group-unread" aria-label={`${group.unreadCount} unread`}>{group.unreadCount}</span>}</Link></li>)}
+            {groupItems.map(group=><li key={group.id}><Link href={`/messages?group=${group.id}`} className={`dm-row dm-group-row ${groupId===group.id?'active':''}`} aria-current={groupId===group.id?'page':undefined}><GroupAvatar group={group}/><span className="dm-row-copy"><strong>{group.name}</strong><span className="dm-row-preview">{group.lastMessage??`${group.memberCount} members`}</span></span>{group.unreadCount>0&&<span className="group-unread" aria-label={`${group.unreadCount} unread`}>{group.unreadCount}</span>}</Link></li>)}
             {items.map((c) => (
               <ConversationRow
                 key={c.user.id}
@@ -1693,7 +1691,7 @@ export default function Messages() {
         ) : (
           <div className="dm-empty">
             <span className="dm-empty-icon">
-              <MessagesSquare size={38} strokeWidth={1.5} />
+              <Send size={44} strokeWidth={1.4} />
             </span>
             <h2>Your messages</h2>
             <p>Send private messages, videos and Reels to a friend.</p>

@@ -7,6 +7,7 @@ import { DirectMessageDto } from './social.dto.js';
 export class GroupDto {
   @ApiProperty({format:'uuid'}) id:string;
   @ApiProperty() name:string;
+  @ApiProperty({type:String,nullable:true}) avatarUrl:string|null;
   @ApiProperty({format:'uuid'}) ownerId:string;
   @ApiProperty() memberCount:number;
   @ApiProperty() unreadCount:number;
@@ -31,4 +32,7 @@ export class RenameGroupDto {
 export class GroupAckDto {
   @ApiProperty({format:'uuid'}) @IsUUID('all') messageId:string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() read?:boolean;
+}
+export class GroupAvatarDto {
+  @ApiProperty({format:'uuid'}) @IsUUID('all') mediaId:string;
 }

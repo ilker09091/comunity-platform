@@ -4,7 +4,7 @@ import { CurrentUser, type AuthUser } from '../../common/decorators/auth.decorat
 import { ApiAuth, ApiErrors } from '../../common/swagger/api-docs.decorators.js';
 import { CursorQueryDto, Paginated } from '../../common/dto/common.dto.js';
 import { GroupsService } from './groups.service.js';
-import { CreateGroupDto, GroupAckDto, GroupDetailDto, GroupDto, GroupMembersDto, GroupMessageDto, RenameGroupDto } from './groups.dto.js';
+import { CreateGroupDto, GroupAckDto, GroupAvatarDto, GroupDetailDto, GroupDto, GroupMembersDto, GroupMessageDto, RenameGroupDto } from './groups.dto.js';
 import { EditMessageDto, SendMessageDto } from './social.dto.js';
 
 @ApiTags('Group chats') @ApiAuth() @ApiErrors(400,401,403,404)
@@ -19,6 +19,10 @@ export class GroupsController {
   get(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string){return this.groups.get(u.id,id);}
   @Patch(':id') @ApiOperation({operationId:'groupsRename',summary:'Group owner renames the conversation'}) @ApiOkResponse({type:GroupDetailDto})
   rename(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string,@Body() dto:RenameGroupDto){return this.groups.rename(u.id,id,dto.name);}
+  @Post(':id/avatar') @HttpCode(200) @ApiOperation({operationId:'groupsSetAvatar',summary:'Group owner sets an uploaded photo'}) @ApiOkResponse({type:GroupDetailDto})
+  avatar(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string,@Body() dto:GroupAvatarDto){return this.groups.setAvatar(u.id,id,dto.mediaId);}
+  @Delete(':id/avatar') @HttpCode(200) @ApiOperation({operationId:'groupsRemoveAvatar',summary:'Group owner removes the group photo'}) @ApiOkResponse({type:GroupDetailDto})
+  removeAvatar(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string){return this.groups.setAvatar(u.id,id,null);}
   @Post(':id/members') @ApiOperation({operationId:'groupsAddMembers',summary:'Group owner adds accepted contacts'}) @ApiCreatedResponse({type:GroupDetailDto})
   members(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string,@Body() dto:GroupMembersDto){return this.groups.members(u.id,id,dto.memberIds);}
   @Delete(':id/members/:userId') @HttpCode(204) @ApiOperation({operationId:'groupsRemoveMember',summary:'Owner removes a member'}) @ApiNoContentResponse()

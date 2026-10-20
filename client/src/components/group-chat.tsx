@@ -3,8 +3,8 @@ import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ImagePlus as Camera, Check, LogOut, Pencil, ArrowUp as Send, EllipsisVertical as Settings2, UsersRound as Users, UserPlus, X } from 'lucide-react';
-import { api, type Models } from '@/lib/api/client';
+import { ArrowLeft, ImagePlus as Camera, LogOut, Pencil, Send, Settings2, UsersRound as Users, UserPlus, X } from 'lucide-react';
+import { api, upload, type Models } from '@/lib/api/client';
 import { useMediaAttachment } from '@/lib/use-media-attachment';
 import { useSession, useToast } from './providers';
 import { Avatar, ConfirmDialog, ErrorState, LoadMore, Modal } from './ui';
@@ -18,6 +18,11 @@ type User=Models['UserSummaryDto'];
 type Group=Models['GroupDetailDto'];
 type Message=Models['GroupMessageDto'];
 type Draft={content?:string;mediaId?:string;audioId?:string;stickerId?:string;gifId?:string;replyToId?:string};
+export function GroupAvatar({group,size=48}:{group:{name:string;avatarUrl?:string|null};size?:number}) {
+  return <span className="group-avatar" role="img" aria-label={`${group.name} group photo`} style={{width:size,height:size}}>
+    {group.avatarUrl?<img src={group.avatarUrl} alt=""/>:<Users size={Math.round(size*.48)} aria-hidden="true"/>}
+  </span>;
+}
 export type GroupMessageActions={own:boolean;first:boolean;last:boolean;replyAuthor?:string;onReply:(message:Models['DirectMessageDto'])=>void;onEdit:(message:Models['DirectMessageDto'])=>void;onUnsend:(message:Models['DirectMessageDto'])=>void;onJump:(id:string)=>void};
 
 export function useGroups(enabled=true) {
@@ -50,14 +55,26 @@ export function CreateGroup({onClose}:{onClose:()=>void}) {
 function GroupSettings({group,onClose}:{group:Group;onClose:()=>void}) {
   const {user}=useSession(),router=useRouter(),client=useQueryClient(),toast=useToast();
   const [name,setName]=useState(group.name),[adding,setAdding]=useState(false),[remove,setRemove]=useState<User|null>(null),[leaving,setLeaving]=useState(false);
+  const photoInput=useRef<HTMLInputElement>(null),[photoProgress,setPhotoProgress]=useState<number|null>(null);
   const refresh=()=>void client.invalidateQueries({queryKey:['messages']});
   const owner=group.ownerId===user?.id;
+  const photo=useMutation({mutationFn:async(file:File|null)=>{
+    if(!file)return api('groupsRemoveAvatar',{params:{id:group.id}});
+    if(!file.type.startsWith('image/'))throw new Error('Choose a photo for the group.');
+    const media=await upload(file,setPhotoProgress) as Models['MediaDto'];
+    try{return await api('groupsSetAvatar',{params:{id:group.id},body:{mediaId:media.id}});}
+    catch(error){void api('mediaRemove',{params:{id:media.id}}).catch(()=>{});throw error;}
+  },onSuccess:updated=>{client.setQueryData(['messages',user?.id,'group',group.id],updated);refresh();toast('Group photo updated.');},onError:error=>toast(error.message,true),onSettled:()=>setPhotoProgress(null)});
   const rename=useMutation({mutationFn:()=>api('groupsRename',{params:{id:group.id},body:{name:name.trim()}}),onSuccess:()=>{refresh();toast('Group name updated.');},onError:error=>toast(error.message,true)});
   const add=useMutation({mutationFn:(id:string)=>api('groupsAddMembers',{params:{id:group.id},body:{memberIds:[id]}}),onSuccess:()=>{refresh();setAdding(false);},onError:error=>toast(error.message,true)});
   const removeMember=useMutation({mutationFn:(id:string)=>api('groupsRemoveMember',{params:{id:group.id,userId:id}}),onSuccess:()=>{setRemove(null);refresh();},onError:error=>toast(error.message,true)});
   const leave=useMutation({mutationFn:()=>api('groupsLeave',{params:{id:group.id}}),onSuccess:()=>{onClose();refresh();router.push('/messages');},onError:error=>toast(error.message,true)});
-  return <><Modal title="Group details" onClose={onClose} className="group-settings-dialog"><div className="group-settings-body">
-    <span className="group-big-icon"><Users size={38}/></span>
+  return <><Modal title="Group details" onClose={onClose} className="group-settings-dialog" guardClose={()=>!photo.isPending}><div className="group-settings-body">
+    <div className="group-photo-editor"><GroupAvatar group={group} size={88}/>
+      {owner&&<><div className="group-photo-actions"><button type="button" className="button secondary small" disabled={photo.isPending} onClick={()=>photoInput.current?.click()}><Camera size={16}/>{photo.isPending?'Updating…':group.avatarUrl?'Change group photo':'Add group photo'}</button>{group.avatarUrl&&<button type="button" className="button secondary small" disabled={photo.isPending} onClick={()=>photo.mutate(null)}>Remove photo</button>}</div>
+      <input ref={photoInput} hidden type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={event=>{const file=event.target.files?.[0];event.target.value='';if(file)photo.mutate(file);}}/>
+      {photo.isPending&&<small role="status">{photoProgress===null?'Saving group photo…':`Uploading… ${photoProgress}%`}</small>}</>}
+    </div>
     {owner?<form className="group-rename" onSubmit={event=>{event.preventDefault();if(name.trim())rename.mutate();}}><input aria-label="Rename group" value={name} maxLength={60} onChange={event=>setName(event.target.value)}/><button className="button small" disabled={!name.trim()||name===group.name||rename.isPending}>Save</button></form>:<h3>{group.name}</h3>}
     <p className="muted">{group.memberCount} members · Private group chat</p>
     <div className="group-member-list">{group.members.map(member=><div key={member.id}><Avatar user={member} size={40}/><span><strong>{member.displayName}</strong><small>{member.id===group.ownerId?'Owner':member.id===user?.id?'You':member.username?`@${member.username}`:'Account unavailable'}</small></span>{owner&&member.id!==user?.id&&<button type="button" className="dm-icon" aria-label={`Remove ${member.displayName} from group`} onClick={()=>setRemove(member)}><X size={18}/></button>}</div>)}</div>
@@ -111,11 +128,11 @@ export function GroupThread({id,renderMessage}:{id:string;renderMessage:(message
   if(group.error)return <div className="dm-empty"><ErrorState error={group.error} retry={()=>void group.refetch()}/><Link href="/messages" className="button secondary">Back to messages</Link></div>;
   const g=group.data!;
   return <section className="dm-thread group-thread" aria-label={`Group conversation ${g.name}`}>
-    <header className="dm-thread-head"><Link href="/messages" className="dm-icon dm-back" aria-label="Back to conversations"><ArrowLeft size={23}/></Link><span className="group-avatar"><Users size={24}/></span><button type="button" className="group-title" onClick={()=>setSettings(true)}><strong>{g.name}</strong><small>{g.memberCount} members</small></button><button className="dm-icon" aria-label="Group details" onClick={()=>setSettings(true)}><Settings2 size={22}/></button></header>
+    <header className="dm-thread-head"><Link href="/messages" className="dm-icon dm-back" aria-label="Back to conversations"><ArrowLeft size={23}/></Link><GroupAvatar group={g}/><button type="button" className="group-title" onClick={()=>setSettings(true)}><strong>{g.name}</strong><small>{g.memberCount} members</small></button><button className="dm-icon" aria-label="Group details" onClick={()=>setSettings(true)}><Settings2 size={22}/></button></header>
     <div className="dm-scroll" ref={scroller} onScroll={()=>{const element=scroller.current;if(element)pinned.current=element.scrollHeight-element.scrollTop-element.clientHeight<80;}}>
       <LoadMore hasMore={history.hasNextPage} pending={history.isFetchingNextPage} onClick={()=>void history.fetchNextPage()}/>
       {history.error&&<ErrorState error={history.error} retry={()=>void history.refetch()}/>}
-      {!history.hasNextPage&&<div className="dm-intro"><span className="group-big-icon"><Users size={40}/></span><strong>{g.name}</strong><span>A private space for {g.memberCount} people</span></div>}
+      {!history.isPending&&!history.hasNextPage&&!messages.length&&<div className="dm-intro"><GroupAvatar group={g} size={88}/><strong>{g.name}</strong><span>A private space for {g.memberCount} people</span></div>}
       <ol className="dm-messages" ref={list}>{messages.map((message,index)=>{
         const own=message.senderId===user?.id,first=messages[index-1]?.senderId!==message.senderId,last=messages[index+1]?.senderId!==message.senderId;
         return <Fragment key={message.id}>{!own&&first&&<li className="group-message-author">{message.sender.displayName}</li>}{renderMessage(message,{own,first,last,replyAuthor:g.members.find(member=>member.id===message.replyTo?.senderId)?.displayName,onReply:value=>{setReply(value);setEditing(null);},onEdit:value=>{setEditing(value);setText(value.content??'');setReply(null);attachment.clear();},onUnsend:setUnsending,onJump:jump})}</Fragment>;
@@ -133,7 +150,7 @@ export function GroupThread({id,renderMessage}:{id:string;renderMessage:(message
           {!calls.busy&&<VoiceRecorder disabled={send.isPending||attachment.busy||!!attachment.media} onActiveChange={setVoice} onSend={async audioId=>{await send.mutateAsync({audioId,replyToId:reply?.id});}}/>}
         </div>
         <input ref={file} hidden type="file" accept="image/*,video/*" onChange={event=>{void attachment.select(event.target.files?.[0]);event.target.value='';}}/>
-        {(!!text.trim()||!!attachment.media||!!editing)&&<button type="submit" className="dm-send" aria-label={editing?'Save edit':'Send message'} disabled={send.isPending||edit.isPending||attachment.busy||voice||(!text.trim()&&!attachment.media)} onPointerDown={event=>event.preventDefault()}>{editing?<Check size={21}/>:<Send size={21}/>}</button>}
+        {(!!text.trim()||!!attachment.media||!!editing)&&<button type="submit" className="dm-send" aria-label={editing?'Save edit':'Send message'} disabled={send.isPending||edit.isPending||attachment.busy||voice||(!text.trim()&&!attachment.media)} onPointerDown={event=>event.preventDefault()}>{editing?'Save':'Send'}</button>}
       </div>
     </form>
     <div className="dm-sticker-dock" ref={setDock}/>

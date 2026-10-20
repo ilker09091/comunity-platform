@@ -585,6 +585,16 @@ export const endpoints = {
     "method": "PATCH",
     "authenticated": true
   },
+  "groupsSetAvatar": {
+    "path": "/api/group-chats/{id}/avatar",
+    "method": "POST",
+    "authenticated": true
+  },
+  "groupsRemoveAvatar": {
+    "path": "/api/group-chats/{id}/avatar",
+    "method": "DELETE",
+    "authenticated": true
+  },
   "groupsAddMembers": {
     "path": "/api/group-chats/{id}/members",
     "method": "POST",

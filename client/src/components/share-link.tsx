@@ -6,7 +6,7 @@ import { api, type Models } from '@/lib/api/client';
 import { useToast } from './providers';
 import { Modal, LoadMore } from './ui';
 import { RecipientPicker } from './social-controls';
-import { useGroups } from './group-chat';
+import { GroupAvatar, useGroups } from './group-chat';
 
 type Target={id:string;name:string;group:boolean};
 export function ShareLinkDialog({title,path,onClose}:{title:string;path:string;onClose:()=>void}) {
@@ -27,7 +27,7 @@ export function ShareLinkDialog({title,path,onClose}:{title:string;path:string;o
     <div className="share-invite-body"><div className="share-invite-preview"><span className="group-avatar"><Users size={26}/></span><span><strong>{title}</strong><small>Circle invitation · Tap to join</small></span></div>
       <div className="share-invite-tabs" role="tablist" aria-label="Share to"><button type="button" role="tab" aria-selected={tab==='people'} onClick={()=>setTab('people')}>People</button><button type="button" role="tab" aria-selected={tab==='groups'} onClick={()=>setTab('groups')}>Groups</button></div>
       <div className="group-selected">{selected.map(target=><button type="button" key={`${target.group}:${target.id}`} onClick={()=>toggle(target)} aria-label={`Remove ${target.name}`}>{target.name}<X size={13}/></button>)}</div>
-      {tab==='people'?<RecipientPicker disabled={send.isPending} onSelect={(person:Models['UserSummaryDto'])=>toggle({id:person.id,name:person.displayName,group:false})}/>:<div className="group-share-list">{groups.data?.pages.flatMap(page=>page.items).map(group=><button type="button" key={group.id} disabled={send.isPending} onClick={()=>toggle({id:group.id,name:group.name,group:true})}><Users size={22}/><span><strong>{group.name}</strong><small>{group.memberCount} members</small></span>{selected.some(target=>target.group&&target.id===group.id)&&<Check size={20}/>}</button>)}{!groups.isPending&&!groups.data?.pages[0]?.items.length&&<p className="muted">Create a group chat from Messages first.</p>}<LoadMore hasMore={groups.hasNextPage} pending={groups.isFetchingNextPage} onClick={()=>void groups.fetchNextPage()}/></div>}
+      {tab==='people'?<RecipientPicker disabled={send.isPending} onSelect={(person:Models['UserSummaryDto'])=>toggle({id:person.id,name:person.displayName,group:false})}/>:<div className="group-share-list">{groups.data?.pages.flatMap(page=>page.items).map(group=><button type="button" key={group.id} disabled={send.isPending} onClick={()=>toggle({id:group.id,name:group.name,group:true})}><GroupAvatar group={group} size={40}/><span><strong>{group.name}</strong><small>{group.memberCount} members</small></span>{selected.some(target=>target.group&&target.id===group.id)&&<Check size={20}/>}</button>)}{!groups.isPending&&!groups.data?.pages[0]?.items.length&&<p className="muted">Create a group chat from Messages first.</p>}<LoadMore hasMore={groups.hasNextPage} pending={groups.isFetchingNextPage} onClick={()=>void groups.fetchNextPage()}/></div>}
       <input className="social-input" aria-label="Add a message" placeholder="Add a message…" maxLength={1000} value={comment} onChange={event=>setComment(event.target.value)}/>
       <button type="button" className="button group-create-submit" disabled={!selected.length||send.isPending} onClick={()=>send.mutate()}><Send size={18}/>{send.isPending?'Sending…':`Send${selected.length?` · ${selected.length}`:''}`}</button>
     </div>

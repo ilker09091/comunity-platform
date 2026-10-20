@@ -1,4 +1,4 @@
-import { Controller, Get, Injectable, Logger, Module, Query } from '@nestjs/common';
+import { Controller, Get, Injectable, Logger, Module, Query, type OnModuleInit } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
@@ -39,28 +39,42 @@ interface GiphyGif { id: string; title?: string; rating?: string; images?: Recor
  * and a sent GIF is resolved by id here, so a message or comment can only ever embed GIPHY media.
  */
 @Injectable()
-export class GifsService {
+export class GifsService implements OnModuleInit {
   private readonly logger = new Logger(GifsService.name);
   private readonly cache = new Map<string, { at: number; value: unknown }>();
+  private readonly pending = new Map<string, Promise<unknown>>();
   private get key() { return process.env.GIPHY_API_KEY?.trim() || ''; }
   private get base() { return (process.env.GIPHY_API_URL ?? 'https://api.giphy.com/v1').replace(/\/$/, ''); }
   get enabled() { return !!this.key; }
+  onModuleInit() {
+    if(process.env.NODE_ENV==='production'&&!this.enabled)
+      this.logger.warn('GIF search disabled: GIPHY_API_KEY is missing. Configure the root .env or .env.giphy and recreate the api container.');
+  }
 
   private async call<T>(path: string, params: Record<string, string>, ttlMs: number): Promise<T> {
     const query = new URLSearchParams({ ...params, api_key: this.key, rating: process.env.GIPHY_RATING || 'pg-13' });
     const cacheKey = `${path}?${query}`;
     const hit = this.cache.get(cacheKey);
     if (hit && Date.now() - hit.at < ttlMs) return hit.value as T;
+    const pending=this.pending.get(cacheKey);
+    if(pending)return pending as Promise<T>;
+    const request=this.request<T>(path,query,cacheKey,ttlMs);
+    this.pending.set(cacheKey,request);
+    try{return await request;}finally{this.pending.delete(cacheKey);}
+  }
+
+  private async request<T>(path:string,query:URLSearchParams,cacheKey:string,ttlMs:number):Promise<T> {
     let response: Response;
     try {
       response = await fetch(`${this.base}${path}?${query}`, { signal: AbortSignal.timeout(6000) });
     } catch (error) {
-      this.logger.warn({ message: 'GIF provider unreachable', error: (error as Error).message });
+      this.logger.warn({ message: 'GIF provider unreachable', error: error instanceof Error?error.name:'Error' });
       throw AppException.unprocessable(ErrorCode.FEATURE_DISABLED, 'GIFs are unavailable right now. Try again later.');
     }
     if (response.status === 404) throw AppException.notFound(ErrorCode.NOT_FOUND, 'GIF not found');
     if (!response.ok) {
       this.logger.warn({ message: 'GIF provider error', status: response.status });
+      if(response.status===429)throw AppException.unprocessable(ErrorCode.FEATURE_DISABLED,'GIF service is busy. Please try again later.');
       throw AppException.unprocessable(ErrorCode.FEATURE_DISABLED, 'GIFs are unavailable right now. Try again later.');
     }
     let value: T;

@@ -33,6 +33,7 @@ export class SoundtrackService {
 
   private notShared = `NOT EXISTS (SELECT 1 FROM direct_messages dm WHERE dm.media_id = m.id)
           AND NOT EXISTS (SELECT 1 FROM group_messages gm WHERE gm.media_id = m.id)
+          AND NOT EXISTS (SELECT 1 FROM chat_groups cg WHERE cg.avatar_media_id = m.id)
     AND NOT EXISTS (SELECT 1 FROM stories st WHERE st.media_id = m.id)
     AND NOT EXISTS (SELECT 1 FROM circle_posts cp WHERE cp.media_id = m.id)`;
 

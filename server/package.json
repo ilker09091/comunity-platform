@@ -24,6 +24,7 @@
     "migration:revert": "nest build && node dist/database/migrate.js revert",
     "migration:show": "nest build && node dist/database/migrate.js show",
     "openapi:export": "nest build && node dist/scripts/export-openapi.js",
+    "gifs:check": "node dist/scripts/check-gifs.js",
     "user:set-role": "node dist/scripts/set-role.js"
   },
   "dependencies": {

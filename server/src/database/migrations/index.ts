@@ -1,3 +1,4 @@
+import { GroupAvatars1760192500000 } from './1760192500000-GroupAvatars.js';
 import { MessagesAndStories1760191200000 } from './1760191200000-MessagesAndStories.js';
 import { StoryPostShares1760191300000 } from './1760191300000-StoryPostShares.js';
 import { StoryEngagementRequestsStickers1760191400000 } from './1760191400000-StoryEngagementRequestsStickers.js';
@@ -63,4 +64,5 @@ export const migrations = [
   AdminUserNotes1760192200000,
   GifAttachments1760192300000,
   GroupMessaging1760192400000,
+  GroupAvatars1760192500000,
 ];

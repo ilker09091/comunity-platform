@@ -9,6 +9,31 @@ GIF search reads `GIPHY_API_KEY` from the root `.env` or the optional private
 `.env.giphy` file. The local key is saved in `.env.giphy`, which is ignored by
 Git: copy that file separately to the VPS project directory before rebuilding.
 Do not put the key in a `NEXT_PUBLIC_*` variable. See [messaging changes](docs/MESSAGING_UPGRADE.md).
+
+For the existing VPS, copy the private key file once from your workstation:
+
+```powershell
+scp .env.giphy root@13.140.148.251:/opt/comunity-platform/.env.giphy
+```
+
+Then run in `/opt/comunity-platform` on the VPS:
+
+```sh
+chmod 600 .env.giphy
+docker compose up -d --build --no-deps web api turn
+docker compose exec -T api npm run gifs:check
+```
+
+Use `up` to recreate the API after changing its environment; `restart` keeps the
+old environment. The check verifies a real GIPHY response from the running API
+container without displaying the key. A successful local build alone does not
+verify the VPS configuration. GIF search uses the official HTTPS endpoint in
+Compose. The API logs a clear warning when its key is missing.
+
+GIPHY beta keys have a provider-side limit of 100 API calls per hour. For higher
+production traffic, request the key upgrade in the
+[GIPHY dashboard](https://developers.giphy.com/docs/api/quick-start-guide/).
+Changing Docker settings cannot change that provider-side limit.
 Set `SITE_URL` (default `https://rosefly.store`) for link previews, canonical URLs and the sitemap. See [ports and call quality settings](docs/CALL_EXPERIENCE.md).
 
 ## 1. Prepare the server
