@@ -27,6 +27,9 @@ import { ReelDiscoveryCycles1760191000000 } from './1760191000000-ReelDiscoveryC
 import { CallsAndStreaks1760191800000 } from './1760191800000-CallsAndStreaks.js';
 import { DirectMessageAttachments1760191900000 } from './1760191900000-DirectMessageAttachments.js';
 import { CallMessages1760192000000 } from './1760192000000-CallMessages.js';
+import { Circles1760192100000 } from './1760192100000-Circles.js';
+import { AdminUserNotes1760192200000 } from './1760192200000-AdminUserNotes.js';
+import { GifAttachments1760192300000 } from './1760192300000-GifAttachments.js';
 export const migrations = [
   CreateUsersAndAuth1760180000000,
   CreateMedia1760180100000,
@@ -55,4 +58,7 @@ export const migrations = [
   CallsAndStreaks1760191800000,
   DirectMessageAttachments1760191900000,
   CallMessages1760192000000,
+  Circles1760192100000,
+  AdminUserNotes1760192200000,
+  GifAttachments1760192300000,
 ];

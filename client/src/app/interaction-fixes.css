@@ -71,3 +71,6 @@
   .quick-actions { flex-wrap:wrap; }
   .admin-page-head { flex-wrap:wrap; }
 }
+
+/* Sticky sidebars scroll as a whole; their cards must never be squeezed (it clipped the profile card's button). */
+.left-sidebar > *, .right-sidebar > * { flex-shrink: 0; }

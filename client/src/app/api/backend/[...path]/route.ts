@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { endpoints } from "@/lib/api/operations";
 import type { components } from "@/lib/api/schema";
 
@@ -95,6 +95,25 @@ const MEDIA_RESPONSE_HEADERS = [
  * address. Signed URLs are the access check, so no cookies or tokens are forwarded. Bodies are
  * streamed and Range requests pass through (206), which Safari/iOS needs for video playback.
  */
+/**
+ * `next dev` only: a local API that shares the production database has the records but not the
+ * files. Missing files are then read from MEDIA_FALLBACK_ORIGIN (e.g. the live site's
+ * /api/backend), re-signed with MEDIA_FALLBACK_URL_SECRET when the two media keys differ.
+ * Production builds never take this path.
+ */
+const fallbackOrigin =
+  process.env.NODE_ENV !== "production" ? process.env.MEDIA_FALLBACK_ORIGIN?.replace(/\/$/, "") : undefined;
+function fallbackUrl(request: NextRequest, apiPath: string) {
+  const search = new URLSearchParams(request.nextUrl.search);
+  const secret = process.env.MEDIA_FALLBACK_URL_SECRET?.trim();
+  if (secret) {
+    // Same signature as the API's MediaUrlService.
+    const key = apiPath.split("/").at(-1)!, exp = search.get("exp") ?? "";
+    search.set("sig", createHmac("sha256", secret).update(`${key}:${exp}`).digest("base64url").slice(0, 43));
+  }
+  return `${fallbackOrigin}${apiPath}?${search}`;
+}
+
 async function mediaFile(request: NextRequest, apiPath: string) {
   const headers: Record<string, string> = {};
   for (const name of MEDIA_REQUEST_HEADERS) {
@@ -102,13 +121,10 @@ async function mediaFile(request: NextRequest, apiPath: string) {
     if (value) headers[name] = value;
   }
   try {
-    const upstream = await fetch(origin + apiPath + request.nextUrl.search, {
-      method: request.method,
-      headers,
-      cache: "no-store",
-      redirect: "manual",
-      signal: request.signal,
-    });
+    const load = (url: string) =>
+      fetch(url, { method: request.method, headers, cache: "no-store", redirect: "manual", signal: request.signal });
+    let upstream = await load(origin + apiPath + request.nextUrl.search);
+    if (fallbackOrigin && upstream.status === 404) upstream = await load(fallbackUrl(request, apiPath));
     const out = new Headers();
     for (const name of MEDIA_RESPONSE_HEADERS) {
       const value = upstream.headers.get(name);
@@ -251,7 +267,9 @@ async function handler(
     }
     if ((logout && upstream.ok) || (!signingIn && upstream.status === 401))
       clearSession(response);
-    response.headers.set("Cache-Control", "no-store");
+    // Public preview images may be cached by crawlers; everything else is per-user.
+    const image = (upstream.headers.get("content-type") ?? "").startsWith("image/") && upstream.ok;
+    response.headers.set("Cache-Control", image ? upstream.headers.get("cache-control") ?? "public, max-age=3600" : "no-store");
     return response;
   } catch (error) {
     const expired =

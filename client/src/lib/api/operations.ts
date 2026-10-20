@@ -315,6 +315,11 @@ export const endpoints = {
     "method": "POST",
     "authenticated": true
   },
+  "gifsList": {
+    "path": "/api/gifs",
+    "method": "GET",
+    "authenticated": true
+  },
   "bookmarksList": {
     "path": "/api/users/me/bookmarks",
     "method": "GET",
@@ -705,6 +710,126 @@ export const endpoints = {
     "method": "POST",
     "authenticated": true
   },
+  "circlesList": {
+    "path": "/api/circles",
+    "method": "GET",
+    "authenticated": true
+  },
+  "circlesCreate": {
+    "path": "/api/circles",
+    "method": "POST",
+    "authenticated": true
+  },
+  "circlesInvite": {
+    "path": "/api/circles/invites/{code}",
+    "method": "GET",
+    "authenticated": true
+  },
+  "circlesJoin": {
+    "path": "/api/circles/join",
+    "method": "POST",
+    "authenticated": true
+  },
+  "circlesGet": {
+    "path": "/api/circles/{id}",
+    "method": "GET",
+    "authenticated": true
+  },
+  "circlesUpdate": {
+    "path": "/api/circles/{id}",
+    "method": "PATCH",
+    "authenticated": true
+  },
+  "circlesDelete": {
+    "path": "/api/circles/{id}",
+    "method": "DELETE",
+    "authenticated": true
+  },
+  "circlesResetInvite": {
+    "path": "/api/circles/{id}/invite/reset",
+    "method": "POST",
+    "authenticated": true
+  },
+  "circlesLeave": {
+    "path": "/api/circles/{id}/leave",
+    "method": "POST",
+    "authenticated": true
+  },
+  "circlesMembers": {
+    "path": "/api/circles/{id}/members",
+    "method": "GET",
+    "authenticated": true
+  },
+  "circlesSetRole": {
+    "path": "/api/circles/{id}/members/{userId}/role",
+    "method": "POST",
+    "authenticated": true
+  },
+  "circlesRemoveMember": {
+    "path": "/api/circles/{id}/members/{userId}",
+    "method": "DELETE",
+    "authenticated": true
+  },
+  "circlesFeed": {
+    "path": "/api/circles/{id}/posts",
+    "method": "GET",
+    "authenticated": true
+  },
+  "circlesCreatePost": {
+    "path": "/api/circles/{id}/posts",
+    "method": "POST",
+    "authenticated": true
+  },
+  "circlesDeletePost": {
+    "path": "/api/circles/{id}/posts/{postId}",
+    "method": "DELETE",
+    "authenticated": true
+  },
+  "circlesToday": {
+    "path": "/api/circles/{id}/today",
+    "method": "GET",
+    "authenticated": true
+  },
+  "circlesPromptHistory": {
+    "path": "/api/circles/{id}/prompts",
+    "method": "GET",
+    "authenticated": true
+  },
+  "circlesSetPrompt": {
+    "path": "/api/circles/{id}/prompts",
+    "method": "POST",
+    "authenticated": true
+  },
+  "circlesAlbums": {
+    "path": "/api/circles/{id}/albums",
+    "method": "GET",
+    "authenticated": true
+  },
+  "circlesCreateAlbum": {
+    "path": "/api/circles/{id}/albums",
+    "method": "POST",
+    "authenticated": true
+  },
+  "circlesAlbumItems": {
+    "path": "/api/circles/{id}/albums/{albumId}/items",
+    "method": "GET",
+    "authenticated": true
+  },
+  "circlesDeleteAlbum": {
+    "path": "/api/circles/{id}/albums/{albumId}",
+    "method": "DELETE",
+    "authenticated": true
+  },
+  "previewsPost": {
+    "path": "/api/posts/{id}/preview.jpg",
+    "method": "GET",
+    "authenticated": false
+  },
+  "previewsAvatar": {
+    "path": "/api/users/{username}/avatar.jpg",
+    "method": "GET",
+    "authenticated": false
+  },
   "adminImporterRequest": {
     "path": "/api/admin/importer/request",
     "method": "POST",
@@ -738,6 +863,51 @@ export const endpoints = {
   "adminAnalyticsTop": {
     "path": "/api/admin/analytics/top-content",
     "method": "GET",
+    "authenticated": true
+  },
+  "adminUsersSessions": {
+    "path": "/api/admin/users/{id}/sessions",
+    "method": "GET",
+    "authenticated": true
+  },
+  "adminUsersRevokeSessions": {
+    "path": "/api/admin/users/{id}/sessions/revoke",
+    "method": "POST",
+    "authenticated": true
+  },
+  "adminUsersRevokeSession": {
+    "path": "/api/admin/users/{id}/sessions/{sessionId}/revoke",
+    "method": "POST",
+    "authenticated": true
+  },
+  "adminUsersResetPassword": {
+    "path": "/api/admin/users/{id}/password",
+    "method": "POST",
+    "authenticated": true
+  },
+  "adminUsersUpdateProfile": {
+    "path": "/api/admin/users/{id}/profile",
+    "method": "PATCH",
+    "authenticated": true
+  },
+  "adminUsersActivity": {
+    "path": "/api/admin/users/{id}/activity",
+    "method": "GET",
+    "authenticated": true
+  },
+  "adminUsersNotes": {
+    "path": "/api/admin/users/{id}/notes",
+    "method": "GET",
+    "authenticated": true
+  },
+  "adminUsersAddNote": {
+    "path": "/api/admin/users/{id}/notes",
+    "method": "POST",
+    "authenticated": true
+  },
+  "adminUsersDeleteNote": {
+    "path": "/api/admin/users/{id}/notes/{noteId}",
+    "method": "DELETE",
     "authenticated": true
   },
   "adminUsersDeleteAccount": {

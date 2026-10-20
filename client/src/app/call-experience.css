@@ -5,7 +5,6 @@
 .ig-call-dialog .call-type > span { min-width:0; overflow:hidden; text-overflow:ellipsis; }
 .ig-call-dialog .call-actions { flex-wrap:wrap; gap:12px; }
 .ig-call-dialog.viewing-screen .call-remote { object-fit:contain; }
-.ig-call-dialog.is-sharing .call-local { object-fit:contain; transform:none; aspect-ratio:16/9; background:#15151b; }
 .call-share-settings {
   position:absolute; z-index:6; right:24px; bottom:148px; width:248px; padding:18px;
   border:1px solid #ffffff25; border-radius:20px; background:linear-gradient(145deg,#30303aeb,#17171fed);
@@ -83,7 +82,6 @@ dialog.call-minimized > header { height:42px!important; padding:6px 10px!importa
   .ig-call-dialog:not(.call-minimized) .call-control-icon { width:42px; height:42px; }
 }
 @media(max-height:520px) and (min-width:600px) {
-  .ig-call-dialog.is-sharing .call-local { left:50%; right:auto; top:80px; transform:translateX(-50%); width:110px; max-height:70px; }
   .ig-call-dialog .call-share-settings { left:auto; right:16px; bottom:96px; width:280px; padding:12px; }
   .call-share-heading { float:right; }
   .call-share-heading > svg,.call-share-settings > p,.call-share-settings > small { display:none; }
@@ -93,3 +91,73 @@ dialog.call-minimized > header { height:42px!important; padding:6px 10px!importa
   .call-quality-option > svg { display:none; }
 }
 @media(prefers-reduced-motion:reduce) { dialog.modal.call-minimized[open] { animation:none; } }
+
+/* Discord-style screen viewing: the shared screen fills the call; cameras become tiles. */
+.screen-stage { position:absolute; inset:0; z-index:2; background:#050507; outline:none; }
+.screen-surface { position:absolute; inset:0; overflow:hidden; display:grid; place-items:center; touch-action:none; user-select:none; cursor:zoom-in; }
+.screen-stage.zoomed .screen-surface { cursor:grab; }
+.screen-stage.zoomed .screen-surface:active { cursor:grabbing; }
+.screen-video { width:100%; height:100%; object-fit:contain; transform-origin:center; will-change:transform; pointer-events:none; }
+.screen-pip-note { position:absolute; margin:0; color:#ffffffa6; font-size:13px; }
+.screen-topbar,.screen-toolbar { position:absolute; z-index:3; display:flex; align-items:center; transition:opacity .25s; }
+.screen-topbar { top:72px; left:24px; right:300px; gap:10px; min-width:0; color:#fff; font-size:13px; text-shadow:0 1px 4px #000a; }
+.screen-live { flex:0 0 auto; padding:2px 7px; border-radius:4px; background:#ed4245; color:#fff; font-size:10px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; text-shadow:none; }
+.screen-title { display:flex; align-items:center; gap:6px; min-width:0; font-weight:600; }
+.screen-title > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.screen-status { flex:0 0 auto; color:#ffffffb3; font-variant-numeric:tabular-nums; }
+.screen-info { flex:0 0 auto; padding:3px 8px; border-radius:6px; background:#0008; color:#ffffffd9; font-size:11px; font-variant-numeric:tabular-nums; text-shadow:none; }
+.screen-toolbar { top:66px; right:72px; gap:2px; padding:4px; border:1px solid #ffffff1f; border-radius:12px; background:#111214d9; backdrop-filter:blur(14px); }
+.screen-toolbar button { display:grid; place-items:center; min-width:34px; height:34px; padding:0 6px; border:0; border-radius:8px; background:transparent; color:#dbdee1; cursor:pointer; }
+.screen-toolbar button:hover:not(:disabled) { background:#ffffff1a; color:#fff; }
+.screen-toolbar button:disabled { opacity:.35; cursor:default; }
+.screen-toolbar button[aria-pressed=true] { color:#fff; background:#5865f2; }
+.screen-zoom-level { min-width:52px!important; font-size:12px; font-weight:600; font-variant-numeric:tabular-nums; }
+.screen-volume { display:flex; align-items:center; gap:4px; padding-right:6px; }
+.screen-volume input { width:84px; accent-color:#5865f2; }
+.screen-stage:focus-visible { outline:2px solid #5865f2; outline-offset:-2px; }
+.ig-call-dialog.viewing-screen .call-person,.ig-call-dialog.viewing-screen .call-type,.ig-call-dialog.viewing-screen .call-ambient { display:none; }
+.ig-call-dialog.viewing-screen .call-stage::after { z-index:2; }
+.ig-call-dialog.viewing-screen .call-actions { z-index:5; transition:opacity .25s; }
+/* Camera tiles beside the shared screen. */
+.ig-call-dialog.viewing-screen .call-video-stage { inset:auto 16px 140px auto; width:auto; height:auto; z-index:4; display:flex; flex-direction:column; align-items:flex-end; gap:8px; pointer-events:none; transition:opacity .25s; }
+.ig-call-dialog.viewing-screen .call-video-stage > video { position:static; width:clamp(120px,15vw,200px); height:auto; aspect-ratio:4/3; max-height:none; object-fit:cover; border:1px solid #ffffff30; border-radius:12px; background:#1e1f22; box-shadow:0 6px 24px #0007; }
+.ig-call-dialog.viewing-screen .call-video-stage > video[data-video-active=false] { display:none; }
+.ig-call-dialog.viewing-screen .call-video-stage > .button { pointer-events:auto; }
+/* Your own stream, like Discord's preview tile. */
+.call-screen-self { position:absolute; z-index:4; left:24px; bottom:148px; width:clamp(180px,24%,300px); aspect-ratio:16/9; overflow:hidden; border:2px solid #3ba55c; border-radius:12px; background:#111; box-shadow:0 8px 28px #0007; transition:opacity .25s; }
+.call-screen-preview { width:100%; height:100%; object-fit:contain; }
+.call-screen-self-label { position:absolute; left:8px; top:8px; display:flex; align-items:center; gap:6px; color:#fff; font-size:11px; font-weight:600; text-shadow:0 1px 3px #000; }
+.call-screen-stop { position:absolute; right:8px; bottom:8px; display:flex; align-items:center; gap:5px; padding:5px 10px; border:0; border-radius:8px; background:#ed4245; color:#fff; font-size:12px; font-weight:600; cursor:pointer; }
+.call-screen-stop:hover:not(:disabled) { background:#c03537; }
+/* Idle: only the picture stays (Discord fades the overlays). */
+.call-stage.screen-idle .screen-topbar,.call-stage.screen-idle .screen-toolbar,.call-stage.screen-idle .call-actions,
+.call-stage.screen-idle .call-video-stage,.call-stage.screen-idle .call-screen-self,.call-stage.screen-idle .call-share-settings { opacity:0; pointer-events:none; }
+.call-stage.screen-idle .screen-surface { cursor:none; }
+.ig-call-dialog:has(.call-stage.screen-idle) > header { opacity:0; pointer-events:none; transition:opacity .25s; }
+/* Full screen: the call stage itself, without the dialog header. */
+.call-stage:fullscreen { width:100vw; height:100vh; background:#000; }
+.call-stage:fullscreen .screen-topbar { top:20px; }
+.call-stage:fullscreen .screen-toolbar { top:14px; right:20px; }
+/* The mini window shows just the screen. */
+.ig-call-dialog.call-minimized .screen-topbar,.ig-call-dialog.call-minimized .screen-toolbar,
+.ig-call-dialog.call-minimized.viewing-screen .call-video-stage,.ig-call-dialog.call-minimized .call-screen-self { display:none; }
+.ig-call-dialog.call-minimized .screen-surface { pointer-events:none; }
+@media(max-width:767px) {
+  .screen-topbar { top:calc(64px + env(safe-area-inset-top,0px)); left:12px; right:12px; flex-wrap:wrap; row-gap:4px; font-size:12px; }
+  .screen-toolbar { top:auto; right:50%; bottom:calc(120px + env(safe-area-inset-bottom,0px)); transform:translateX(50%); }
+  .screen-toolbar button { min-width:40px; height:40px; }
+  .screen-volume input { width:64px; }
+  .ig-call-dialog.viewing-screen .call-video-stage { top:calc(112px + env(safe-area-inset-top,0px)); right:12px; bottom:auto; }
+  .ig-call-dialog.viewing-screen .call-video-stage > video { width:clamp(72px,24vw,108px); }
+  .call-stage:fullscreen .screen-toolbar { top:auto; right:50%; bottom:20px; }
+  .call-stage:fullscreen .screen-topbar { top:12px; }
+}
+@media(max-height:520px) and (min-width:600px) {
+  .screen-toolbar { top:auto; bottom:84px; right:16px; transform:none; }
+  .screen-topbar { top:60px; }
+  .ig-call-dialog.viewing-screen .call-video-stage { top:60px; bottom:auto; }
+  .ig-call-dialog.viewing-screen .call-video-stage > video { width:110px; }
+}
+@media(prefers-reduced-motion:reduce) { .screen-topbar,.screen-toolbar,.call-screen-self,.ig-call-dialog.viewing-screen .call-video-stage { transition:none; } }
+.screen-stage::before { content:""; position:absolute; inset:0 0 auto; height:150px; z-index:1; pointer-events:none; background:linear-gradient(#000b,transparent); transition:opacity .25s; }
+.call-stage.screen-idle .screen-stage::before { opacity:0; }

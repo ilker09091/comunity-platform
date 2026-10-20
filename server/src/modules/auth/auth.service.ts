@@ -15,7 +15,7 @@ import { PlatformSettingsService } from '../platform/platform-settings.service.j
 import { AuthResponseDto, ChangePasswordDto, LoginDto, RegisterDto } from './dto/auth.dto.js';
 
 // OWASP-recommended Argon2id parameters (19 MiB, t=2, p=1).
-const ARGON2_OPTIONS = { type: argon2.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1 } as const;
+export const ARGON2_OPTIONS = { type: argon2.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1 } as const;
 
 interface RefreshPayload {
   sub: string;

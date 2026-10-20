@@ -34,6 +34,7 @@ import {
   Paginated,
 } from '../../common/dto/common.dto.js';
 import { MediaModule } from '../media/media.module.js';
+import { GifsModule } from '../gifs/gifs.js';
 import { MediaDto } from '../media/dto/media.dto.js';
 import { UploadsMulterModule } from '../media/multer.options.js';
 import { PostsModule } from '../posts/posts.module.js';
@@ -501,7 +502,7 @@ export class PushController {
   }
 }
 @Module({
-  imports: [MediaModule, UsersModule, PostsModule, UploadsMulterModule],
+  imports: [MediaModule, UsersModule, PostsModule, UploadsMulterModule, GifsModule],
   controllers: [MessagesController, StoriesController, StickersController, NotesController, PushController, CallsController, StreaksController],
   providers: [MessagesService, MessageAudioService, StoriesService, StickersService, NotesService, PushService, CallsService, StreaksService],
 })

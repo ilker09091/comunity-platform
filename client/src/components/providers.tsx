@@ -1,4 +1,5 @@
 "use client";
+import { ThemeSync } from "@/lib/theme";
 import {
   createContext,
   useContext,
@@ -138,7 +139,7 @@ export default function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={client}>
       <ToastContext.Provider value={showToast}>
-        <Session><CallsProvider><VideoPlaybackBoundary /><AppBridge />{children}</CallsProvider></Session>
+        <ThemeSync /><Session><CallsProvider><VideoPlaybackBoundary /><AppBridge />{children}</CallsProvider></Session>
         {toast && (
           <div
             className={`toast ${toast.error ? "toast-error" : ""}`}

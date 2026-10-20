@@ -10,6 +10,7 @@ import { PushService } from './push.service.js';
 import { MediaService } from '../media/media.service.js';
 import { MediaUrlService } from '../media/media-url.service.js';
 import { StickersService } from './stickers.service.js';
+import { GifsService } from '../gifs/gifs.js';
 import { PostsQueryService } from '../posts/posts-query.service.js';
 import {
   USER_AVATAR_JOIN,
@@ -53,6 +54,7 @@ export class MessagesService {
     private readonly push: PushService,
     private readonly stickers: StickersService,
     private readonly urls: MediaUrlService,
+    private readonly gifs: GifsService,
   ) {}
 
   /** Whether `owner` still treats `peer` as a message request, and whether `peer` already wrote. */
@@ -186,8 +188,11 @@ export class MessagesService {
     const parents = replyIds.length
       ? await sqlRows(
           this.db,
-          `SELECT d.id, d.sender_id, d.content, d.post_id, d.story_reply, d.view_once, d.has_sticker, d.audio_key, d.call_id, m.type AS media_type
-          FROM direct_messages d LEFT JOIN media m ON m.id = d.media_id WHERE d.id = ANY($1::uuid[])`,
+          `SELECT d.id, d.sender_id, d.content, d.post_id, d.story_reply, d.view_once, d.has_sticker, d.audio_key, d.call_id, d.gif,
+              d.audio_duration_ms, m.type AS media_type, m.storage_key AS media_key, sk.emoji AS sticker_emoji, skm.storage_key AS sticker_key
+          FROM direct_messages d LEFT JOIN media m ON m.id = d.media_id
+          LEFT JOIN stickers sk ON sk.id = d.sticker_id LEFT JOIN media skm ON skm.id = sk.media_id
+          WHERE d.id = ANY($1::uuid[])`,
           [replyIds],
         )
       : [];
@@ -201,7 +206,7 @@ export class MessagesService {
             ? 'VIEW_ONCE'
             : m.content
               ? 'TEXT'
-              : m.has_sticker ? 'STICKER' : m.audio_key ? 'AUDIO' : m.call_id ? 'CALL' : m.media_type === 'IMAGE'
+              : m.has_sticker ? 'STICKER' : m.audio_key ? 'AUDIO' : m.call_id ? 'CALL' : m.gif ? 'GIF' : m.media_type === 'IMAGE'
                 ? 'PHOTO'
                 : m.media_type === 'VIDEO'
                   ? 'VIDEO'
@@ -210,12 +215,17 @@ export class MessagesService {
                     : m.story_reply
                       ? 'STORY'
                       : 'UNAVAILABLE',
-          preview: m.view_once ? null : m.content ? String(m.content).slice(0, 140) : null,
+          preview: m.view_once ? null : m.content ? String(m.content).slice(0, 140) : m.sticker_emoji ?? null,
+          audioDurationMs: m.audio_key ? m.audio_duration_ms ?? null : null,
+          // WhatsApp-style quote thumbnail; view-once media never leaks into a quote.
+          thumbnailUrl: m.view_once ? null : m.gif?.previewUrl ?? (m.media_type === 'IMAGE' ? this.urls.url(m.media_key ?? null)
+            : m.sticker_key ? this.urls.url(m.sticker_key) : null),
         },
       ]),
     );
     const stickers=await this.stickers.hydrate([...new Set(rows.map(r=>r.sticker_id).filter(Boolean))],viewerId);
     return rows.map((r) => ({
+      gif: r.gif ?? null,
       call: r.call_id
         ? { kind: r.call_kind, status: r.call_status, durationSeconds: r.call_duration_s ?? null }
         : null,
@@ -255,12 +265,12 @@ export class MessagesService {
     note?: { text: string; songTitle: string | null },
   ) {
     await this.assertPeer(senderId, recipientId, true);
-    if (!dto.content && !dto.mediaId && !dto.postId && !dto.stickerId && !dto.audioId)
+    if (!dto.content && !dto.mediaId && !dto.postId && !dto.stickerId && !dto.audioId && !dto.gifId)
       throw AppException.badRequest(
         ErrorCode.VALIDATION_ERROR,
         'Write a message or select a video',
       );
-    if ([dto.mediaId,dto.postId,dto.stickerId,dto.audioId].filter(Boolean).length>1)
+    if ([dto.mediaId,dto.postId,dto.stickerId,dto.audioId,dto.gifId].filter(Boolean).length>1)
       throw AppException.badRequest(
         ErrorCode.VALIDATION_ERROR,
         'Choose one attachment',
@@ -279,6 +289,7 @@ export class MessagesService {
       );
       if (!parent) throw AppException.notFound(ErrorCode.NOT_FOUND, 'Message not found');
     }
+    const gif = dto.gifId ? await this.gifs.resolve(dto.gifId) : null;
     if (dto.postId) {
       await this.posts.getOne(dto.postId, senderId);
       await this.posts.getOne(dto.postId, recipientId);
@@ -319,8 +330,8 @@ export class MessagesService {
       const message=(await sqlOne(
         m,
         `INSERT INTO direct_messages(sender_id, recipient_id, content, media_id, post_id, story_id, story_reply, reply_to_id, view_once,
-          note_reply, note_text, note_song, sticker_id, has_sticker, audio_key, audio_duration_ms)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+          note_reply, note_text, note_song, sticker_id, has_sticker, audio_key, audio_duration_ms, gif)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
         [
           senderId,
           recipientId,
@@ -335,6 +346,7 @@ export class MessagesService {
           note?.text ?? null,
           note?.songTitle ?? null,
           dto.stickerId??null,!!dto.stickerId,audio?.storage_key??null,audio?.duration_ms??null,
+          gif ? JSON.stringify(gif) : null,
         ],
       ))!;
       if(dto.audioId)await sqlRows(m,'DELETE FROM message_audio_uploads WHERE id=$1',[dto.audioId]);

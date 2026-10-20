@@ -4,8 +4,8 @@ import { IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'cl
 import { sanitizeText } from '../../../common/utils/sanitize.js';
 import { MeDto, USERNAME_RE } from '../../users/dto/user.dto.js';
 
-const PASSWORD_RULE = /^(?=.*[A-Za-z])(?=.*\d).{8,128}$/s;
-const PASSWORD_MESSAGE = 'password must be 8-128 characters and contain at least one letter and one digit';
+export const PASSWORD_RULE = /^(?=.*[A-Za-z])(?=.*\d).{8,128}$/s;
+export const PASSWORD_MESSAGE = 'password must be 8-128 characters and contain at least one letter and one digit';
 
 export class RegisterDto {
   @ApiProperty({ example: 'jane@example.com', maxLength: 254 })

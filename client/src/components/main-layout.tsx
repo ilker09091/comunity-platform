@@ -23,7 +23,11 @@ import {
   Heart,
   Send,
   Smartphone,
+  UsersRound,
+  Moon,
+  Sun,
 } from "lucide-react";
+import { useTheme } from "@/lib/theme";
 import { api } from "@/lib/api/client";
 import { useFeatures } from "@/lib/platform-config";
 import { useSession } from "./providers";
@@ -47,6 +51,17 @@ function UnreadBadge({ count }: { count?: number }) {
   return <span className="nav-badge">{count > 99 ? "99+" : count}</span>;
 }
 
+/** Quick light/dark switch; "System" stays available in Settings → Appearance. */
+function ThemeMenuItem() {
+  const { theme, setPreference } = useTheme();
+  const dark = theme === "dark";
+  return (
+    <button type="button" role="menuitemcheckbox" aria-checked={dark} className="theme-menu-item" onClick={() => setPreference(dark ? "light" : "dark")}>
+      {dark ? <Sun size={16} /> : <Moon size={16} />} {dark ? "Light mode" : "Dark mode"}
+    </button>
+  );
+}
+
 export function AppHeader() {
   const pathname = usePathname();
   const router = useRouter();
@@ -61,6 +76,7 @@ export function AppHeader() {
     { href: "/explore", label: "Explore", icon: Compass },
     { href: "/reels", label: "Reels", icon: Clapperboard },
     { href: "/messages", label: "Messages", icon: MessageCircle, badge: messageUnread },
+    { href: "/circles", label: "Circles", icon: UsersRound },
     { href: "/notifications", label: "Notifications", icon: Bell, badge: unreadTotal },
     { href: "/following", label: "Following", icon: Users },
   ].filter((item) => item.href !== "/reels" || on("reels"));
@@ -119,6 +135,11 @@ export function AppHeader() {
             <UnreadBadge count={unreadTotal} />
           </Link>
           {user && (
+            <Link href="/circles" className="icon-button mobile-only header-bell header-circles" aria-label="Circles">
+              <UsersRound size={23} strokeWidth={1.9} />
+            </Link>
+          )}
+          {user && (
             <Link
               href="/messages"
               className="icon-button mobile-only header-bell header-messages"
@@ -153,6 +174,7 @@ export function AppHeader() {
               <Link href="/settings">
                 <Settings size={16} /> Settings
               </Link>
+              <ThemeMenuItem />
               <a href={APK_URL} download>
                 <Smartphone size={16} /> Get the Android app
               </a>
@@ -267,6 +289,7 @@ export function Shortcuts() {
     { href: "/explore", label: "Explore", icon: Compass },
     { href: "/reels", label: "Reels", icon: Clapperboard },
     { href: "/messages", label: "Messages", icon: MessageCircle },
+    { href: "/circles", label: "Circles", icon: UsersRound },
     { href: "/saved", label: "Saved Posts", icon: Bookmark },
     { href: "/following", label: "Following", icon: Users },
     { href: user ? `/profile/${user.username}` : "/login", label: "My Profile", icon: UserRound },

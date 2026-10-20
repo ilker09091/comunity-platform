@@ -1,14 +1,74 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Keyboard, Loader2, Plus, Sticker as StickerIcon, X } from "lucide-react";
+import { Keyboard, Loader2, Plus, Search, Sticker as StickerIcon, X } from "lucide-react";
 import { api, upload, type Models } from "@/lib/api/client";
 import { haptic } from "@/lib/haptics";
 import { useSession, useToast } from "./providers";
 import { ConfirmDialog } from "./ui";
 
 type Sticker = Models["StickerDto"];
+export type Gif = Models["GifDto"];
+
+/** A sent GIF: a looping silent video when GIPHY offers one (lighter), else the animated image. */
+export function GifView({ gif, className = "", maxWidth = 240 }: { gif: Gif; className?: string; maxWidth?: number }) {
+  const ratio = gif.width && gif.height ? `${gif.width}/${gif.height}` : undefined;
+  return gif.mp4 ? (
+    <video className={`gif-view ${className}`} src={gif.mp4} poster={gif.previewUrl} autoPlay loop muted playsInline
+      aria-label={gif.title} style={{ aspectRatio: ratio, maxWidth }} />
+  ) : (
+    <img className={`gif-view ${className}`} src={gif.url} alt={gif.title} style={{ aspectRatio: ratio, maxWidth }} loading="lazy" />
+  );
+}
+
+/** GIPHY search (trending when empty), shown as a tab of the sticker tray. */
+function GifPanel({ onPick, disabled }: { onPick: (gif: Gif) => void; disabled?: boolean }) {
+  const [search, setSearch] = useState(""), [term, setTerm] = useState("");
+  useEffect(() => { const timer = setTimeout(() => setTerm(search.trim()), 300); return () => clearTimeout(timer); }, [search]);
+  const gifs = useInfiniteQuery({
+    queryKey: ["gifs", term],
+    queryFn: ({ pageParam, signal }) => api("gifsList", { query: { q: term || undefined, offset: pageParam }, signal }),
+    initialPageParam: 0,
+    getNextPageParam: (page) => page.nextOffset ?? undefined,
+    staleTime: 5 * 60_000,
+  });
+  const items = gifs.data?.pages.flatMap((page) => page.items) ?? [];
+  const enabled = gifs.data?.pages[0]?.enabled ?? true;
+  // Loads more when the end comes into view, whichever element scrolls (tray or popover).
+  const sentinel = useRef<HTMLDivElement>(null);
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = gifs;
+  useEffect(() => {
+    const node = sentinel.current;
+    if (!node || !hasNextPage) return;
+    const observer = new IntersectionObserver((entries) => { if (entries[0]?.isIntersecting && !isFetchingNextPage) void fetchNextPage(); }, { rootMargin: "200px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, items.length]);
+  return (
+    <div className="gif-panel">
+      <label className="gif-search"><Search size={15} aria-hidden="true" />
+        <input value={search} maxLength={50} placeholder="Search GIFs" aria-label="Search GIFs" onChange={(e) => setSearch(e.target.value)} />
+      </label>
+      {!enabled ? <p className="sticker-hint">GIFs aren’t set up on this server yet.</p>
+        : gifs.isPending ? <p className="sticker-hint">Loading GIFs…</p>
+        : gifs.error ? <p className="sticker-hint" role="alert">{gifs.error.message}</p>
+        : items.length ? (
+          <div className="gif-grid">
+            {items.map((gif) => (
+              <button type="button" key={gif.id} className="gif-option" disabled={disabled} aria-label={`Send GIF: ${gif.title}`} onClick={() => onPick(gif)}
+                style={{ aspectRatio: `${gif.width}/${gif.height}` }}>
+                <img src={gif.previewUrl} alt="" loading="lazy" />
+              </button>
+            ))}
+            <div ref={sentinel} className="gif-sentinel" aria-hidden="true" />
+          </div>
+        ) : <p className="sticker-hint">No GIFs found. Try another word.</p>}
+      {enabled && <small className="gif-credit">Powered by GIPHY</small>}
+    </div>
+  );
+}
 
 /** A sticker as shown in comments and in the picker. */
 export function StickerView({ sticker, size = 96 }: { sticker: Sticker; size?: number }) {
@@ -75,16 +135,19 @@ export function StickerButton({
   onPick,
   conversation = false,
   dock,
+  onGif,
 }: {
   disabled?: boolean;
   onPick: (sticker: Sticker) => void;
   conversation?:boolean;
   dock?:HTMLElement|null;
+  /** Adds a GIFs tab (GIPHY search) that sends the chosen GIF. */
+  onGif?: (gif: Gif) => void;
 }) {
   const [open, setOpen] = useState(false);
   /** Opens upwards when the composer sits near the bottom of the screen (e.g. Reels comments). */
   const [up, setUp] = useState(false);
-  const [tab, setTab] = useState<"pack" | "mine" | "favorites">("pack");
+  const [tab, setTab] = useState<"pack" | "mine" | "favorites" | "gifs">("pack");
   const [progress, setProgress] = useState<number | null>(null);
   const [removing, setRemoving] = useState<Sticker | null>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -143,17 +206,19 @@ export function StickerButton({
   }, [open, conversation]);
   useEffect(() => {
     if (!open || removing) return;
-    const close = (e: PointerEvent) => {
+    // On click, not pointerdown: closing the tray moves the chat, and doing it mid-press would
+    // make the press land elsewhere (e.g. a message's Reply button would lose its click).
+    const close = (e: MouseEvent) => {
       const target=e.target as Node;
       // The message field hands over to the keyboard through focus, without a jump.
       if (conversation && target instanceof HTMLTextAreaElement) return;
       if (!box.current?.contains(target)&&!panel.current?.contains(target)) setOpen(false);
     };
     const escape = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("pointerdown", close);
+    document.addEventListener("click", close);
     document.addEventListener("keydown", escape);
     return () => {
-      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("click", close);
       document.removeEventListener("keydown", escape);
     };
   }, [open, removing, conversation]);
@@ -196,10 +261,11 @@ export function StickerButton({
   const shown = tab === "pack" ? pack : tab==='mine'?mine:favorites;
   const content=<>
           <div className="sticker-tabs" role="tablist">
-            {(['pack','mine','favorites'] as const).map(value=><button key={value} type="button" role="tab" aria-selected={tab===value} onClick={()=>setTab(value)}>
-              {value==='pack'?'Stickers':value==='mine'?'Your stickers':'Favorites'}
+            {(onGif?(['pack','gifs','mine','favorites'] as const):(['pack','mine','favorites'] as const)).map(value=><button key={value} type="button" role="tab" aria-selected={tab===value} onClick={()=>setTab(value)}>
+              {value==='pack'?'Stickers':value==='gifs'?'GIFs':value==='mine'?'Yours':'Favorites'}
             </button>)}
           </div>
+          {tab==='gifs'&&onGif?<GifPanel disabled={disabled} onPick={gif=>{haptic("tap");if(!conversation)setOpen(false);onGif(gif);}}/>:<>
           {stickers.isPending && <p className="sticker-hint">Loading stickers...</p>}
           {stickers.error && <p className="sticker-hint" role="alert">{stickers.error.message}</p>}
           <div className="sticker-grid">
@@ -211,8 +277,9 @@ export function StickerButton({
               {sticker.isOwn&&<button type="button" className="sticker-remove" aria-label={`Delete ${sticker.name} sticker`} onClick={()=>setRemoving(sticker)}><X size={12}/></button>}
             </div>)}
           </div>
-          {tab==='mine'&&!mine.length&&<p className="sticker-hint">Create your own sticker from a photo. Transparent PNG or WebP images keep their background transparency.</p>}
+          {tab==='mine'&&!mine.length&&<p className="sticker-hint">Create your own sticker from a photo or GIF. Transparent PNG/WebP keep their transparency; GIFs stay animated.</p>}
           {tab==='favorites'&&!favorites.length&&<p className="sticker-hint">Tap the star next to a sticker in a conversation to save it here.</p>}
+          </>}
           <input ref={file} hidden type="file" accept="image/png,image/webp,image/jpeg,image/gif" onChange={e=>{const image=e.target.files?.[0];e.target.value='';if(image)create.mutate(image);}}/>
         </>;
   return (

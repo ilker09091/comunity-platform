@@ -9,16 +9,21 @@ Kamera kapatıldığında karşı tarafa veri kanalı üzerinden kaynak değişi
 bildirilir; donmuş video gizlenir. İki kamera da kapalıysa sesli arama görünümü
 gösterilir. Bir katılımcı kamera/ekran gönderiyorsa onun görüntüsü görünür.
 
-Ekran paylaşımı tarayıcının kendi seçim penceresini kullanır. Paylaşım sırasında
-sağdaki kalite panelinden 720p/30 FPS, 720p/60 FPS, 1080p/30 FPS veya 1080p/60 FPS
-seçilebilir. Mobilde panel alt tarafta, arama düğmelerinin üzerinde gösterilir.
-Varsayılan 1080p/30 FPS'tir. Seçim, aynı yakalama izine canlı uygulanır; mikrofonu
-ve bağlantıyı yeniden açmaz. Sırasıyla 3,5/6/6/10 Mbit/sn üst sınırları ve
-çözünürlüğü koruma tercihi uygulanır. Gerçek çözünürlük ve
-kalite seçilen kaynağa, tarayıcıya ve bağlantıya bağlıdır. Mikrofon açık kalır;
-paylaşımı bitirmek daha önce açık olan kamerayı geri açar. Tarayıcının paylaşımı
-durdurma düğmesi de aynı işlemi yapar. Ekran paylaşımı API'si bulunmayan mobil
-tarayıcılarda düğme devre dışıdır; bu cihazlar karşı tarafın paylaşımını izleyebilir.
+Ekran paylaşımı Discord'daki gibi çalışır: ekran kameradan **ayrı** bir video kanalıyla
+gider, kamera ve ekran aynı anda açık olabilir. Tarayıcının seçim penceresinde "sesi paylaş"
+seçilirse ekranın sesi de gider. Paylaşım sırasında sağdaki kalite panelinden 720p/30,
+720p/60, 1080p/30 veya 1080p/60 seçilir (üst sınırlar 3,5/6/6/10 Mbit/sn, çözünürlüğü koruma
+tercihi); ekran açıkken kamera 0,9 Mbit/sn'ye düşer. Paylaşan kişi kendi yayınını sol altta
+küçük önizleme olarak görür ve oradan durdurabilir. Tarayıcının "paylaşımı durdur" çubuğu da
+aynı işi yapar. Ekran paylaşımı API'si olmayan mobil tarayıcılar paylaşamaz ama izleyebilir.
+
+İzleyen taraf: paylaşılan ekran aramanın tamamını kaplar, kameralar sağda küçük kutulara
+geçer. Üst çubukta canlı rozeti, alınan çözünürlük/FPS; araç çubuğunda yakınlaştırma
+(%100–500; fare tekerleği, iki parmak, çift tık/çift dokunma, `+` `-` `0` tuşları),
+yakınlaştırınca sürükleyerek gezinme, ekran sesi için ayrı ses seviyesi, resim içinde resim
+ve tam ekran (`F`) vardır. Tam ekran tüm arama sahnesini kapsar; telefonda yatay ekrana
+kilitlemeyi dener. Kontroller 3 saniye hareketsizlikte gizlenir. Küçültülmüş pencerede
+yalnızca ekran görünür.
 
 Geçici sinyalleşme hataları yeniden denenir; başarısız/kopmuş ICE bağlantısı yeniden
 kurulmaya çalışılır. Çevrimiçi olma/ağ değişimi ve uygulamaya dönüş olayları da
@@ -113,3 +118,20 @@ Bu değişiklikte geçen kontroller:
 
 Bu makinede Docker olmadığı için Coturn konteyneri başlatılmadı; canlı VPS/TURN,
 operatör ağları ve fiziksel mobil cihazlar test kapsamına girmedi.
+
+## Android uygulamasında arka planda zil sesi (APK 1.0.3)
+
+Uygulama arka plandayken veya kapalıyken gelen arama, Chrome'un bildirim delegasyonuyla
+uygulamaya gelir. `DelegationService` arama bildirimini (`call-*` etiketi / "Incoming … call")
+"Calls" kanalına yönlendirir: `res/raw/ring.mp3` zil sesi, uzun titreşim, kilit ekranında görünür,
+ses bildirim açılana veya iptal edilene kadar tekrar eder (en fazla 60 sn, sunucunun çalma süresi).
+Arama başka cihazda cevaplanınca, reddedilince veya cevapsız kalınca sayfa bildirimi kapatır ve
+zil durur. Android 14+ tam ekran arama için kullanıcı izni isteyebilir; izin yoksa üstten açılan
+bildirim olarak çalar. Uygulama açıkken uygulama içi zil sesi kullanılır.
+
+APK aynı anahtarla imzalanır (mevcut kurulumun üzerine güncellenir):
+
+```sh
+cd android && ./gradlew assembleRelease
+cp app/build/outputs/apk/release/app-release.apk ../client/public/downloads/circle.apk
+```

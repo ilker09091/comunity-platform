@@ -32,7 +32,8 @@ export class SoundtrackService {
   ) {}
 
   private notShared = `NOT EXISTS (SELECT 1 FROM direct_messages dm WHERE dm.media_id = m.id)
-    AND NOT EXISTS (SELECT 1 FROM stories st WHERE st.media_id = m.id)`;
+    AND NOT EXISTS (SELECT 1 FROM stories st WHERE st.media_id = m.id)
+    AND NOT EXISTS (SELECT 1 FROM circle_posts cp WHERE cp.media_id = m.id)`;
 
   async add(ownerId: string, mediaId: string, audioId: string, mix: boolean): Promise<void> {
     const audio = await sqlOne<{ path: string }>(

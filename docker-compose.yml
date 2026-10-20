@@ -68,6 +68,9 @@ services:
       CALL_TURN_URLS: ${CALL_TURN_URLS:-turn:${TURN_PUBLIC_IP:-13.140.148.251}:3478?transport=udp,turn:${TURN_PUBLIC_IP:-13.140.148.251}:3478?transport=tcp}
       CALL_TURN_SECRET: ${CALL_TURN_SECRET:-}
       CALL_TURN_SECRET_FILE: /app/storage/turn-control/key
+      # GIF search in messages and comments (free key: developers.giphy.com). Empty = GIFs off.
+      GIPHY_API_KEY: ${GIPHY_API_KEY:-}
+      GIPHY_RATING: ${GIPHY_RATING:-pg-13}
 
     ports:
       - "127.0.0.1:3101:3002"
@@ -103,6 +106,8 @@ services:
 
       API_ORIGIN: ${INTERNAL_API_ORIGIN:-http://api:3002}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
+      # Public address used in link previews (Open Graph), canonical URLs and the sitemap.
+      SITE_URL: ${SITE_URL:-https://rosefly.store}
 
     ports:
       - "127.0.0.1:3100:3000"

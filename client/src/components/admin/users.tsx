@@ -31,6 +31,7 @@ import {
 } from "./kit";
 import { ReportsTable } from "./reports";
 import { CommentItems, PostItems, type ContentPage } from "./content";
+import { EditProfileButton, ResetPasswordButton, UserActivity, UserNotes, UserSessions } from "./user-management";
 
 export const RANK: Record<Role, number> = { USER: 0, SUPPORT: 1, MODERATOR: 2, ADMIN: 3, SUPER_ADMIN: 4 };
 export const ROLE_INFO: Record<Role, string> = {
@@ -445,6 +446,8 @@ function UserDetailView({ d, canReports }: { d: Models["AdminUserDetailDto"]; ca
       actions={
         <>
           <VerifyToggle user={u} />
+          <EditProfileButton key={`${u.username}-${u.displayName}`} detail={d} canAct={!self && outranks} />
+          <ResetPasswordButton user={u} canAct={!self && outranks} />
           <UserActions user={u} variant="buttons" />
         </>
       }
@@ -477,6 +480,9 @@ function UserDetailView({ d, canReports }: { d: Models["AdminUserDetailDto"]; ca
         onChange={setTab}
         items={[
           { value: "overview", label: "Overview" },
+          { value: "activity", label: "Activity" },
+          { value: "devices", label: "Devices", count: d.activeSessions },
+          { value: "notes", label: "Notes" },
           { value: "content", label: "Content" },
           { value: "safety", label: "Restrictions & warnings", count: activeRestrictions },
           ...(canReports ? [{ value: "reports", label: "Reports", count: u.openReportCount }] : []),
@@ -519,6 +525,9 @@ function UserDetailView({ d, canReports }: { d: Models["AdminUserDetailDto"]; ca
         </div>
       )}
 
+      {tab === "activity" && <UserActivity id={u.id} />}
+      {tab === "devices" && <UserSessions user={u} canAct={!self && outranks} />}
+      {tab === "notes" && <UserNotes id={u.id} />}
       {tab === "content" && <UserContent user={u} counts={d.content} />}
 
       {tab === "safety" && (

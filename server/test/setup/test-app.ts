@@ -23,7 +23,7 @@ export async function createTestApp(): Promise<INestApplication> {
 export async function resetDatabase(app: INestApplication) {
   const ds = app.get(DataSource);
   if (!ds.options.database?.toString().endsWith('_test')) throw new Error('Not a test database');
-  await ds.query('TRUNCATE TABLE users, admin_audit_logs, media_file_deletions CASCADE');
+  await ds.query('TRUNCATE TABLE users, admin_audit_logs, media_file_deletions, circles CASCADE');
   // The cascade also empties stickers; restore the built-in pack the migration seeds.
   for (const [i, [emoji, name]] of SYSTEM_STICKERS.entries())
     await ds.query('INSERT INTO stickers(emoji, name, position) VALUES ($1, $2, $3)', [emoji, name, i]);

@@ -2,11 +2,12 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Mic, MicOff, Phone, PhoneOff, Video, VideoOff, SwitchCamera, Volume1, Volume2, MonitorUp, MonitorOff, Minimize2, Maximize2, Check, SlidersHorizontal } from "lucide-react";
 import { api, ApiError, type Models } from "@/lib/api/client";
-import { CallConnection, SCREEN_QUALITIES, type CallMediaState, type ScreenQuality } from "@/lib/call-connection";
+import { CallConnection, NO_CALL_MEDIA, SCREEN_QUALITIES, type CallMediaState, type CallScreens, type ScreenQuality } from "@/lib/call-connection";
 import { CALL_AUDIO, findAudioRoutes, routedMicrophone, type AudioRoutes } from "@/lib/audio-route";
 import { useSession, useToast } from "./providers";
 import { Avatar, Modal } from "./ui";
 import { playMessageSound } from "./app-bridge";
+import { ScreenStage } from "./call-screen";
 
 type Call = Models["CallDto"];
 type Peer = Models["UserSummaryDto"];
@@ -72,10 +73,12 @@ export default function CallsProvider({children}:{children:ReactNode}) {
   const [muted,setMuted]=useState(false),[camera,setCamera]=useState(false),[state,setState]=useState<string>("new");
   const [local,setLocal]=useState<MediaStream|null>(null),[remote,setRemote]=useState<MediaStream|null>(null);
   const [elapsed,setElapsed]=useState(0);
-  const [mediaState,setMediaState]=useState<CallMediaState>({localSource:'none',remoteSource:'none'});
+  const [mediaState,setMediaState]=useState<CallMediaState>(NO_CALL_MEDIA);
+  const [screens,setScreens]=useState<CallScreens>({local:null,remote:null});
   const [minimized,setMinimized]=useState(false);
   const [screenQuality,setScreenQuality]=useState<ScreenQuality>('1080p30');
-  const sharing=mediaState.localSource==='screen';
+  const sharing=mediaState.localScreen;
+  const viewingScreen=mediaState.remoteScreen&&!!screens.remote;
   /** Earpiece by default for voice calls; the person switches to the loudspeaker themselves. */
   const [speaker,setSpeaker]=useState(false),[canRoute,setCanRoute]=useState(false),[sink,setSink]=useState<string|null>(null);
   const routes=useRef<AudioRoutes|null|undefined>(undefined);
@@ -90,7 +93,7 @@ export default function CallsProvider({children}:{children:ReactNode}) {
     connecting.current=null;connectedAt.current=null;
     stream.current?.getTracks().forEach(t=>t.stop());stream.current=null;
     setLocal(null);setRemote(null);setMuted(false);setCamera(false);setState("new");setElapsed(0);cursor.current=0;
-    setMinimized(false);setMediaState({localSource:'none',remoteSource:'none'});
+    setMinimized(false);setMediaState(NO_CALL_MEDIA);setScreens({local:null,remote:null});
     setScreenQuality('1080p30');
     routes.current=undefined;setSpeaker(false);setCanRoute(false);setSink(null);
     busy.current=false;setWorking(false);
@@ -113,7 +116,8 @@ export default function CallsProvider({children}:{children:ReactNode}) {
     const connection=new CallConnection({iceServers:config.iceServers},media,value.outgoing,
       signal=>callRequest(requestSignal=>api("callsSignal",{params:{id:value.id},body:{deviceId:device.current,...signal},signal:requestSignal}),abort.signal),
       next=>{if(run===generation.current)setState(next);},fail,remote=>{if(run===generation.current)setRemote(remote);},
-      next=>{if(run===generation.current){setMediaState(next);setCamera(next.localSource==='camera');}});
+      next=>{if(run===generation.current){setMediaState(next);setCamera(next.localSource==='camera');}},
+      next=>{if(run===generation.current)setScreens(next);});
     engine.current=connection;setRemote(connection.remote);setState("connecting");
     } finally { if(connecting.current===value.id)connecting.current=null; }
   },[fail]);
@@ -207,7 +211,10 @@ export default function CallsProvider({children}:{children:ReactNode}) {
       if(!cancelled)timer=setTimeout(poll,3000);
     };
     void poll();
-    return()=>{cancelled=true;abort.abort();clearTimeout(timer);const old=current.current;
+    // A push for an incoming call while the app is open: check now instead of on the next poll.
+    const onPush=(event:MessageEvent)=>{if(event.data?.type==='circle:incoming-call'&&!current.current&&!busy.current){clearTimeout(timer);void poll();}};
+    navigator.serviceWorker?.addEventListener('message',onPush);
+    return()=>{cancelled=true;abort.abort();clearTimeout(timer);navigator.serviceWorker?.removeEventListener('message',onPush);const old=current.current;
       if(old?.canControl)void api("callsAction",{params:{id:old.id},body:{deviceId:device.current,action:old.state==="ringing"&&!old.outgoing?"reject":"end"},keepalive:true}).catch(()=>{});
       release();assign(null);
     };
@@ -252,6 +259,13 @@ export default function CallsProvider({children}:{children:ReactNode}) {
     window.addEventListener('online',online);document.addEventListener('visibilitychange',visible);network?.addEventListener('change',online);
     return()=>{window.removeEventListener('online',online);document.removeEventListener('visibilitychange',visible);network?.removeEventListener('change',online);};
   },[callId]);
+  // Once a call stops ringing (answered here or elsewhere, declined, missed), its system notification
+  // must not keep ringing: on Android the app's "Calls" channel repeats the ringtone until dismissed.
+  const ringing=!!callId&&callState==='ringing'&&!callOutgoing;
+  useEffect(()=>{
+    if(ringing)return;
+    void navigator.serviceWorker?.ready.then(registration=>registration.active?.postMessage({type:'circle:close-call-notifications'})).catch(()=>{});
+  },[ringing]);
   // Browsers (iOS especially) only let audio play after a gesture: prime the ringtone on the first tap.
   useEffect(()=>{
     const prime=()=>{const tone=ringtoneElement();if(!tone||!tone.paused)return;tone.muted=true;
@@ -290,6 +304,7 @@ export default function CallsProvider({children}:{children:ReactNode}) {
     catch(error){if(!(error instanceof DOMException&&error.name==='NotAllowedError'))toast(describeError(error),true);}
     finally{setWorking(false);}
   };
+  const screenStats=useCallback(()=>engine.current?.screenStats()??Promise.resolve(null),[]);
   const changeScreenQuality=async(quality:ScreenQuality)=>{
     const connection=engine.current,run=generation.current;
     if(!connection||working)return;setWorking(true);
@@ -298,20 +313,27 @@ export default function CallsProvider({children}:{children:ReactNode}) {
     finally{if(run===generation.current)setWorking(false);}
   };
   const incoming=call&&!call.outgoing&&call.state==="ringing";
-  const videoCall=(call?.state==='ringing'&&call.kind==='video')||camera||sharing||mediaState.remoteSource!=='none';
+  const videoCall=(call?.state==='ringing'&&call.kind==='video')||camera||sharing||viewingScreen||mediaState.remoteSource!=='none';
   const label=incoming?`Incoming ${call.kind} call`:call?.state==="ringing"?"Calling…":state==="connected"?`${Math.floor(elapsed/60)}:${String(elapsed%60).padStart(2,"0")}`:state==="disconnected"?"Reconnecting…":"Connecting…";
   return <Context.Provider value={{start:(peer,kind)=>void start(peer,kind),busy:!!call||working}}>
     {children}
     {call&&<Modal title={incoming?"Incoming call":"Circle call"} modal={!minimized||!!incoming}
       headerActions={!incoming&&<button type="button" className="icon-button call-window-toggle" aria-label={minimized?'Restore call':'Minimize call'} onClick={()=>setMinimized(value=>!value)}>{minimized?<Maximize2 size={18}/>:<Minimize2 size={18}/>}</button>}
-      className={`call-dialog ig-call-dialog ${incoming?'is-incoming':''} ${minimized&&!incoming?'call-minimized':''} ${sharing?'is-sharing':''} ${mediaState.remoteSource==='screen'?'viewing-screen':''}`} closeOnBackdrop={false} onClose={()=>void finish(incoming?"reject":"end")}>
+      className={`call-dialog ig-call-dialog ${incoming?'is-incoming':''} ${minimized&&!incoming?'call-minimized':''} ${sharing?'is-sharing':''} ${viewingScreen?'viewing-screen':''}`} closeOnBackdrop={false} onClose={()=>void finish(incoming?"reject":"end")}>
       <div className={`call-stage ${call.state==='ringing'?'is-ringing':''}`}>
         {call.peer.avatarUrl&&<img className="call-ambient" src={call.peer.avatarUrl} alt="" aria-hidden="true"/>}
-        <div className="call-type">{sharing||mediaState.remoteSource==='screen'?<MonitorUp size={15}/>:videoCall?<Video size={15}/>:<Phone size={15}/>}<span>{sharing?'Sharing your screen':mediaState.remoteSource==='screen'?'Screen sharing':videoCall?'Video call':'Voice call'}</span></div>
+        <div className="call-type">{sharing||viewingScreen?<MonitorUp size={15}/>:videoCall?<Video size={15}/>:<Phone size={15}/>}<span>{sharing?'Sharing your screen':viewingScreen?'Screen sharing':videoCall?'Video call':'Voice call'}</span></div>
         <div className="call-person"><Avatar user={call.peer} size={80}/><h2>{call.peer.displayName}</h2><p role="status" aria-live="polite">{label}</p></div>
+        {!incoming&&viewingScreen&&<ScreenStage stream={screens.remote!} name={call.peer.displayName} status={label}
+          audio={mediaState.remoteScreenAudio} stats={screenStats} sinkId={sink}/>}
         {!incoming&&<div className={`call-video-stage ${camera?"has-camera":""}`}>
           <Media stream={remote} className="call-remote" sinkId={sink} videoActive={mediaState.remoteSource!=='none'}/>
-          <Media stream={local} muted videoActive={camera||sharing} className={`call-local ${camera||sharing?"":"camera-off"}`}/>
+          <Media stream={local} muted videoActive={camera} className={`call-local ${camera?"":"camera-off"}`}/>
+        </div>}
+        {!incoming&&sharing&&screens.local&&<div className="call-screen-self">
+          <Media stream={screens.local} muted className="call-screen-preview"/>
+          <span className="call-screen-self-label"><span className="screen-live">Live</span> Your screen</span>
+          <button type="button" className="call-screen-stop" disabled={working} onClick={()=>void screenAction()}><MonitorOff size={15}/> Stop</button>
         </div>}
         {sharing&&<aside className="call-share-settings" aria-label="Screen sharing quality">
           <div className="call-share-heading"><span className="call-share-live"><MonitorUp size={15}/> Live</span><SlidersHorizontal size={16}/></div>
@@ -327,7 +349,7 @@ export default function CallsProvider({children}:{children:ReactNode}) {
           {incoming?<><button className="call-control hangup" onClick={()=>void finish("reject")}><span className="call-control-icon"><PhoneOff/></span><span>Decline</span></button><button className="call-control accept" disabled={working} onClick={()=>void accept()}><span className="call-control-icon"><Phone/></span><span>Answer</span></button></>:<>
             <button className={`call-control ${muted?"selected":""}`} aria-label={muted?'Unmute':'Mute'} disabled={!local} aria-pressed={muted} onClick={()=>{engine.current?.mute(!muted);stream.current?.getAudioTracks().forEach(t=>{t.enabled=muted;});setMuted(!muted);}}><span className="call-control-icon">{muted?<MicOff/>:<Mic/>}</span><span>{muted?"Unmute":"Mute"}</span></button>
             {canRoute&&<button className={`call-control call-advanced ${speaker?"selected":""}`} disabled={working} aria-pressed={speaker} onClick={()=>void toggleSpeaker()}><span className="call-control-icon">{speaker?<Volume2/>:<Volume1/>}</span><span>Speaker</span></button>}
-            <button className={`call-control ${camera?'':'selected'}`} aria-label={camera?'Camera off':'Camera on'} disabled={call.state!=="accepted"||working||sharing} aria-pressed={camera} onClick={()=>void cameraAction()}><span className="call-control-icon">{camera?<Video/>:<VideoOff/>}</span><span>{camera?"Camera off":"Camera on"}</span></button>
+            <button className={`call-control ${camera?'':'selected'}`} aria-label={camera?'Camera off':'Camera on'} disabled={call.state!=="accepted"||working} aria-pressed={camera} onClick={()=>void cameraAction()}><span className="call-control-icon">{camera?<Video/>:<VideoOff/>}</span><span>{camera?"Camera off":"Camera on"}</span></button>
             {camera&&<button className="call-control call-advanced" disabled={call.state!=="accepted"||working} onClick={()=>void cameraAction(true)}><span className="call-control-icon"><SwitchCamera/></span><span>Flip</span></button>}
             <button type="button" className={`call-control call-advanced ${sharing?'selected':''}`} aria-pressed={sharing} disabled={call.state!=='accepted'||working||typeof navigator.mediaDevices?.getDisplayMedia!=='function'}
               title={typeof navigator.mediaDevices?.getDisplayMedia!=='function'?'Screen sharing is unavailable in this browser':undefined} onClick={()=>void screenAction()}><span className="call-control-icon">{sharing?<MonitorOff/>:<MonitorUp/>}</span><span>{sharing?'Stop sharing':'Share screen'}</span></button>

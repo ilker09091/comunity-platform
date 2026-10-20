@@ -36,7 +36,7 @@ export class CommentsController {
   @ApiCreatedResponse({ type: CommentDto })
   @ApiErrors(400, 404)
   create(@CurrentUser() user: AuthUser, @Param('id', UuidPipe) id: string, @Body() dto: CreateCommentDto): Promise<CommentDto> {
-    return this.comments.create(user.id, id, dto.content ?? '', null, dto.stickerId);
+    return this.comments.create(user.id, id, dto.content ?? '', null, dto.stickerId, dto.gifId);
   }
 
   @Public()
@@ -96,6 +96,6 @@ export class CommentsController {
   @ApiCreatedResponse({ type: CommentDto })
   @ApiErrors(400, 404, 422)
   reply(@CurrentUser() user: AuthUser, @Param('id', UuidPipe) id: string, @Body() dto: CreateCommentDto): Promise<CommentDto> {
-    return this.comments.create(user.id, id, dto.content ?? '', id, dto.stickerId);
+    return this.comments.create(user.id, id, dto.content ?? '', id, dto.stickerId, dto.gifId);
   }
 }

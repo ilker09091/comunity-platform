@@ -8,9 +8,14 @@ import "./profile-ig.css";
 import "./interaction-fixes.css";
 import "./instagram-overlays.css";
 import "./mobile-messaging.css";
+import "./circles.css";
 import "./call-experience.css";
+import "./dark.css";
+import "./dark-generated.css";
 import Providers from "@/components/providers";
 import { Suspense } from "react";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme-boot";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/seo";
 
 const poppins = localFont({
   src: [
@@ -35,16 +40,33 @@ export const viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#f5f6f8",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f5f6f8" },
+    { media: "(prefers-color-scheme: dark)", color: "#0d0e11" },
+  ],
 };
 
 export const metadata = {
+  metadataBase: new URL(SITE_URL),
+  applicationName: SITE_NAME,
   title: {
     default: "Circle — A little more connection",
     template: "%s | Circle",
   },
-  description:
-    "A space for ideas, everyday moments, and meaningful connections. Share your world on Circle.",
+  description: SITE_DESCRIPTION,
+  keywords: ["Circle", "social network", "photos", "Reels", "short videos", "stories", "circles", "friends", "messages"],
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    locale: "en_US",
+    url: SITE_URL,
+    title: "Circle — A little more connection",
+    description: SITE_DESCRIPTION,
+  },
+  twitter: { card: "summary_large_image", title: "Circle — A little more connection", description: SITE_DESCRIPTION },
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large" } },
+  formatDetection: { telephone: false },
 };
 
 export default function RootLayout({ children }) {
@@ -52,7 +74,12 @@ export default function RootLayout({ children }) {
     <html
       lang="en"
       className={`${poppins.variable} ${geistMono.variable} h-full antialiased`}
+      // The theme script sets data-theme before React hydrates.
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       {/* Browser extensions (e.g. ColorZilla) add attributes to <body> before React loads. */}
       <body suppressHydrationWarning>
         <Suspense

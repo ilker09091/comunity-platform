@@ -100,12 +100,24 @@ def run():
             frames=right.evaluate("async()=>[...(await window.__qaPCs.at(-1).getStats()).values()].filter(s=>s.type==='inbound-rtp'&&s.kind==='video').reduce((n,s)=>n+(s.framesDecoded||0),0)")
             left.get_by_role('button',name='Share screen',exact=True).click()
             left.get_by_role('button',name='Stop sharing',exact=True).wait_for(timeout=20000)
-            right.wait_for_function("document.querySelector('.viewing-screen .call-remote')?.dataset.videoActive==='true'",timeout=20000)
+            right.wait_for_function("document.querySelector('.viewing-screen .screen-video')?.videoWidth>0",timeout=20000)
             assert left.evaluate("window.__qaPCs.at(-1).getSenders().some(s=>s.track?.kind==='video'&&!!s.track.getSettings().displaySurface)")
-            right.wait_for_function("document.querySelector('.call-remote').videoWidth>0")
             right.wait_for_function("async before=>[...(await window.__qaPCs.at(-1).getStats()).values()].filter(s=>s.type==='inbound-rtp'&&s.kind==='video').reduce((n,s)=>n+(s.framesDecoded||0),0)>before",arg=frames)
-            assert right.locator('.call-remote').evaluate('(n)=>getComputedStyle(n).objectFit')=='contain'
-            left.evaluate('window.__screenTrack=window.__qaPCs.at(-1).getSenders().find(s=>s.track?.kind==="video").track;window.__shareMic=window.__qaPCs.at(-1).getSenders().find(s=>s.track?.kind==="audio").track')
+            assert right.locator('.screen-video').evaluate('(n)=>getComputedStyle(n).objectFit')=='contain'
+            # Discord-style viewer: received quality, zoom buttons/keys and full screen of the whole call.
+            right.wait_for_function("/\\d+×\\d+ · \\d+ FPS/.test(document.querySelector('.screen-info')?.textContent||'')",timeout=10000)
+            right.get_by_role('button',name='Zoom in',exact=True).click()
+            assert right.locator('.screen-zoom-level').inner_text()=='125%'
+            assert 'scale(1.25)' in right.locator('.screen-video').evaluate('(n)=>n.style.transform')
+            right.locator('.screen-stage').focus();right.keyboard.press('0')
+            assert right.locator('.screen-zoom-level').inner_text()=='100%'
+            right.get_by_role('button',name='Full screen',exact=True).click()
+            right.wait_for_function("document.fullscreenElement?.classList.contains('call-stage')")
+            right.get_by_role('button',name='Exit full screen',exact=True).click()
+            right.wait_for_function("!document.fullscreenElement")
+            right.screenshot(path=str(OUT/'viewing-screen.png'))
+            print('PASS the viewer fills the call with the screen, shows its quality, zooms and goes full screen')
+            left.evaluate('window.__screenTrack=window.__qaPCs.at(-1).getSenders().find(s=>s.track?.getSettings().displaySurface).track;window.__shareMic=window.__qaPCs.at(-1).getSenders().find(s=>s.track?.kind==="audio").track')
             for quality,width,fps in [('720p 30 FPS',1280,30),('720p 60 FPS',1280,60),('1080p 30 FPS',1920,30),('1080p 60 FPS',1920,60)]:
                 left.get_by_role('button',name=quality,exact=True).click()
                 left.wait_for_function('label=>{const b=document.querySelector(`button[aria-label="${label}"]`);return b?.getAttribute("aria-pressed")==="true"&&!b.disabled;}',arg=quality)
@@ -132,12 +144,18 @@ def run():
             right.wait_for_function("document.querySelector('.call-type')?.textContent==='Voice call'")
             print('PASS browser getDisplayMedia capture, decoded remote frames and stop sharing from voice call')
             left.get_by_role('button',name='Camera on',exact=True).click()
+            left.get_by_role('button',name='Camera off',exact=True).wait_for()
             left.get_by_role('button',name='Share screen',exact=True).click()
             left.get_by_role('button',name='Stop sharing',exact=True).wait_for()
+            # Camera and screen are live together, like Discord.
+            assert left.evaluate("window.__qaPCs.at(-1).getSenders().filter(s=>s.track?.kind==='video'&&s.track.readyState==='live').length===2")
+            right.wait_for_function("document.querySelector('.viewing-screen .screen-video')?.videoWidth>0 && document.querySelector('.viewing-screen .call-remote')?.dataset.videoActive==='true'",timeout=20000)
+            assert left.locator('.call-screen-self').is_visible()
             left.get_by_role('button',name='Stop sharing',exact=True).click()
+            right.wait_for_function("!document.querySelector('.screen-stage') && document.querySelector('.call-remote')?.dataset.videoActive==='true'")
             left.get_by_role('button',name='Camera off',exact=True).wait_for()
             assert left.evaluate("window.__qaPCs.at(-1).getSenders().some(s=>s.track?.kind==='video'&&!s.track.getSettings().displaySurface)")
-            print('PASS screen sharing restores the previous camera')
+            print('PASS the camera stays live beside a shared screen and after it stops')
             # Keep the same peer, DOM audio node and stream while navigating with Next Link.
             left.evaluate('window.__callPeer=window.__qaPCs.at(-1);window.__callAudio=document.querySelector(".call-audio");window.__callSource=window.__callAudio.srcObject')
             before=packets(left)

@@ -40,6 +40,8 @@ export interface VideoProcessor {
    * original sound, or mixed under it. The picture is copied, not re-encoded.
    */
   addSoundtrack(video: string, audio: string, output: string, options: { mix: boolean; durationMs: number }): Promise<void>;
+  /** One still frame at `atMs` as a JPEG (link previews). */
+  frame(input: string, output: string, atMs: number): Promise<void>;
 }
 
 const require = createRequire(import.meta.url);
@@ -219,6 +221,11 @@ export class FfmpegVideoProcessor implements VideoProcessor {
       ],
       120_000,
     );
+  }
+
+  async frame(input: string, output: string, atMs: number): Promise<void> {
+    await this.run(this.ffmpeg, ['-hide_banner', '-loglevel', 'error', '-y', '-ss', (atMs / 1000).toFixed(3), '-i', input,
+      '-frames:v', '1', '-vf', 'scale=1200:-2', '-q:v', '3', '-f', 'image2', output], 30_000);
   }
 
   async addSoundtrack(video: string, audio: string, output: string, options: { mix: boolean; durationMs: number }): Promise<void> {

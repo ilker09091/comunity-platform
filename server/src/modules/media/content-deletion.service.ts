@@ -121,6 +121,7 @@ export class ContentDeletionService implements OnModuleInit {
           AND NOT EXISTS (SELECT 1 FROM direct_messages dm WHERE dm.media_id = md.id)
           AND NOT EXISTS (SELECT 1 FROM stories st WHERE st.media_id = md.id)
           AND NOT EXISTS (SELECT 1 FROM stickers sk WHERE sk.media_id = md.id)
+          AND NOT EXISTS (SELECT 1 FROM circle_posts cp WHERE cp.media_id = md.id)
         RETURNING md.storage_key, md.size_bytes`,
       [mediaIds],
     );

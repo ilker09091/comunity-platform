@@ -519,6 +519,7 @@ export enum MediaUsageEnum {
   MESSAGE = 'MESSAGE',
   STORY = 'STORY',
   STICKER = 'STICKER',
+  CIRCLE = 'CIRCLE',
   POST = 'POST',
   AVATAR = 'AVATAR',
   COVER = 'COVER',

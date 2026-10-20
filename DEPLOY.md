@@ -4,7 +4,8 @@ Production stack: PostgreSQL + NestJS API + Next.js web, all in Docker Compose.
 
 TURN is included in the main Compose file. On the existing stack, update calls with
 `docker compose up -d --build --no-deps web api turn`.
-The API generates a persistent relay key automatically. See [ports and call quality settings](docs/CALL_EXPERIENCE.md).
+The API generates a persistent relay key automatically.
+Set `SITE_URL` (default `https://rosefly.store`) for link previews, canonical URLs and the sitemap. See [ports and call quality settings](docs/CALL_EXPERIENCE.md).
 
 ## 1. Prepare the server
 

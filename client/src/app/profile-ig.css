@@ -240,8 +240,8 @@
   .ig-profile-header {
     --avatar: 86px;
     grid-template-columns: 86px minmax(0, 1fr) auto;
+    /* Phones: no cover banner, like Instagram; the photo and counts lead. */
     grid-template-areas:
-      "cover cover cover"
       "avatar stats stats"
       "name name menu"
       "bio bio bio"
@@ -255,12 +255,10 @@
     box-shadow: none;
   }
   .ig-profile-cover {
-    height: 132px;
-    margin: 0 -16px 10px;
-    border-radius: 0;
+    display: none;
   }
   .ig-profile-avatar {
-    margin-top: -46px;
+    margin-top: 16px;
   }
   .ig-profile-avatar .avatar {
     border-width: 3px;

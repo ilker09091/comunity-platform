@@ -26,6 +26,16 @@ is for a separately managed relay/native deployment. The relay needs an actual r
 external address, open listening/relay ports and TLS certificates if using `turns:`.
 The API issues expiring HMAC credentials; browser code never receives the shared key.
 
+## Local development with the shared database
+
+`server/.env` points the local API at the live database, but uploaded files live on the VPS.
+`MEDIA_PUBLIC_URL=/api/backend` keeps local media links on the local site, and under
+`next dev` only, `MEDIA_FALLBACK_ORIGIN` in `client/.env.local` reads files missing locally
+from the live site. If the local and live `MEDIA_URL_SECRET` differ, put the live one in
+`MEDIA_FALLBACK_URL_SECRET` (server-side only). Production builds never use the fallback.
+Files uploaded while developing are stored locally only, so the live site cannot show them:
+prefer a separate development database.
+
 ## Calls
 
 For the camera-off, screen-sharing, minimized window and recovery update, including

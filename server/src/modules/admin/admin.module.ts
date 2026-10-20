@@ -13,6 +13,7 @@ import { AdminPinsService } from './admin-pins.service.js';
 import { AdminReadService } from './admin-read.service.js';
 import { AdminReportsService } from './admin-reports.service.js';
 import { AdminUsersService } from './admin-users.service.js';
+import { AdminAccountsService } from './admin-accounts.service.js';
 import { AdminAnalyticsController, AdminCoreController } from './controllers/admin-core.controller.js';
 import { AdminContentController } from './controllers/admin-content.controller.js';
 import {
@@ -47,6 +48,7 @@ import { AdminUsersController } from './controllers/admin-users.controller.js';
     AdminGuard,
     AdminReadService,
     AdminUsersService,
+    AdminAccountsService,
     AdminContentService,
     AdminDeletionService,
     AdminMediaService,

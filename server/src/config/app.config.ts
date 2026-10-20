@@ -90,8 +90,9 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env) {
       localDir: env.MEDIA_LOCAL_DIR ?? './storage/media',
       // Falls back to a key derived from JWT_SECRET so development works out of the box.
       // Set a dedicated MEDIA_URL_SECRET in production.
+      // Compose passes an unset variable as "", which must never become an empty HMAC key.
       urlSecret:
-        env.MEDIA_URL_SECRET ??
+        env.MEDIA_URL_SECRET?.trim() ||
         createHash('sha256').update(`media-url:${jwtSecret}`).digest('hex'),
       urlTtlSeconds: parseDurationSeconds(env.MEDIA_URL_TTL, 24 * 3600),
       // Base for media URLs handed to browsers. Unset → PUBLIC_BASE_URL (the API's own address).

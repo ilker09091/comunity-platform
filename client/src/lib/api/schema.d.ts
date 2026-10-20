@@ -893,6 +893,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/gifs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trending GIFs, or search results with `q` (GIPHY) */
+        get: operations["gifsList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/users/me/bookmarks": {
         parameters: {
             query?: never;
@@ -2082,6 +2099,318 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/circles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your circles, most recently active first */
+        get: operations["circlesList"];
+        put?: never;
+        /** Create a circle; you become its owner */
+        post: operations["circlesCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/circles/invites/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview a circle from its invite code */
+        get: operations["circlesInvite"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/circles/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Join with an invite code */
+        post: operations["circlesJoin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/circles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A circle you belong to; marks it as seen */
+        get: operations["circlesGet"];
+        put?: never;
+        post?: never;
+        /** Delete the circle and everything in it (owner) */
+        delete: operations["circlesDelete"];
+        options?: never;
+        head?: never;
+        /** Edit name, look and rules (admins) */
+        patch: operations["circlesUpdate"];
+        trace?: never;
+    };
+    "/api/circles/{id}/invite/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace the invite link; the old one stops working */
+        post: operations["circlesResetInvite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/circles/{id}/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Leave; ownership passes on, the last person out deletes the circle */
+        post: operations["circlesLeave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/circles/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Members with roles and today’s streak contribution */
+        get: operations["circlesMembers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/circles/{id}/members/{userId}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Make someone an admin/member, or hand over ownership (owner) */
+        post: operations["circlesSetRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/circles/{id}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove someone with a lower role */
+        delete: operations["circlesRemoveMember"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/circles/{id}/posts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The circle feed, newest first */
+        get: operations["circlesFeed"];
+        put?: never;
+        /** Post, answer today’s question or add to an album; counts toward the streak */
+        post: operations["circlesCreatePost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/circles/{id}/posts/{postId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete your post (admins: any post) */
+        delete: operations["circlesDeletePost"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/circles/{id}/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Today’s question; answers unlock after you answer */
+        get: operations["circlesToday"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/circles/{id}/prompts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Earlier questions and everyone’s answers */
+        get: operations["circlesPromptHistory"];
+        put?: never;
+        /** Ask your own question: today if unanswered, else tomorrow (admins) */
+        post: operations["circlesSetPrompt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/circles/{id}/albums": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Shared albums, newest first */
+        get: operations["circlesAlbums"];
+        put?: never;
+        /** Open an album that accepts uploads for a limited time */
+        post: operations["circlesCreateAlbum"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/circles/{id}/albums/{albumId}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Photos and videos in an album */
+        get: operations["circlesAlbumItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/circles/{id}/albums/{albumId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete an album (its creator or admins) */
+        delete: operations["circlesDeleteAlbum"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/posts/{id}/preview.jpg": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** JPEG still of a public post for link previews (first photo, or a video frame) */
+        get: operations["previewsPost"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/{username}/avatar.jpg": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** JPEG profile photo for link previews */
+        get: operations["previewsAvatar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/importer/request": {
         parameters: {
             query?: never;
@@ -2211,6 +2540,155 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{id}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Signed-in devices (IP addresses only with `users.email.read`) */
+        get: operations["adminUsersSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{id}/sessions/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign the account out of every device
+         * @description The target must have a lower role than the acting admin (403 `INSUFFICIENT_RANK`); nobody can act on their own account.
+         */
+        post: operations["adminUsersRevokeSessions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{id}/sessions/{sessionId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign the account out of one device
+         * @description The target must have a lower role than the acting admin (403 `INSUFFICIENT_RANK`); nobody can act on their own account.
+         */
+        post: operations["adminUsersRevokeSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{id}/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set a new password (or generate one, shown once) and sign out every device (step-up)
+         * @description The target must have a lower role than the acting admin (403 `INSUFFICIENT_RANK`); nobody can act on their own account.
+         */
+        post: operations["adminUsersResetPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{id}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit or clean up a profile (name, username, bio, photos); audited with the previous values
+         * @description The target must have a lower role than the acting admin (403 `INSUFFICIENT_RANK`); nobody can act on their own account.
+         */
+        patch: operations["adminUsersUpdateProfile"];
+        trace?: never;
+    };
+    "/api/admin/users/{id}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Usage counts (never message contents), circles and posting over the last 14 days */
+        get: operations["adminUsersActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Internal staff notes about the account */
+        get: operations["adminUsersNotes"];
+        put?: never;
+        /** Add an internal note (never shown to the account) */
+        post: operations["adminUsersAddNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{id}/notes/{noteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete your note (admins: any note) */
+        delete: operations["adminUsersDeleteNote"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3930,6 +4408,19 @@ export interface components {
             /** @description Created by the viewer (can be deleted) */
             isOwn: boolean;
         };
+        GifDto: {
+            /** @description Provider id (GIPHY) */
+            id: string;
+            title: string;
+            /** @description Animated image (WebP or GIF) for display */
+            url: string;
+            /** @description Looping MP4, lighter than the image when supported */
+            mp4: string | null;
+            /** @description Small animated preview for the picker and reply quotes */
+            previewUrl: string;
+            width: number;
+            height: number;
+        };
         CommentDto: {
             /**
              * Format: uuid
@@ -3963,6 +4454,7 @@ export interface components {
              * @example false
              */
             stickerUnavailable: boolean;
+            gif: components["schemas"]["GifDto"] | null;
             /** @example 4 */
             likeCount: number;
             /**
@@ -4019,6 +4511,8 @@ export interface components {
              * @description A built-in sticker or one of your own (GET /stickers)
              */
             stickerId?: string;
+            /** @description GIF id from GET /gifs */
+            gifId?: string;
         };
         UpdateCommentDto: {
             /**
@@ -4026,6 +4520,12 @@ export interface components {
              * @example Great point!
              */
             content: string;
+        };
+        GifPageDto: {
+            /** @description False when no GIF provider key is configured on the server */
+            enabled: boolean;
+            items: components["schemas"]["GifDto"][];
+            nextOffset: number | null;
         };
         BookmarkResultDto: {
             /**
@@ -4321,9 +4821,13 @@ export interface components {
             /** Format: uuid */
             senderId: string;
             /** @enum {string} */
-            kind: "TEXT" | "PHOTO" | "VIDEO" | "POST" | "STORY" | "VIEW_ONCE" | "STICKER" | "AUDIO" | "CALL" | "UNAVAILABLE";
+            kind: "TEXT" | "PHOTO" | "VIDEO" | "POST" | "STORY" | "VIEW_ONCE" | "STICKER" | "AUDIO" | "CALL" | "GIF" | "UNAVAILABLE";
             /** @description Up to 140 characters */
             preview: string | null;
+            /** @description Length of a quoted voice message */
+            audioDurationMs: number | null;
+            /** @description Small picture of a quoted photo, sticker or GIF */
+            thumbnailUrl: string | null;
         };
         StoryReplyRefDto: {
             /**
@@ -4340,6 +4844,7 @@ export interface components {
             songTitle: string | null;
         };
         DirectMessageDto: {
+            gif: components["schemas"]["GifDto"] | null;
             /** @description Set on call history entries; the sender is the caller */
             call: components["schemas"]["CallLogDto"] | null;
             sticker: components["schemas"]["StickerDto"] | null;
@@ -4417,6 +4922,8 @@ export interface components {
         SendMessageDto: {
             /** Format: uuid */
             stickerId?: string;
+            /** @description GIF id from GET /gifs */
+            gifId?: string;
             /**
              * Format: uuid
              * @description A recorded voice clip uploaded by this account
@@ -4652,6 +5159,226 @@ export interface components {
             canRestore: boolean;
             restoresRemaining: number;
             expiresAt: string | null;
+        };
+        CircleStreakDto: {
+            /** @description Current shared streak; 0 once it has lapsed */
+            days: number;
+            best: number;
+            /** @description Members who did something for the circle today (UTC) */
+            todayCount: number;
+            /** @description How many are needed today to keep the streak */
+            needed: number;
+            completedToday: boolean;
+            contributedToday: boolean;
+            /** @description The streak ends unless today is completed */
+            atRisk: boolean;
+        };
+        CircleDto: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            emoji: string;
+            color: string;
+            description: string | null;
+            /** @enum {string} */
+            kind: "friends" | "class" | "club";
+            /** @enum {string} */
+            role: "owner" | "admin" | "member";
+            memberCount: number;
+            /** @description Up to five members for the avatar stack */
+            members: components["schemas"]["UserSummaryDto"][];
+            streak: components["schemas"]["CircleStreakDto"];
+            /** @enum {string} */
+            streakRule: "auto" | "all" | "most" | "half";
+            membersCanInvite: boolean;
+            /** @description Only for people allowed to invite */
+            inviteCode: string | null;
+            /** @description You have answered today's question */
+            answeredToday: boolean;
+            /** @description Something new since you last opened the circle */
+            hasNew: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CreateCircleDto: {
+            name: string;
+            /** @description One emoji shown as the circle picture */
+            emoji: string;
+            /**
+             * @description Lowercase hex accent colour
+             * @example #7c5cff
+             */
+            color: string;
+            description?: string | null;
+            /**
+             * @default friends
+             * @enum {string}
+             */
+            kind: "friends" | "class" | "club";
+        };
+        CircleInviteDto: {
+            name: string;
+            emoji: string;
+            color: string;
+            description: string | null;
+            /** @enum {string} */
+            kind: "friends" | "class" | "club";
+            memberCount: number;
+            members: components["schemas"]["UserSummaryDto"][];
+            /**
+             * Format: uuid
+             * @description Set when you are already a member
+             */
+            circleId: string | null;
+            full: boolean;
+        };
+        JoinCircleDto: {
+            code: string;
+        };
+        UpdateCircleDto: {
+            name?: string;
+            emoji?: string;
+            /** @example #7c5cff */
+            color?: string;
+            description?: string | null;
+            /** @enum {string} */
+            kind?: "friends" | "class" | "club";
+            /**
+             * @description auto: everyone up to 6 members, two thirds above
+             * @enum {string}
+             */
+            streakRule?: "auto" | "all" | "most" | "half";
+            /** @description Members (not only admins) can see and share the invite link */
+            membersCanInvite?: boolean;
+        };
+        CircleMemberDto: {
+            user: components["schemas"]["UserSummaryDto"];
+            /** @enum {string} */
+            role: "owner" | "admin" | "member";
+            /** Format: date-time */
+            joinedAt: string;
+            contributedToday: boolean;
+        };
+        CircleRoleDto: {
+            /**
+             * @description owner transfers ownership; you become an admin
+             * @enum {string}
+             */
+            role: "admin" | "member" | "owner";
+        };
+        CirclePostDto: {
+            /** Format: uuid */
+            id: string;
+            author: components["schemas"]["UserSummaryDto"];
+            content: string | null;
+            media: components["schemas"]["MediaDto"] | null;
+            pollChoice: number | null;
+            /** Format: uuid */
+            promptId: string | null;
+            /** Format: uuid */
+            albumId: string | null;
+            canDelete: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PaginatedCirclePost: {
+            items: components["schemas"]["CirclePostDto"][];
+            /**
+             * @description Pass as `cursor` to fetch the next page. `null` when there are no more items.
+             * @example null
+             */
+            nextCursor: string | null;
+            /** @example false */
+            hasMore: boolean;
+        };
+        CreateCirclePostDto: {
+            content?: string;
+            /**
+             * Format: uuid
+             * @description Your uploaded photo or video
+             */
+            mediaId?: string;
+            /**
+             * Format: uuid
+             * @description Answer today's question
+             */
+            promptId?: string;
+            /**
+             * Format: uuid
+             * @description Add to an open album (photo or video required)
+             */
+            albumId?: string;
+            /** @description Option index for a poll question */
+            pollChoice?: number;
+        };
+        CirclePromptDto: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * Format: date
+             * @description UTC day
+             */
+            day: string;
+            /** @enum {string} */
+            kind: "text" | "photo" | "poll";
+            text: string;
+            options: string[] | null;
+            /** @description Written by a circle admin; null for the built-in question */
+            author: components["schemas"]["UserSummaryDto"] | null;
+            answeredCount: number;
+            memberCount: number;
+            myAnswer: components["schemas"]["CirclePostDto"] | null;
+            /** @description Empty until you answer (today's question only) */
+            answers: components["schemas"]["CirclePostDto"][];
+            /** @description Votes per option once you have answered a poll */
+            results: number[] | null;
+        };
+        PaginatedCirclePrompt: {
+            items: components["schemas"]["CirclePromptDto"][];
+            /**
+             * @description Pass as `cursor` to fetch the next page. `null` when there are no more items.
+             * @example null
+             */
+            nextCursor: string | null;
+            /** @example false */
+            hasMore: boolean;
+        };
+        CreateCirclePromptDto: {
+            text: string;
+            /** @enum {string} */
+            kind: "text" | "photo" | "poll";
+            /** @description Two to six choices for a poll */
+            options?: string[];
+        };
+        CircleAlbumDto: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            createdBy: components["schemas"]["UserSummaryDto"] | null;
+            /** Format: date-time */
+            closesAt: string;
+            open: boolean;
+            itemCount: number;
+            /** @description Up to four newest photos/videos */
+            preview: components["schemas"]["MediaDto"][];
+            canDelete: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PaginatedCircleAlbum: {
+            items: components["schemas"]["CircleAlbumDto"][];
+            /**
+             * @description Pass as `cursor` to fetch the next page. `null` when there are no more items.
+             * @example null
+             */
+            nextCursor: string | null;
+            /** @example false */
+            hasMore: boolean;
+        };
+        CreateCircleAlbumDto: {
+            title: string;
+            /** @description Hours the album accepts uploads */
+            hours: number;
         };
         ImporterRequestDto: {
             /** @enum {string} */
@@ -4973,6 +5700,100 @@ export interface components {
             /** @description Reel view counts and watch time are not tracked (see ADMIN_ARCHITECTURE.md §8) */
             viewsTracked: boolean;
         };
+        AdminSessionDto: {
+            /** Format: uuid */
+            id: string;
+            /** @description Browser/app as reported at sign-in */
+            userAgent: string | null;
+            /** @description Only with `users.email.read` */
+            ipAddress: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            lastUsedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            revokedAt: string | null;
+            revokedReason: string | null;
+            active: boolean;
+        };
+        ReasonDto: {
+            /** @example Repeated spam after warnings */
+            reason: string;
+        };
+        RevokedSessionsDto: {
+            revoked: number;
+        };
+        AdminResetPasswordDto: {
+            /** @example Repeated spam after warnings */
+            reason: string;
+            /** @description Omit to generate a strong temporary password. password must be 8-128 characters and contain at least one letter and one digit */
+            password?: string;
+        };
+        AdminResetPasswordResultDto: {
+            /** @description The generated password, shown once; null when you chose it */
+            temporaryPassword: string | null;
+            /** @description Devices that were signed out */
+            revokedSessions: number;
+        };
+        AdminUpdateProfileDto: {
+            /** @example Repeated spam after warnings */
+            reason: string;
+            displayName?: string;
+            username?: string;
+            bio?: string | null;
+            location?: string | null;
+            website?: string | null;
+            isPrivate?: boolean;
+            /** @description Delete the profile photo */
+            removeAvatar?: boolean;
+            /** @description Delete the cover image */
+            removeCover?: boolean;
+        };
+        AdminProfileResultDto: {
+            /** @description Fields that actually changed */
+            changed: string[];
+        };
+        AdminCircleMembershipDto: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            emoji: string;
+            color: string;
+            role: string;
+            memberCount: number;
+            /** Format: date-time */
+            joinedAt: string;
+        };
+        AdminUserActivityDto: {
+            messagesSent: number;
+            messagesReceived: number;
+            /** @description People they have exchanged direct messages with */
+            conversations: number;
+            /** @description Calls in the last 30 days (both directions) */
+            recentCalls: number;
+            activeStories: number;
+            stickers: number;
+            bookmarks: number;
+            likesGiven: number;
+            reportsFiled: number;
+            circles: components["schemas"]["AdminCircleMembershipDto"][];
+            /** @description Posts per day for the last 14 UTC days, oldest first */
+            postsByDay: number[];
+        };
+        AdminUserNoteDto: {
+            /** Format: uuid */
+            id: string;
+            body: string;
+            author: components["schemas"]["AdminUserRefDto"] | null;
+            canDelete: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CreateAdminUserNoteDto: {
+            body: string;
+        };
         DeleteAccountDto: {
             /** @example Repeated spam after warnings */
             reason: string;
@@ -5086,10 +5907,6 @@ export interface components {
             /** Format: uuid */
             id: string;
             status: components["schemas"]["UserStatus"];
-        };
-        ReasonDto: {
-            /** @example Repeated spam after warnings */
-            reason: string;
         };
         BanUserDto: {
             /** @example Repeated spam after warnings */
@@ -5266,7 +6083,7 @@ export interface components {
             history: components["schemas"]["AuditLogDto"][];
         };
         /** @enum {string} */
-        MediaUsage: "MESSAGE" | "STORY" | "STICKER" | "POST" | "AVATAR" | "COVER" | "UNATTACHED";
+        MediaUsage: "MESSAGE" | "STORY" | "STICKER" | "CIRCLE" | "POST" | "AVATAR" | "COVER" | "UNATTACHED";
         MediaUsageDto: {
             kind: components["schemas"]["MediaUsage"];
             /** Format: uuid */
@@ -9450,6 +10267,73 @@ export interface operations {
             };
             /** @description Resource not found or not visible to the viewer */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Request is valid but cannot be processed in the current state */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    gifsList: {
+        parameters: {
+            query?: {
+                /** @description Search words; omit for trending GIFs */
+                q?: string;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GifPageDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -14924,6 +15808,1950 @@ export interface operations {
             };
         };
     };
+    circlesList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CircleDto"][];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesCreate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCircleDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CircleDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CircleInviteDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesJoin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JoinCircleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CircleDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CircleDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCircleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CircleDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesResetInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CircleDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesLeave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CircleMemberDto"][];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesSetRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CircleRoleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CircleMemberDto"][];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesRemoveMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesFeed: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor returned as `nextCursor` by the previous page. Omit for the first page. */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedCirclePost"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesCreatePost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCirclePostDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CirclePostDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesDeletePost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                postId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesToday: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CirclePromptDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesPromptHistory: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor returned as `nextCursor` by the previous page. Omit for the first page. */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedCirclePrompt"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesSetPrompt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCirclePromptDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CirclePromptDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesAlbums: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor returned as `nextCursor` by the previous page. Omit for the first page. */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedCircleAlbum"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesCreateAlbum: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCircleAlbumDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CircleAlbumDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesAlbumItems: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor returned as `nextCursor` by the previous page. Omit for the first page. */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+                albumId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedCirclePost"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    circlesDeleteAlbum: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                albumId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    previewsPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description JPEG image */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Rate limit exceeded (`RATE_LIMITED`) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    previewsAvatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description JPEG image */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Rate limit exceeded (`RATE_LIMITED`) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
     adminImporterRequest: {
         parameters: {
             query?: never;
@@ -15277,6 +18105,632 @@ export interface operations {
             };
             /** @description Not staff, missing permission (`FORBIDDEN`), insufficient rank or step-up required */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Rate limit exceeded (`RATE_LIMITED`) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    adminUsersSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSessionDto"][];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not staff, missing permission (`FORBIDDEN`), insufficient rank or step-up required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Rate limit exceeded (`RATE_LIMITED`) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    adminUsersRevokeSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevokedSessionsDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not staff, missing permission (`FORBIDDEN`), insufficient rank or step-up required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Rate limit exceeded (`RATE_LIMITED`) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    adminUsersRevokeSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevokedSessionsDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not staff, missing permission (`FORBIDDEN`), insufficient rank or step-up required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Rate limit exceeded (`RATE_LIMITED`) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    adminUsersResetPassword: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Token from `POST /admin/step-up` (10 min). Missing/expired → 403 `STEP_UP_REQUIRED`. */
+                "X-Step-Up-Token": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminResetPasswordDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminResetPasswordResultDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Rate limit exceeded (`RATE_LIMITED`) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    adminUsersUpdateProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUpdateProfileDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProfileResultDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not staff, missing permission (`FORBIDDEN`), insufficient rank or step-up required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Conflict with existing state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Rate limit exceeded (`RATE_LIMITED`) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    adminUsersActivity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserActivityDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not staff, missing permission (`FORBIDDEN`), insufficient rank or step-up required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Rate limit exceeded (`RATE_LIMITED`) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    adminUsersNotes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserNoteDto"][];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not staff, missing permission (`FORBIDDEN`), insufficient rank or step-up required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Rate limit exceeded (`RATE_LIMITED`) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    adminUsersAddNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAdminUserNoteDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserNoteDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not staff, missing permission (`FORBIDDEN`), insufficient rank or step-up required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Rate limit exceeded (`RATE_LIMITED`) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    adminUsersDeleteNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                noteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Missing or invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not staff, missing permission (`FORBIDDEN`), insufficient rank or step-up required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -20,6 +20,7 @@ function preview(message) {
     return message.call.status === "completed" ? `Ended a ${kind} call` : `Missed ${kind} call`;
   }
   if (message.audioUrl) return "Sent a voice message";
+  if (message.gif) return "Sent a GIF";
   if (message.hasSticker) return "Sent a sticker";
   if (message.viewOnce) return "Sent a view once photo";
   if (message.media) return message.media.type === "IMAGE" ? "Sent a photo" : "Sent a video";
@@ -91,7 +92,9 @@ self.addEventListener("push", (event) => {
         tag: message.tag,
         renotify: true,
         requireInteraction: !!message.call,
-        vibrate: [80, 40, 80],
+        // Calls ring like a phone (the Android app also plays the ringtone on its "Calls" channel).
+        vibrate: message.call ? [800, 600, 800, 600, 800, 600, 800] : [80, 40, 80],
+        silent: false,
         data: { url: message.url },
       });
     })(),
@@ -112,5 +115,33 @@ self.addEventListener("notificationclick", (event) => {
       }
       await self.clients.openWindow(url);
     })(),
+  );
+});
+
+// The browser can rotate a push subscription at any time; re-subscribe and tell the server at once,
+// instead of waiting for the next visit (otherwise notifications silently stop).
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    (async () => {
+      const key = event.oldSubscription && event.oldSubscription.options.applicationServerKey;
+      const subscription = event.newSubscription ||
+        (key ? await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }) : null);
+      if (!subscription) return;
+      const json = subscription.toJSON();
+      await fetch(`${API}/push/subscriptions`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-Social-Client": "web" },
+        body: JSON.stringify({ endpoint: subscription.endpoint, p256dh: json.keys && json.keys.p256dh, auth: json.keys && json.keys.auth }),
+      }).catch(() => undefined);
+    })(),
+  );
+});
+
+// The page asks to dismiss a ringing call notification once the call is answered, declined or over.
+self.addEventListener("message", (event) => {
+  if (!event.data || event.data.type !== "circle:close-call-notifications") return;
+  event.waitUntil(
+    self.registration.getNotifications().then((list) => list.forEach((n) => { if (n.tag && n.tag.startsWith("call-")) n.close(); })),
   );
 });

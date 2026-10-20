@@ -1,5 +1,5 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
+import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { UuidPipe } from '../../../common/errors/validation.js';
 import { ApiErrors } from '../../../common/swagger/api-docs.decorators.js';
 import { AccountGovernanceService } from '../../platform/account-governance.service.js';
@@ -11,6 +11,18 @@ import { ReqContext, type RequestContext } from '../../platform/audit.service.js
 import { AdminController, ApiStepUp, RequirePermissions } from '../admin.guard.js';
 import { AdminUsersService } from '../admin-users.service.js';
 import { AdminDeletionService } from '../admin-deletion.service.js';
+import { AdminAccountsService } from '../admin-accounts.service.js';
+import {
+  AdminProfileResultDto,
+  AdminResetPasswordDto,
+  AdminResetPasswordResultDto,
+  AdminSessionDto,
+  AdminUpdateProfileDto,
+  AdminUserActivityDto,
+  AdminUserNoteDto,
+  CreateAdminUserNoteDto,
+  RevokedSessionsDto,
+} from '../dto/admin-accounts.dto.js';
 import {
   AccountStatusResultDto,
   AdminPageOf,
@@ -48,7 +60,89 @@ export class AdminUsersController {
     private readonly moderation: ContentModerationService,
     private readonly stepUp: StepUpService,
     private readonly deletion: AdminDeletionService,
+    private readonly accounts: AdminAccountsService,
   ) {}
+
+  @Get(':id/sessions')
+  @RequirePermissions('users.read')
+  @ApiOperation({ operationId: 'adminUsersSessions', summary: 'Signed-in devices (IP addresses only with `users.email.read`)' })
+  @ApiOkResponse({ type: [AdminSessionDto] })
+  @ApiErrors(400, 404)
+  sessions(@ReqContext() ctx: RequestContext, @Param('id', UuidPipe) id: string) { return this.accounts.sessions(ctx, id); }
+
+  @Post(':id/sessions/revoke')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('users.suspend')
+  @ApiOperation({ operationId: 'adminUsersRevokeSessions', summary: 'Sign the account out of every device', description: RANK_NOTE })
+  @ApiOkResponse({ type: RevokedSessionsDto })
+  @ApiErrors(400, 404)
+  revokeAll(@ReqContext() ctx: RequestContext, @Param('id', UuidPipe) id: string, @Body() dto: ReasonDto) {
+    return this.accounts.revokeSessions(ctx, id, dto.reason);
+  }
+
+  @Post(':id/sessions/:sessionId/revoke')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('users.suspend')
+  @ApiOperation({ operationId: 'adminUsersRevokeSession', summary: 'Sign the account out of one device', description: RANK_NOTE })
+  @ApiOkResponse({ type: RevokedSessionsDto })
+  @ApiErrors(400, 404)
+  revokeOne(@ReqContext() ctx: RequestContext, @Param('id', UuidPipe) id: string, @Param('sessionId', UuidPipe) sessionId: string, @Body() dto: ReasonDto) {
+    return this.accounts.revokeSessions(ctx, id, dto.reason, sessionId);
+  }
+
+  @Post(':id/password')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('users.update')
+  @ApiStepUp()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ operationId: 'adminUsersResetPassword', summary: 'Set a new password (or generate one, shown once) and sign out every device (step-up)', description: RANK_NOTE })
+  @ApiOkResponse({ type: AdminResetPasswordResultDto })
+  @ApiErrors(400, 403, 404)
+  resetPassword(@ReqContext() ctx: RequestContext, @Param('id', UuidPipe) id: string, @Body() dto: AdminResetPasswordDto) {
+    return this.accounts.resetPassword(ctx, id, dto.reason, dto.password);
+  }
+
+  @Patch(':id/profile')
+  @RequirePermissions('users.update')
+  @ApiOperation({ operationId: 'adminUsersUpdateProfile', summary: 'Edit or clean up a profile (name, username, bio, photos); audited with the previous values', description: RANK_NOTE })
+  @ApiOkResponse({ type: AdminProfileResultDto })
+  @ApiErrors(400, 404, 409)
+  updateProfile(@ReqContext() ctx: RequestContext, @Param('id', UuidPipe) id: string, @Body() dto: AdminUpdateProfileDto) {
+    return this.accounts.updateProfile(ctx, id, dto);
+  }
+
+  @Get(':id/activity')
+  @RequirePermissions('users.read')
+  @ApiOperation({ operationId: 'adminUsersActivity', summary: 'Usage counts (never message contents), circles and posting over the last 14 days' })
+  @ApiOkResponse({ type: AdminUserActivityDto })
+  @ApiErrors(400, 404)
+  activity(@ReqContext() ctx: RequestContext, @Param('id', UuidPipe) id: string) { return this.accounts.activity(ctx, id); }
+
+  @Get(':id/notes')
+  @RequirePermissions('users.read')
+  @ApiOperation({ operationId: 'adminUsersNotes', summary: 'Internal staff notes about the account' })
+  @ApiOkResponse({ type: [AdminUserNoteDto] })
+  @ApiErrors(400, 404)
+  notes(@ReqContext() ctx: RequestContext, @Param('id', UuidPipe) id: string) { return this.accounts.notes(ctx, id); }
+
+  @Post(':id/notes')
+  @RequirePermissions('users.warn')
+  @ApiOperation({ operationId: 'adminUsersAddNote', summary: 'Add an internal note (never shown to the account)' })
+  @ApiCreatedResponse({ type: AdminUserNoteDto })
+  @ApiErrors(400, 404)
+  addNote(@ReqContext() ctx: RequestContext, @Param('id', UuidPipe) id: string, @Body() dto: CreateAdminUserNoteDto) {
+    return this.accounts.addNote(ctx, id, dto.body);
+  }
+
+  @Delete(':id/notes/:noteId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermissions('users.warn')
+  @ApiOperation({ operationId: 'adminUsersDeleteNote', summary: 'Delete your note (admins: any note)' })
+  @ApiNoContentResponse()
+  @ApiErrors(400, 404)
+  async deleteNote(@ReqContext() ctx: RequestContext, @Param('id', UuidPipe) id: string, @Param('noteId', UuidPipe) noteId: string) {
+    await this.accounts.deleteNote(ctx, id, noteId);
+  }
 
   @Post(':id/delete')
   @HttpCode(HttpStatus.OK)

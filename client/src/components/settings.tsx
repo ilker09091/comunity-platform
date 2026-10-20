@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { Monitor, Moon, Sun } from "lucide-react";
+import { useTheme, type ThemePreference } from "@/lib/theme";
 import {
   useInfiniteQuery,
   useMutation,
@@ -86,6 +88,27 @@ function PrivacySettings({ user }: { user: Models["MeDto"] }) {
       </label>
     </section>
   );
+}
+const THEMES: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
+  { value: "system", label: "System", icon: Monitor },
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+];
+export function AppearanceSettings() {
+  const { preference, setPreference } = useTheme();
+  return <section className="card settings-card" aria-labelledby="appearance-title">
+    <div className="settings-title"><Moon size={20} /><div><h2 id="appearance-title">Appearance</h2><p>Light, dark, or follow your device.</p></div></div>
+    <div className="theme-options" role="radiogroup" aria-label="Theme">
+      {THEMES.map(({ value, label, icon: Icon }) => (
+        <button type="button" role="radio" key={value} aria-checked={preference === value} className={`theme-option ${value}`} onClick={() => setPreference(value)}>
+          {value === "system"
+            ? <span className="theme-preview-stack" aria-hidden="true"><span className="theme-preview"><span /><span /><span /></span><span className="theme-preview dark"><span /><span /><span /></span></span>
+            : <span className={`theme-preview ${value}`} aria-hidden="true"><span /><span /><span /></span>}
+          <span className="theme-option-label"><Icon size={15} /> {label}</span>
+        </button>
+      ))}
+    </div>
+  </section>;
 }
 export function VideoPlaybackSettings() {
   const preferences = useVideoPreferences();
@@ -356,6 +379,7 @@ export default function Settings() {
           </Link>
         }
       />
+      <AppearanceSettings />
       <PrivacySettings key={user.id} user={user} />
       <VideoPlaybackSettings />
       <SecuritySettings />

@@ -1,4 +1,7 @@
 import { SocialModule } from './modules/social/social.module.js';
+import { CirclesModule } from './modules/circles/circles.module.js';
+import { PreviewsModule } from './modules/previews/previews.js';
+import { GifsModule } from './modules/gifs/gifs.js';
 import { Logger, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigType } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
@@ -75,6 +78,9 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     ReportsModule,
     InboxModule,
     SocialModule,
+    CirclesModule,
+    PreviewsModule,
+    GifsModule,
     AdminModule,
   ],
   controllers: [AppController],

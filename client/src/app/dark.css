@@ -1,0 +1,82 @@
+/* Dark mode: the design tokens switch here; dark-generated.css covers hard-coded colours.
+   The theme is chosen in Settings → Appearance (system, light or dark) and applied to <html>
+   before the first paint, so there is no flash of the light theme. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0d0e11;
+  --surface: #17181c;
+  --surface-muted: #1f2126;
+  --surface-hover: #24262c;
+  /* Same white-text contrast as the light theme's blue, still bright enough for links. */
+  --primary: #2d8ef4;
+  --primary-hover: #4aa0f7;
+  --primary-soft: #132538;
+  --primary-soft-strong: #193049;
+  --text: #ecedf0;
+  --text-2: #b9bdc6;
+  --muted: #8c929d;
+  --border: #2a2c33;
+  --border-strong: #353841;
+  --input: #1f2126;
+  --like: #ff5a73;
+  --danger: #ff6b78;
+  --success: #3ccf8e;
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.02), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+:root[data-theme="dark"] body { background: var(--background); color: var(--text); }
+:root[data-theme="dark"] ::selection { background: #3d9bff55; }
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] textarea,
+:root[data-theme="dark"] select { color: var(--text); }
+:root[data-theme="dark"] input::placeholder,
+:root[data-theme="dark"] textarea::placeholder { color: var(--muted); }
+:root[data-theme="dark"] .modal::backdrop { background: rgba(0, 0, 0, 0.62); }
+:root[data-theme="dark"] .admin-root {
+  --ok-soft: #12291f;
+  --warn: #f0a640;
+  --warn-soft: #2b2112;
+  --danger-soft: #2e1519;
+}
+/* The logo and white artwork keep their colours; only UI surfaces change. */
+:root[data-theme="dark"] .brand-logo { filter: drop-shadow(0 0 0.5px #ffffff40); }
+:root[data-theme="dark"] img:not([src*=".svg"]) { color-scheme: normal; }
+/* Scrollbars follow the theme in Chromium/Firefox. */
+:root[data-theme="dark"] * { scrollbar-color: #3a3d45 transparent; }
+
+/* Smooth switch between themes (not on first paint, see theme.ts). */
+:root.theme-switching,
+:root.theme-switching * { transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease !important; }
+@media (prefers-reduced-motion: reduce) {
+  :root.theme-switching, :root.theme-switching * { transition: none !important; }
+}
+
+/* Settings → Appearance: three small previews of the page in each theme. */
+.theme-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.theme-option { display: flex; flex-direction: column; gap: 8px; padding: 8px; border: 1.5px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); text-align: left; transition: border-color .15s, box-shadow .15s; }
+.theme-option[aria-checked="true"] { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent); }
+.theme-preview { position: relative; display: grid; grid-template-columns: 30% 1fr; grid-template-rows: 22% 1fr; gap: 5px; height: 72px; padding: 7px; border-radius: 9px; background: #f5f6f8; overflow: hidden; }
+.theme-preview > span { border-radius: 4px; background: #fff; box-shadow: 0 0 0 1px #e8ebf0; }
+.theme-preview > span:first-child { grid-column: 1 / -1; }
+/* System: the light preview with its right half shown dark. */
+.theme-preview-stack { position: relative; display: block; }
+.theme-preview-stack > .theme-preview + .theme-preview { position: absolute; inset: 0; clip-path: inset(0 0 0 50%); }
+.theme-preview.dark { background: #0d0e11; }
+.theme-preview.dark > span { background: #1f2126; box-shadow: 0 0 0 1px #2a2c33; }
+.theme-option-label { display: inline-flex; align-items: center; gap: 6px; padding: 0 2px 2px; font-size: 13px; font-weight: 600; }
+
+/* Custom properties the generator does not rewrite. */
+:root[data-theme="dark"] .dm-shell { --dm-bubble-in: #24262c; }
+:root[data-theme="dark"] .dm-message.own .dm-bubble { background: color-mix(in srgb, var(--primary) 24%, var(--surface)); color: var(--text); }
+:root[data-theme="dark"] .dm-message.own .dm-quote { background: color-mix(in srgb, var(--primary) 34%, var(--surface)); }
+:root[data-theme="dark"] .wa-voice.own { background: color-mix(in srgb, var(--primary) 24%, var(--surface)); }
+:root[data-theme="dark"] .wa-voice.own .wa-voice-mic { box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 24%, var(--surface)); }
+:root[data-theme="dark"] .dm-message.own .dm-bubble .dm-stamp { color: var(--text-2); }
+
+/* Toggle switches keep a white knob and a visible track. */
+:root[data-theme="dark"] input.switch::before { background: #fff; }
+:root[data-theme="dark"] input.switch:not(:checked) { background: #464a53; }
+
+/* Initials avatars: a quiet blue tint instead of flat grey. */
+:root[data-theme="dark"] .avatar { background: linear-gradient(135deg, #1c2a3d, #18283b); color: #8ebdf5; }
+:root[data-theme="dark"] .composer-create-reel { color: var(--text-2); }

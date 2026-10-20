@@ -22,6 +22,8 @@ export function applyTestEnv() {
     MEDIA_LOCAL_DIR: join(tmpdir(), 'community-platform-e2e-media'),
     MEDIA_CLEANUP_ENABLED: 'false',
     PUBLIC_BASE_URL: 'http://localhost:0',
+    // Absolute API media links, whatever the developer's .env uses for the website gateway.
+    MEDIA_PUBLIC_URL: '',
   });
 }
 

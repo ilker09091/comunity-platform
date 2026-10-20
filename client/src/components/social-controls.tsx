@@ -7,7 +7,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { Send, Link2, CirclePlus, Check, Search, Share2 } from "lucide-react";
+import { Send, Link2, CirclePlus, Check, Search, Share2, MessageCircle, X } from "lucide-react";
 import { haptic } from "@/lib/haptics";
 import { api, type User } from "@/lib/api/client";
 import { sharePath } from "@/lib/use-post-engagement";
@@ -224,7 +224,7 @@ function SendSheet({
   const link = () => `${window.location.origin}/post/${postId}`;
   const busy = send.isPending || addStory.isPending;
   return (
-    <Modal title={reel?'Share Reel':'Send to'} onClose={onClose} guardClose={() => !busy} className={`send-sheet ${reel?'reel-share-sheet':''} ${expanded?'expanded':''}`}>
+    <Modal title={reel?'Share reel':'Share'} onClose={onClose} guardClose={() => !busy} className={`send-sheet ${reel?'reel-share-sheet':''} ${expanded?'expanded':''}`}>
       <button ref={handle} type="button" className="share-sheet-handle" aria-label={expanded?'Collapse share sheet':'Expand share sheet'} aria-expanded={expanded}
         onPointerDown={e=>{drag.current={y:e.clientY,id:e.pointerId,moved:false};e.currentTarget.setPointerCapture(e.pointerId);}}
         onPointerMove={e=>{const start=drag.current;if(!start||start.id!==e.pointerId)return;const dy=e.clientY-start.y;if(Math.abs(dy)>6)start.moved=true;setDragY(dy);}}
@@ -232,106 +232,119 @@ function SendSheet({
           if(dy>90){if(expanded)setExpanded(false);else if(!busy)onClose();}else if(dy<-40)setExpanded(true);}}
         onPointerCancel={()=>{drag.current=null;setDragY(0);}}
         onClick={()=>{const moved=drag.current?.moved;drag.current=null;if(!moved)setExpanded(value=>!value);}}><span/></button>
-      <label className="send-search">
-        <Search size={16} aria-hidden="true" />
-        <input
-          aria-label="Search recipients"
-          placeholder="Search"
-          maxLength={100}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onFocus={()=>setExpanded(true)}
-        />
-      </label>
-      <div className="send-grid" role="listbox" aria-label="People" aria-multiselectable="true">
-        {shown.map((person) => {
-          const on = selected.some((p) => p.id === person.id);
-          return (
+      <div className="send-body">
+        <label className="send-search">
+          <Search size={16} aria-hidden="true" />
+          <input
+            aria-label="Search recipients"
+            placeholder="Search people"
+            maxLength={100}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onFocus={()=>setExpanded(true)}
+          />
+        </label>
+        {selected.length > 0 && (
+          <div className="send-selected" aria-label="Selected people">
+            {selected.map((person) => (
+              <button type="button" key={person.id} className="send-chip" onClick={() => toggle(person)} aria-label={`Remove ${person.displayName}`}>
+                <Avatar user={person} size={22} /><span>{person.displayName}</span><X size={13} aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="send-grid" role="listbox" aria-label="People" aria-multiselectable="true">
+          {shown.map((person) => {
+            const on = selected.some((p) => p.id === person.id);
+            return (
+              <button
+                type="button"
+                key={person.id}
+                role="option"
+                aria-selected={on}
+                className={`send-person ${on ? "on" : ""}`}
+                disabled={busy}
+                aria-label={`Send to ${person.displayName}`}
+                onClick={() => toggle(person)}
+              >
+                <span className="send-avatar">
+                  <Avatar user={person} size={64} />
+                  {on && (
+                    <span className="send-check" aria-hidden="true">
+                      <Check size={13} strokeWidth={3} />
+                    </span>
+                  )}
+                </span>
+                <span className="send-name">{person.displayName}</span>
+              </button>
+            );
+          })}
+          {pending && !shown.length && <p className="send-hint">Loading people…</p>}
+          {!pending && !shown.length && (
+            <p className="send-hint">{term ? "No people found. Try a different name." : "Search for someone to send this to."}</p>
+          )}
+        </div>
+        {results.error&&term&&<ErrorState error={results.error} retry={()=>void results.refetch()}/>}
+      </div>
+      <footer className="send-footer">
+        {selected.length > 0 ? (
+          <form
+            className="send-compose"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!busy) send.mutate();
+            }}
+          >
+            <input
+              aria-label="Add a message"
+              placeholder="Write a message…"
+              maxLength={1500}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+            <button type="submit" className="send-button" disabled={busy}>
+              {send.isPending ? "Sending…" : selected.length > 1 ? `Send separately (${selected.length})` : "Send"}
+            </button>
+          </form>
+        ) : (
+          <div className="send-actions" role="group" aria-label="Share options">
+            {story && (
+              <button type="button" disabled={busy} onClick={() => addStory.mutate()} aria-label="Add to your story">
+                <span className="send-action-icon story"><CirclePlus size={22} /></span>
+                <span>{addStory.isPending ? "Adding…" : "Add to story"}</span>
+              </button>
+            )}
             <button
               type="button"
-              key={person.id}
-              role="option"
-              aria-selected={on}
-              className={`send-person ${on ? "on" : ""}`}
-              disabled={busy}
-              aria-label={`Send to ${person.displayName}`}
-              onClick={() => toggle(person)}
+              onClick={() =>
+                void navigator.clipboard.writeText(link()).then(
+                  () => { haptic("success"); toast("Link copied."); },
+                  () => toast("Unable to copy the link.", true),
+                )
+              }
             >
-              <span className="send-avatar">
-                <Avatar user={person} size={72} />
-                {on && (
-                  <span className="send-check" aria-hidden="true">
-                    <Check size={13} strokeWidth={3} />
-                  </span>
-                )}
-              </span>
-              <span className="send-name">{person.displayName}</span>
+              <span className="send-action-icon"><Link2 size={21} /></span>
+              <span>Copy link</span>
             </button>
-          );
-        })}
-        {pending && !shown.length && <p className="send-hint">Loading people...</p>}
-        {!pending && !shown.length && (
-          <p className="send-hint">{term ? "No people found. Try a different name." : "Search for someone to send this to."}</p>
+            <a className="send-action-link" href={`https://wa.me/?text=${encodeURIComponent(link())}`} target="_blank" rel="noopener noreferrer">
+              <span className="send-action-icon whatsapp"><MessageCircle size={21} /></span>
+              <span>WhatsApp</span>
+            </a>
+            <a className="send-action-link" href={`https://t.me/share/url?url=${encodeURIComponent(link())}`} target="_blank" rel="noopener noreferrer">
+              <span className="send-action-icon telegram"><Send size={19} /></span>
+              <span>Telegram</span>
+            </a>
+            <a className="send-action-link" href={`https://x.com/intent/post?url=${encodeURIComponent(link())}`} target="_blank" rel="noopener noreferrer">
+              <span className="send-action-icon x" aria-hidden="true">𝕏</span>
+              <span>X</span>
+            </a>
+            <button type="button" onClick={() => void sharePath(`/post/${postId}`, toast)}>
+              <span className="send-action-icon"><Share2 size={20} /></span>
+              <span>More</span>
+            </button>
+          </div>
         )}
-      </div>
-      {results.error&&term&&<ErrorState error={results.error} retry={()=>void results.refetch()}/>}
-      {selected.length > 0 ? (
-        <form
-          className="send-compose"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!busy) send.mutate();
-          }}
-        >
-          <input
-            aria-label="Add a message"
-            placeholder="Write a message..."
-            maxLength={1500}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
-          <button type="submit" className="send-button" disabled={busy}>
-            {send.isPending ? "Sending..." : selected.length > 1 ? `Send separately (${selected.length})` : "Send"}
-          </button>
-        </form>
-      ) : (
-        <div className="send-actions">
-          {story && (
-            <button type="button" disabled={busy} onClick={() => addStory.mutate()} aria-label="Add to your story">
-              <span className="send-action-icon story">
-                <CirclePlus size={22} />
-              </span>
-              <span>{addStory.isPending ? "Adding..." : "Add to story"}</span>
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() =>
-              void navigator.clipboard.writeText(link()).then(
-                () => toast("Link copied."),
-                () => toast("Unable to copy the link.", true),
-              )
-            }
-          >
-            <span className="send-action-icon">
-              <Link2 size={22} />
-            </span>
-            <span>Copy link</span>
-          </button>
-          <button type="button" onClick={() => void sharePath(`/post/${postId}`, toast)}>
-            <span className="send-action-icon">
-              <Share2 size={21} />
-            </span>
-            <span>Share</span>
-          </button>
-          <Link href="/messages" className="send-action-link" onClick={onClose}>
-            <span className="send-action-icon">
-              <Send size={20} />
-            </span>
-            <span>Messages</span>
-          </Link>
-        </div>
-      )}
+      </footer>
     </Modal>
   );
 }

@@ -27,7 +27,7 @@ import {
   VerifiedBadge,
 } from "./ui";
 import { useFeatures } from "@/lib/platform-config";
-import { StickerButton, StickerView } from "./sticker-picker";
+import { GifView, StickerButton, StickerView } from "./sticker-picker";
 
 export function CommentInput({
   postId,
@@ -46,8 +46,8 @@ export function CommentInput({
   const client = useQueryClient();
   const [content, setContent] = useState("");
   const mutation = useMutation({
-    mutationFn: (stickerId?: string) => {
-      const body = { content: content.trim() || undefined, stickerId };
+    mutationFn: (attachment?: { stickerId?: string; gifId?: string }) => {
+      const body = { content: content.trim() || undefined, ...attachment };
       return parentId
         ? api("commentsReply", { params: { id: parentId }, body })
         : api("commentsCreate", { params: { id: postId }, body });
@@ -108,7 +108,8 @@ export function CommentInput({
         />
         <StickerButton
           disabled={mutation.isPending}
-          onPick={(sticker) => mutation.mutate(sticker.id)}
+          onPick={(sticker) => mutation.mutate({ stickerId: sticker.id })}
+          onGif={(gif) => mutation.mutate({ gifId: gif.id })}
         />
         <button
           className="comment-send"
@@ -170,7 +171,7 @@ export function CommentItem({
     <article className="comment-item" id={`comment-${item.id}`}>
       {item.author ? <Link href={`/profile/${item.author.username}`} aria-label={`View @${item.author.username}'s profile`}><Avatar user={item.author} size={31} /></Link> : <Avatar user={item.author} size={31} />}
       <div className="comment-body">
-        <div className={`comment-bubble ${!tombstone && !item.content && item.sticker ? "sticker-only" : ""}`}>
+        <div className={`comment-bubble ${!tombstone && !item.content && (item.sticker || item.gif) ? "sticker-only" : ""}`}>
           <div className="comment-heading">
             {item.author ? (
               <Link href={`/profile/${item.author.username}`}>
@@ -223,6 +224,7 @@ export function CommentItem({
                 </div>
               )}
               {item.stickerUnavailable && <p className="muted">Sticker unavailable</p>}
+              {item.gif && <GifView gif={item.gif} className="comment-gif" maxWidth={220} />}
             </>
           )}
         </div>

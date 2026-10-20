@@ -1,6 +1,8 @@
+import { GIF_ID, GifDto } from '../gifs/gifs.js';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  Matches,
   ArrayMaxSize,
   IsArray,
   IsBoolean,
@@ -22,6 +24,7 @@ import { UserSummaryDto } from '../users/dto/user.dto.js';
 
 export class SendMessageDto {
   @ApiPropertyOptional({format:'uuid'}) @IsOptional() @IsUUID('all') stickerId?: string;
+  @ApiPropertyOptional({ description: 'GIF id from GET /gifs' }) @IsOptional() @IsString() @Matches(GIF_ID) gifId?: string;
   @ApiPropertyOptional({format:'uuid',description:'A recorded voice clip uploaded by this account'})
   @IsOptional() @IsUUID('all') audioId?: string;
   @ApiPropertyOptional({ maxLength: 2000 })
@@ -59,11 +62,15 @@ export class MessageReplyRefDto {
   @ApiProperty({ format: 'uuid' }) id: string;
   @ApiProperty({ format: 'uuid' }) senderId: string;
   @ApiProperty({
-    enum: ['TEXT', 'PHOTO', 'VIDEO', 'POST', 'STORY', 'VIEW_ONCE', 'STICKER', 'AUDIO', 'CALL', 'UNAVAILABLE'],
+    enum: ['TEXT', 'PHOTO', 'VIDEO', 'POST', 'STORY', 'VIEW_ONCE', 'STICKER', 'AUDIO', 'CALL', 'GIF', 'UNAVAILABLE'],
   })
-  kind: 'TEXT' | 'PHOTO' | 'VIDEO' | 'POST' | 'STORY' | 'VIEW_ONCE' | 'STICKER' | 'AUDIO' | 'CALL' | 'UNAVAILABLE';
+  kind: 'TEXT' | 'PHOTO' | 'VIDEO' | 'POST' | 'STORY' | 'VIEW_ONCE' | 'STICKER' | 'AUDIO' | 'CALL' | 'GIF' | 'UNAVAILABLE';
   @ApiProperty({ type: String, nullable: true, description: 'Up to 140 characters' })
   preview: string | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'Length of a quoted voice message' })
+  audioDurationMs: number | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Small picture of a quoted photo, sticker or GIF' })
+  thumbnailUrl: string | null;
 }
 export class StoryReplyRefDto {
   @ApiProperty({
@@ -95,6 +102,7 @@ export class CallLogDto {
   durationSeconds: number | null;
 }
 export class DirectMessageDto {
+  @ApiProperty({ type: () => GifDto, nullable: true }) gif: GifDto | null;
   @ApiProperty({ type: CallLogDto, nullable: true, description: 'Set on call history entries; the sender is the caller' })
   call: CallLogDto | null;
   @ApiProperty({type:()=>StickerDto,nullable:true}) sticker: StickerDto|null;

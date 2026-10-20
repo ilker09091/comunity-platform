@@ -1,3 +1,4 @@
+import { GifsService } from '../gifs/gifs.js';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
@@ -35,6 +36,7 @@ export class CommentsService {
     private readonly settings: PlatformSettingsService,
     private readonly deletion: ContentDeletionService,
     private readonly urls: MediaUrlService,
+    private readonly gifs: GifsService,
   ) {}
 
   private async maxDepth() {
@@ -89,6 +91,7 @@ export class CommentsService {
       content: live ? r.content : null,
       sticker,
       stickerUnavailable: live && r.has_sticker && !sticker,
+      gif: live ? r.gif ?? null : null,
       likeCount: r.like_count,
       replyCount: r.reply_count,
       hasReplies: r.has_replies,
@@ -148,12 +151,14 @@ export class CommentsService {
     content: string,
     parentId: string | null,
     stickerId?: string,
+    gifId?: string,
   ): Promise<CommentDto> {
     await this.settings.assertFeature('comments');
     content = content.trim();
-    if (!content && !stickerId) {
+    if (stickerId && gifId) throw AppException.badRequest(ErrorCode.VALIDATION_ERROR, 'Choose a sticker or a GIF');
+    if (!content && !stickerId && !gifId) {
       throw AppException.badRequest(ErrorCode.VALIDATION_ERROR, 'Validation failed', [
-        { field: 'content', message: 'Write a comment or choose a sticker' },
+        { field: 'content', message: 'Write a comment or choose a sticker or GIF' },
       ]);
     }
     await this.assertLength(content);
@@ -166,6 +171,7 @@ export class CommentsService {
       );
       if (!usable) throw AppException.notFound(ErrorCode.NOT_FOUND, 'Sticker not found');
     }
+    const gif = gifId ? await this.gifs.resolve(gifId) : null;
     const maxDepth = await this.maxDepth();
     const id = await this.db.transaction(async (m) => {
       let targetPostId: string;
@@ -188,9 +194,10 @@ export class CommentsService {
 
       const row = await sqlOne<{ id: string }>(
         m,
-        `INSERT INTO comments (post_id, author_id, parent_id, depth, content, sticker_id, has_sticker)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-        [targetPostId, viewerId, parent?.id ?? null, parent ? parent.depth + 1 : 0, content, stickerId ?? null, !!stickerId],
+        `INSERT INTO comments (post_id, author_id, parent_id, depth, content, sticker_id, has_sticker, gif)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+        [targetPostId, viewerId, parent?.id ?? null, parent ? parent.depth + 1 : 0, content, stickerId ?? null, !!stickerId,
+          gif ? JSON.stringify(gif) : null],
       );
       await sqlRows(m, `UPDATE posts SET comment_count = comment_count + 1 WHERE id = $1`, [targetPostId]);
       if (parent) {

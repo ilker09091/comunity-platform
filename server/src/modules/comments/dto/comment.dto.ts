@@ -1,6 +1,7 @@
+import { GIF_ID, GifDto } from '../../gifs/gifs.js';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsEnum, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
 import { CursorQueryDto } from '../../../common/dto/common.dto.js';
 import { sanitizeText } from '../../../common/utils/sanitize.js';
 import { UserSummaryDto } from '../../users/dto/user.dto.js';
@@ -50,6 +51,7 @@ export class CommentDto {
 
   @ApiProperty({ example: false, description: 'This comment had a sticker that is no longer available' })
   stickerUnavailable: boolean;
+  @ApiProperty({ type: () => GifDto, nullable: true }) gif: GifDto | null;
 
   @ApiProperty({ example: 4 })
   likeCount: number;
@@ -95,6 +97,12 @@ export class CreateCommentDto {
   @IsOptional()
   @IsUUID('all')
   stickerId?: string;
+
+  @ApiPropertyOptional({ description: 'GIF id from GET /gifs' })
+  @IsOptional()
+  @IsString()
+  @Matches(GIF_ID)
+  gifId?: string;
 }
 
 export class UpdateCommentDto {

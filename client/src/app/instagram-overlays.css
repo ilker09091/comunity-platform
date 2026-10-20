@@ -109,69 +109,84 @@
   .ig-call-dialog .call-stage:has(.call-remote[data-video-active="true"]) .call-person { top:72px; }
 }
 
-/* "Share" sheet for posts and Reels, Instagram-style: bottom sheet with a grab handle, a 3-column
-   grid of round avatars, and quick actions (or a message box and Send once someone is picked).
-   Posts keep the light theme; Reels use Instagram's dark sheet. */
-.share-sheet-handle { display:none; align-self:center; width:100%; height:24px; padding:0; border:0; background:transparent; touch-action:none; cursor:grab; }
-.share-sheet-handle span { display:block; width:40px; height:4px; margin:10px auto; border-radius:2px; background:#0000002e; }
-.send-sheet .send-search { height:36px; margin:4px 0 16px; border-radius:10px; }
-.send-sheet .send-search input { font-size:16px; }
-.send-sheet .send-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px 8px; }
-.send-sheet .send-person.on .send-avatar { box-shadow:none; }
-.send-sheet .send-person.on .send-avatar .avatar { opacity:.82; }
-.send-sheet .send-check { right:0; bottom:0; width:24px; height:24px; background:#0095f6; }
-.send-sheet .send-name { max-width:100%; font-size:12px; line-height:1.3; white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; text-align:center; }
-.send-sheet .send-actions { gap:6px; margin:0 -16px; padding:14px 16px 4px; scrollbar-width:none; }
-.send-sheet .send-actions::-webkit-scrollbar { display:none; }
-.send-sheet .send-actions > button,.send-sheet .send-actions > a { min-width:72px; font-size:11.5px; }
-.send-sheet .send-action-icon { width:52px; height:52px; }
-.send-sheet .send-action-icon.story { background:linear-gradient(45deg,#feda75,#fa7e1e 30%,#d62976 60%,#962fbf 85%,#4f5bd5); color:#fff; }
-.send-sheet .send-compose { margin:0 -16px; padding:12px 16px 4px; }
-.send-sheet .send-compose input { height:44px; background:transparent; padding:0 2px; font-size:16px; }
-.send-sheet .send-button { height:44px; border-radius:10px; background:#0095f6; font-size:14px; font-weight:600; }
+/* Share sheet (posts and Reels): search, a grid of people, and a footer that holds either the
+   share targets or the message box once someone is picked. Dialog on desktop, bottom sheet on
+   phones; the body scrolls, the footer stays. Tokens only, so it follows light/dark; Reels use
+   a dark sheet in both themes. */
+.send-sheet.modal { --send-pad: 20px; display: flex; flex-direction: column; width: min(540px, calc(100vw - 24px)); max-height: min(680px, calc(100dvh - 48px)); padding: 0; overflow: hidden; }
+.send-sheet.modal > header { flex: 0 0 auto; padding: 14px var(--send-pad); }
+.send-sheet.modal > header h2 { flex: 1; text-align: center; font-size: 16px; }
+.share-sheet-handle { display: none; align-self: center; width: 100%; height: 22px; padding: 0; border: 0; background: transparent; touch-action: none; cursor: grab; }
+.share-sheet-handle span { display: block; width: 38px; height: 4px; margin: 9px auto; border-radius: 2px; background: var(--border-strong); }
+.send-body { display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; min-height: 0; padding: 4px var(--send-pad) 0; }
+.send-sheet .send-search { flex: 0 0 auto; height: 40px; margin: 0; padding: 0 14px; border-radius: 12px; background: var(--input); color: var(--muted); }
+.send-sheet .send-search input { font-size: 15px; color: var(--text); }
+.send-selected { display: flex; gap: 6px; flex: 0 0 auto; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.send-selected::-webkit-scrollbar { display: none; }
+.send-chip { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; max-width: 180px; height: 30px; padding: 0 8px 0 4px; border: 1px solid var(--border); border-radius: var(--radius-pill); background: var(--surface); color: var(--text); font-size: 12.5px; font-weight: 600; }
+.send-chip > span:not(.avatar) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.send-chip svg { flex: 0 0 auto; color: var(--muted); }
+.send-sheet .send-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-content: start; gap: 18px 8px; flex: 1 1 auto; min-height: 120px; max-height: 360px; margin: 0 calc(-1 * var(--send-pad)); padding: 6px var(--send-pad) 16px; overflow-y: auto; overscroll-behavior: contain; }
+.send-sheet .send-person { display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--text); }
+.send-sheet .send-avatar { position: relative; display: inline-flex; border-radius: 50%; transition: transform .12s ease; }
+.send-sheet .send-person:active .send-avatar { transform: scale(.94); }
+.send-sheet .send-person.on .send-avatar { box-shadow: none; }
+.send-sheet .send-person.on .send-avatar .avatar { opacity: .78; }
+.send-sheet .send-check { position: absolute; right: -1px; bottom: -1px; display: grid; place-items: center; width: 24px; height: 24px; border: 2.5px solid var(--surface); border-radius: 50%; background: var(--primary); color: #fff; }
+.send-sheet .send-name { width: 100%; font-size: 12.5px; line-height: 1.3; text-align: center; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.send-sheet .send-hint { grid-column: 1 / -1; margin: 22px 0; color: var(--muted); font-size: 13.5px; text-align: center; }
+.send-footer { flex: 0 0 auto; padding: 12px var(--send-pad) calc(14px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--border); background: var(--surface); }
+.send-sheet .send-actions { display: flex; gap: 2px; margin: 0 calc(-1 * var(--send-pad)); padding: 2px var(--send-pad); overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; border: 0; }
+.send-sheet .send-actions::-webkit-scrollbar { display: none; }
+.send-sheet .send-actions > button, .send-sheet .send-actions > a { display: flex; flex-direction: column; align-items: center; gap: 7px; flex: 1 0 72px; min-width: 72px; padding: 4px 0; border: 0; border-radius: 12px; background: transparent; color: var(--text); font-size: 11.5px; font-weight: 500; text-decoration: none; scroll-snap-align: start; }
+.send-sheet .send-actions > :hover .send-action-icon { filter: brightness(.96); transform: translateY(-1px); }
+.send-sheet .send-action-icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: var(--surface-muted); color: var(--text); font-size: 21px; font-weight: 700; transition: transform .12s ease; }
+.send-sheet .send-action-icon.story { background: linear-gradient(45deg, #feda75, #fa7e1e 30%, #d62976 60%, #962fbf 85%, #4f5bd5); color: #fff; }
+.send-sheet .send-action-icon.whatsapp { background: #25d366; color: #fff; }
+.send-sheet .send-action-icon.telegram { background: #229ed9; color: #fff; }
+.send-sheet .send-action-icon.x { background: #0f1419; color: #fff; }
+:root[data-theme="dark"] .send-sheet .send-action-icon.x, .reel-share-sheet .send-action-icon.x { background: #fff; color: #0f1419; }
+.send-sheet .send-compose { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; border: 0; animation: none; }
+.send-sheet .send-compose input { height: 44px; padding: 0 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--input); color: var(--text); font-size: 15px; }
+.send-sheet .send-compose input:focus { outline: none; border-color: var(--primary); }
+.send-sheet .send-button { height: 46px; border: 0; border-radius: 12px; background: var(--primary); color: #fff; font-size: 15px; font-weight: 600; }
 
-.reel-share-sheet.modal { background:#262626; color:#f5f5f5; padding:0 16px 16px; }
-.reel-share-sheet.modal > header { background:transparent; border:0; }
-.reel-share-sheet.modal > header h2 { color:#f5f5f5; }
-.reel-share-sheet .icon-button { color:#f5f5f5; background:transparent; border:0; }
-.reel-share-sheet .share-sheet-handle span { background:#ffffff59; }
-.reel-share-sheet .send-search { background:#363636; color:#a8a8a8; }
-.reel-share-sheet .send-search input { color:#f5f5f5; }
-.reel-share-sheet .send-search input::placeholder,.reel-share-sheet .send-compose input::placeholder { color:#a8a8a8; }
-.reel-share-sheet .send-person,.reel-share-sheet .send-actions > button,.reel-share-sheet .send-actions > a { color:#f5f5f5; }
-.reel-share-sheet .send-check { border-color:#262626; }
-.reel-share-sheet .send-hint { color:#a8a8a8; }
-.reel-share-sheet .send-actions,.reel-share-sheet .send-compose { border-top-color:#363636; }
-.reel-share-sheet .send-action-icon { background:#363636; color:#f5f5f5; }
-.reel-share-sheet .send-compose input { color:#f5f5f5; }
-@keyframes ig-sheet-in { from { transform:translateY(100%); } to { transform:none; } }
-@keyframes ig-sheet-out { to { transform:translateY(100%); } }
-@media(max-width:767px) {
+/* Reels: Instagram's dark sheet in both themes. */
+.reel-share-sheet.modal { --surface: #262626; --surface-muted: #363636; --input: #363636; --text: #f5f5f5; --muted: #a8a8a8; --border: #3a3a3a; --border-strong: #555; background: #262626; color: #f5f5f5; }
+.reel-share-sheet.modal > header { background: transparent; border-color: #3a3a3a; }
+.reel-share-sheet .icon-button { color: #f5f5f5; background: transparent; border: 0; }
+
+@keyframes ig-sheet-in { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes ig-sheet-out { to { transform: translateY(100%); } }
+@media (max-width: 767px) {
   /* :not() chain outranks the phone rule that turns every content dialog full screen. */
   html dialog.modal.send-sheet[open]:not(.confirm-dialog):not(.profile-photo-viewer) {
-    display:flex; flex-direction:column; overflow:hidden;
-    width:100vw; max-width:100vw; height:min(64dvh,var(--dialog-height,100dvh)); max-height:none;
-    inset:auto 0 0 0; margin:0; border-radius:16px 16px 0 0;
-    padding:0 16px calc(12px + env(safe-area-inset-bottom,0px));
-    translate:0 var(--sheet-drag,0px); animation:ig-sheet-in 260ms cubic-bezier(.16,1,.3,1);
-    transition:height 240ms cubic-bezier(.16,1,.3,1),translate 200ms ease-out;
+    --send-pad: 16px;
+    display: flex; flex-direction: column; overflow: hidden;
+    width: 100vw; max-width: 100vw; height: min(66dvh, var(--dialog-height, 100dvh)); max-height: none;
+    inset: auto 0 0 0; margin: 0; border-radius: 18px 18px 0 0; padding: 0;
+    translate: 0 var(--sheet-drag, 0px); animation: ig-sheet-in 260ms cubic-bezier(.16, 1, .3, 1);
+    transition: height 240ms cubic-bezier(.16, 1, .3, 1), translate 200ms ease-out;
   }
   /* Expanded (search, or dragged up): fill the visible screen above the keyboard. */
   html dialog.modal.send-sheet.expanded[open]:not(.confirm-dialog):not(.profile-photo-viewer) {
-    inset:calc(8px + env(safe-area-inset-top,0px)) 0 auto 0;
-    height:calc(var(--dialog-height,100dvh) - 8px - env(safe-area-inset-top,0px));
+    inset: calc(8px + env(safe-area-inset-top, 0px)) 0 auto 0;
+    height: calc(var(--dialog-height, 100dvh) - 8px - env(safe-area-inset-top, 0px));
   }
-  html dialog.modal.send-sheet.dragging[open]:not(.confirm-dialog):not(.profile-photo-viewer) { transition:none; }
-  html dialog.modal.send-sheet.closing:not(.confirm-dialog):not(.profile-photo-viewer) { animation:ig-sheet-out 180ms ease-in forwards; }
-  .send-sheet.modal > header { display:none; }
-  .send-sheet .share-sheet-handle { display:block; flex:0 0 auto; }
-  .send-sheet .send-search { flex:0 0 auto; }
-  html .modal.send-sheet .send-grid { flex:1 1 auto; min-height:0; max-height:none; overflow-y:auto; grid-template-columns:repeat(3,minmax(0,1fr)); }
-  .send-sheet .send-actions,.send-sheet .send-compose { flex:0 0 auto; }
+  html dialog.modal.send-sheet.dragging[open]:not(.confirm-dialog):not(.profile-photo-viewer) { transition: none; }
+  html dialog.modal.send-sheet.closing:not(.confirm-dialog):not(.profile-photo-viewer) { animation: ig-sheet-out 180ms ease-in forwards; }
+  .send-sheet.modal > header { display: none; }
+  .send-sheet .share-sheet-handle { display: block; flex: 0 0 auto; }
+  html .modal.send-sheet .send-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); max-height: none; }
+  .send-sheet .send-actions > button, .send-sheet .send-actions > a { flex: 0 0 76px; }
 }
-@media(prefers-reduced-motion:reduce) {
+@media (max-width: 359px) {
+  html .modal.send-sheet .send-grid { gap: 14px 4px; }
+  .send-sheet .send-avatar .avatar { width: 56px !important; height: 56px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
   html dialog.modal.send-sheet[open]:not(.confirm-dialog):not(.profile-photo-viewer),
-  html dialog.modal.send-sheet.closing:not(.confirm-dialog):not(.profile-photo-viewer) { animation:none; transition:none; }
+  html dialog.modal.send-sheet.closing:not(.confirm-dialog):not(.profile-photo-viewer) { animation: none; transition: none; }
 }
 
 /* Mute, Speaker, Camera, Flip and End fit one row on narrow phones. */

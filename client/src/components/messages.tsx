@@ -14,6 +14,10 @@ import {
   Check,
   CheckCheck,
   Image as ImageIcon,
+  Mic,
+  Camera,
+  Eye,
+  Sticker as StickerIcon,
   Music2,
   MoreHorizontal,
   Copy,
@@ -59,7 +63,7 @@ import { messageSoundsOn, setMessageSounds } from "./app-bridge";
 import { useCalls } from "./calls";
 import MessageStreak from "./message-streak";
 import { ImageViewer } from "./image-viewer";
-import { StickerButton, StickerView } from './sticker-picker';
+import { GifView, StickerButton, StickerView } from './sticker-picker';
 import { VoiceMessage, VoiceRecorder } from './voice-message';
 
 type Message = Models["DirectMessageDto"];
@@ -230,6 +234,7 @@ function CallBubble({ message, own, onCall }: { message: Message; own: boolean; 
 function attachmentLabel(message: Message) {
   if(message.call){const summary=callSummary(message.call,false);return summary.missed?summary.title:`${summary.title}${message.call.status==='completed'&&message.call.durationSeconds!=null?` · ${callDuration(message.call.durationSeconds)}`:''}`;}
   if(message.audioUrl)return 'Voice message';
+  if(message.gif)return 'GIF';
   if(message.hasSticker)return 'Sticker';
   if (message.viewOnce) return message.viewOnceType === "VIDEO" ? "Video" : "Photo";
   if (message.media) return message.media.type === "IMAGE" ? "Photo" : "Video";
@@ -286,8 +291,23 @@ const REPLY_KIND: Record<Models["MessageReplyRefDto"]["kind"], string> = {
   STICKER: "Sticker",
   AUDIO: "Voice message",
   CALL: "Call",
+  GIF: "GIF",
   UNAVAILABLE: "Message unavailable",
 };
+
+const voiceLength = (ms: number | null | undefined) =>
+  ms ? `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}` : "";
+/** Icon and words for what a quoted message holds, like WhatsApp ("🎤 Voice message 0:12"). */
+function QuoteSummary({ kind, text, durationMs }: { kind: Models["MessageReplyRefDto"]["kind"]; text: string | null; durationMs?: number | null }) {
+  const Icon = kind === "AUDIO" ? Mic : kind === "PHOTO" ? Camera : kind === "VIDEO" ? Video : kind === "STICKER" ? StickerIcon
+    : kind === "GIF" ? ImageIcon : kind === "VIEW_ONCE" ? Eye : kind === "CALL" ? Phone : null;
+  return (
+    <span className="dm-quote-summary">
+      {Icon && <Icon size={14} aria-hidden="true" />}
+      <span>{kind === "AUDIO" ? `Voice message ${voiceLength(durationMs)}`.trim() : text || REPLY_KIND[kind]}</span>
+    </span>
+  );
+}
 
 function Quote({
   reply,
@@ -300,8 +320,11 @@ function Quote({
 }) {
   return (
     <button type="button" className="dm-quote" onClick={onJump} disabled={!onJump}>
-      <strong>{author}</strong>
-      <span>{reply.preview || REPLY_KIND[reply.kind]}</span>
+      <span className="dm-quote-text">
+        <strong>{author}</strong>
+        <QuoteSummary kind={reply.kind} text={reply.preview} durationMs={reply.audioDurationMs} />
+      </span>
+      {reply.thumbnailUrl && <img className="dm-quote-thumb" src={reply.thumbnailUrl} alt="" />}
     </button>
   );
 }
@@ -536,7 +559,7 @@ function MessageItem({
   useEffect(() => () => window.clearTimeout(press.current), []);
   const media = message.viewOnce ? null : message.media;
   const missing =
-    !message.content && !media && !message.post && !message.storyReply && !message.viewOnce && !message.hasSticker && !message.audioUrl && !message.call;
+    !message.content && !media && !message.post && !message.storyReply && !message.viewOnce && !message.hasSticker && !message.audioUrl && !message.call && !message.gif;
   const swipe = useRef<{ x: number; y: number; id: number } | null>(null);
   const [drag, setDrag] = useState(0);
   const { user } = useSession();
@@ -554,6 +577,8 @@ function MessageItem({
       // Touch: swipe a message to the right to reply, like WhatsApp.
       onPointerDown={(e) => {
         if (e.pointerType !== "touch") return;
+        // Scrubbing a voice note or using a player must not start a swipe-to-reply or the menu.
+        if ((e.target as Element).closest(".wa-voice-wave, .wa-voice-play, .wa-voice-rate, video, audio, input")) return;
         swipe.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
         // Long-press opens the message menu (Reply / Copy / Unsend), like Instagram.
         window.clearTimeout(press.current);
@@ -600,12 +625,19 @@ function MessageItem({
         </span>
       )}
       <div className="dm-message-body" ref={bodyRef} title={separatorLabel(message.createdAt)}>
+        {/* WhatsApp: a reply without text (voice note, sticker, GIF, photo) carries its quote on top. */}
+        {message.replyTo && !hasText && !message.viewOnce && (
+          <div className="dm-reply-head">
+            <Quote reply={message.replyTo} author={quoteAuthor} onJump={() => onJump(message.replyTo!.id)} />
+          </div>
+        )}
         {message.storyReply && <StoryReplyPreview reply={message.storyReply} own={own} />}
         {message.noteReply && <NoteReplyPreview reply={message.noteReply} own={own} />}
         {message.viewOnce && <ViewOnceBubble message={message} own={own} />}
         {message.call&&<CallBubble message={message} own={own} onCall={onCall}/>}
-        {message.audioUrl&&<VoiceMessage src={message.audioUrl} durationMs={message.audioDurationMs}/>}
+        {message.audioUrl&&<VoiceMessage id={message.id} src={message.audioUrl} durationMs={message.audioDurationMs} own={own} author={own?user:peer}/>}
         {message.sticker?<MessageSticker sticker={message.sticker}/>:message.hasSticker?<p className="dm-bubble muted">Sticker unavailable</p>:null}
+        {message.gif && <GifView gif={message.gif} className="dm-gif" />}
         {media &&
           (media.type === "VIDEO" ? (
             <MediaVideo
@@ -633,7 +665,7 @@ function MessageItem({
         {photoOpen&&media&&<ImageViewer src={media.url} alt="Photo in conversation" onClose={()=>setPhotoOpen(false)}/>}
         {message.post && <SharedPost post={message.post} />}
         {missing && <p className="dm-bubble muted">This attachment is no longer available.</p>}
-        {(hasText || message.replyTo) && !message.viewOnce && (
+        {hasText && !message.viewOnce && (
           <div className="dm-bubble">
             {message.replyTo && (
               <Quote
@@ -642,11 +674,11 @@ function MessageItem({
                 onJump={() => onJump(message.replyTo!.id)}
               />
             )}
-            {hasText && <p>{message.content}</p>}
+            <p>{message.content}</p>
             <Stamp message={message} own={own} />
           </div>
         )}
-        {!hasText && !message.replyTo && !message.viewOnce && (
+        {!hasText && !message.viewOnce && (
           <span className="dm-stamp standalone">
             <time dateTime={message.createdAt}>{clock(message.createdAt)}</time>
             {own && !message.call && <Ticks message={message} />}
@@ -788,7 +820,7 @@ function EmojiButton({
   );
 }
 
-type Draft = { content?: string; mediaId?: string; stickerId?:string;audioId?:string;viewOnce?: boolean; replyToId?: string };
+type Draft = { content?: string; mediaId?: string; stickerId?:string;audioId?:string;gifId?:string;viewOnce?: boolean; replyToId?: string };
 
 function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
   const calls = useCalls();
@@ -952,10 +984,11 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
   };
   const send = useMutation({
     mutationFn: (draft: Draft) => api("messagesSend", { params: { id: peer.id }, body: draft }),
-    onSuccess: () => {
+    onSuccess: (_message, draft) => {
       attachment.attached();
       setViewOnce(false);
-      setReplyTo(null);
+      // Keep a reply the person started meanwhile; only the one just sent is done.
+      setReplyTo((current) => (current && current.id === draft.replyToId ? null : current));
       void client.invalidateQueries({ queryKey: ["messages"] });
     },
     onError: (e, draft) => {
@@ -1224,8 +1257,18 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
                 <strong>
                   Replying to {replyTo.senderId === user?.id ? "yourself" : peer.displayName}
                 </strong>
-                <small>{replyTo.viewOnce ? "View once" : replyTo.content || attachmentLabel(replyTo)}</small>
+                <small>
+                  <QuoteSummary
+                    kind={replyTo.viewOnce ? "VIEW_ONCE" : replyTo.content ? "TEXT" : replyTo.audioUrl ? "AUDIO" : replyTo.gif ? "GIF"
+                      : replyTo.hasSticker ? "STICKER" : replyTo.call ? "CALL" : replyTo.media?.type === "VIDEO" ? "VIDEO" : replyTo.media ? "PHOTO" : "TEXT"}
+                    text={replyTo.viewOnce ? null : replyTo.content || replyTo.sticker?.emoji || attachmentLabel(replyTo)}
+                    durationMs={replyTo.audioDurationMs}
+                  />
+                </small>
               </span>
+              {!replyTo.viewOnce && (replyTo.gif?.previewUrl ?? (replyTo.media?.type === "IMAGE" ? replyTo.media.url : replyTo.sticker?.url)) && (
+                <img className="dm-quote-thumb" src={(replyTo.gif?.previewUrl ?? (replyTo.media?.type === "IMAGE" ? replyTo.media.url : replyTo.sticker?.url))!} alt="" />
+              )}
               <button
                 type="button"
                 className="dm-icon"
@@ -1310,9 +1353,11 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
                 });
               }}
             />
-            <StickerButton conversation dock={stickerDock} disabled={!canMessage||voiceActive||send.isPending||attachment.busy||!!media} onPick={sticker=>send.mutate({stickerId:sticker.id,replyToId:replyTo?.id})}/>
+            <StickerButton conversation dock={stickerDock} disabled={!canMessage||voiceActive||send.isPending||attachment.busy||!!media}
+              onPick={sticker=>{send.mutate({stickerId:sticker.id,replyToId:replyTo?.id});setReplyTo(null);}}
+              onGif={gif=>{send.mutate({gifId:gif.id,replyToId:replyTo?.id});setReplyTo(null);}}/>
             {!calls.busy&&<VoiceRecorder disabled={!canMessage||attachment.busy||!!media||send.isPending} onActiveChange={setVoiceActive}
-              onSend={id=>send.mutateAsync({audioId:id,replyToId:replyTo?.id})}/>}
+              onSend={async id=>{await send.mutateAsync({audioId:id,replyToId:replyTo?.id});setReplyTo(null);}}/>}
             <textarea
               ref={textRef}
               aria-label="Message"
