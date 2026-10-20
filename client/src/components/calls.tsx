@@ -8,6 +8,7 @@ import { useSession, useToast } from "./providers";
 import { Avatar, Modal } from "./ui";
 import { playMessageSound } from "./app-bridge";
 import { ScreenStage } from "./call-screen";
+import { useFloatingCall } from '@/lib/use-floating-call';
 
 type Call = Models["CallDto"];
 type Peer = Models["UserSummaryDto"];
@@ -76,6 +77,7 @@ export default function CallsProvider({children}:{children:ReactNode}) {
   const [mediaState,setMediaState]=useState<CallMediaState>(NO_CALL_MEDIA);
   const [screens,setScreens]=useState<CallScreens>({local:null,remote:null});
   const [minimized,setMinimized]=useState(false);
+  const floating=useFloatingCall(minimized,()=>setMinimized(false));
   const [screenQuality,setScreenQuality]=useState<ScreenQuality>('1080p30');
   const sharing=mediaState.localScreen;
   const viewingScreen=mediaState.remoteScreen&&!!screens.remote;
@@ -318,6 +320,7 @@ export default function CallsProvider({children}:{children:ReactNode}) {
   return <Context.Provider value={{start:(peer,kind)=>void start(peer,kind),busy:!!call||working}}>
     {children}
     {call&&<Modal title={incoming?"Incoming call":"Circle call"} modal={!minimized||!!incoming}
+      dialogProps={floating}
       headerActions={!incoming&&<button type="button" className="icon-button call-window-toggle" aria-label={minimized?'Restore call':'Minimize call'} onClick={()=>setMinimized(value=>!value)}>{minimized?<Maximize2 size={18}/>:<Minimize2 size={18}/>}</button>}
       className={`call-dialog ig-call-dialog ${incoming?'is-incoming':''} ${minimized&&!incoming?'call-minimized':''} ${sharing?'is-sharing':''} ${viewingScreen?'viewing-screen':''}`} closeOnBackdrop={false} onClose={()=>void finish(incoming?"reject":"end")}>
       <div className={`call-stage ${call.state==='ringing'?'is-ringing':''}`}>

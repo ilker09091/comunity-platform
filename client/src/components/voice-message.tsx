@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { Loader2, Mic, Pause, Play, Send, Square, Trash2 } from 'lucide-react';
+import { Loader2, Mic, Pause, Play, ArrowUp as Send, Square, Trash2 } from 'lucide-react';
 import { api, type Models } from '@/lib/api/client';
 import { useToast } from './providers';
 import { Avatar } from './ui';
@@ -221,7 +221,12 @@ export function VoiceRecorder({disabled,onSend,onActiveChange}:{disabled:boolean
   };
   const loudest=Math.max(.02,...levels);
   return <>
-    <button type="button" className="dm-icon" aria-label="Record voice message" disabled={disabled||phase!=='idle'} onClick={()=>void start()}><Mic size={22}/></button>
+    <button type="button" className="dm-icon" aria-label="Record voice message" title="Voice message" disabled={disabled||phase!=='idle'} onClick={()=>void start()}>
+      <svg width="21" height="21" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <rect x="9" y="2" width="6" height="12" rx="3" fill="currentColor"/>
+        <path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </button>
     {phase!=='idle'&&<div className={`wa-recorder ${phase}`} role="region" aria-label="Voice recording">
       <button type="button" className="wa-recorder-icon" aria-label="Discard recording" disabled={phase==='sending'} onClick={reset}><Trash2 size={21}/></button>
       {phase==='preview'||phase==='sending'

@@ -5,7 +5,7 @@ export async function fetchMessageUnread(options:Pick<Options<'messagesUnread'>,
   const result=await api('messagesUnread',options);
   try {
     const pending=await api('messagesPendingDelivery',options);
-    if(pending.messageIds.length)await api('messagesDelivered',{...options,body:pending});
+    if(pending.messageIds.length||pending.groupMessageIds?.length)await api('messagesDelivered',{...options,body:pending});
   } catch { /* Keep the badge working; unacknowledged IDs are retried on the next poll. */ }
   return result;
 }

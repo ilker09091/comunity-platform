@@ -470,6 +470,26 @@ export const endpoints = {
     "method": "POST",
     "authenticated": true
   },
+  "messagesEdit": {
+    "path": "/api/messages/{id}",
+    "method": "PATCH",
+    "authenticated": true
+  },
+  "messagesList": {
+    "path": "/api/messages/{id}",
+    "method": "GET",
+    "authenticated": true
+  },
+  "messagesSend": {
+    "path": "/api/messages/{id}",
+    "method": "POST",
+    "authenticated": true
+  },
+  "messagesDelete": {
+    "path": "/api/messages/{id}",
+    "method": "DELETE",
+    "authenticated": true
+  },
   "messagesPendingDelivery": {
     "path": "/api/messages/delivery",
     "method": "GET",
@@ -503,21 +523,6 @@ export const endpoints = {
   "messagesUnread": {
     "path": "/api/messages/unread-count",
     "method": "GET",
-    "authenticated": true
-  },
-  "messagesList": {
-    "path": "/api/messages/{id}",
-    "method": "GET",
-    "authenticated": true
-  },
-  "messagesSend": {
-    "path": "/api/messages/{id}",
-    "method": "POST",
-    "authenticated": true
-  },
-  "messagesDelete": {
-    "path": "/api/messages/{id}",
-    "method": "DELETE",
     "authenticated": true
   },
   "messagesStatus": {
@@ -557,6 +562,66 @@ export const endpoints = {
   },
   "messagesRead": {
     "path": "/api/messages/{id}/read",
+    "method": "POST",
+    "authenticated": true
+  },
+  "groupsCreate": {
+    "path": "/api/group-chats",
+    "method": "POST",
+    "authenticated": true
+  },
+  "groupsList": {
+    "path": "/api/group-chats",
+    "method": "GET",
+    "authenticated": true
+  },
+  "groupsGet": {
+    "path": "/api/group-chats/{id}",
+    "method": "GET",
+    "authenticated": true
+  },
+  "groupsRename": {
+    "path": "/api/group-chats/{id}",
+    "method": "PATCH",
+    "authenticated": true
+  },
+  "groupsAddMembers": {
+    "path": "/api/group-chats/{id}/members",
+    "method": "POST",
+    "authenticated": true
+  },
+  "groupsRemoveMember": {
+    "path": "/api/group-chats/{id}/members/{userId}",
+    "method": "DELETE",
+    "authenticated": true
+  },
+  "groupsLeave": {
+    "path": "/api/group-chats/{id}/membership",
+    "method": "DELETE",
+    "authenticated": true
+  },
+  "groupsMessages": {
+    "path": "/api/group-chats/{id}/messages",
+    "method": "GET",
+    "authenticated": true
+  },
+  "groupsSend": {
+    "path": "/api/group-chats/{id}/messages",
+    "method": "POST",
+    "authenticated": true
+  },
+  "groupsEdit": {
+    "path": "/api/group-chats/{id}/messages/{messageId}",
+    "method": "PATCH",
+    "authenticated": true
+  },
+  "groupsUnsend": {
+    "path": "/api/group-chats/{id}/messages/{messageId}",
+    "method": "DELETE",
+    "authenticated": true
+  },
+  "groupsAcknowledge": {
+    "path": "/api/group-chats/{id}/receipts",
     "method": "POST",
     "authenticated": true
   },

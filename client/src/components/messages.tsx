@@ -28,11 +28,16 @@ import {
   Clapperboard,
   Info,
   Search,
-  Send,
-  Smile,
-  SquarePen,
+  ArrowUp as Send,
+  FaceSlightlySmilingPlus as Smile,
+  MessageSquarePlus as SquarePen,
+  MessagesSquare,
+  ImagePlus,
+  EllipsisVertical,
+  Pencil,
+  UsersRound as Users,
   Video,
-  Phone,
+  PhoneCall as Phone,
   PhoneIncoming,
   PhoneMissed,
   PhoneOutgoing,
@@ -65,6 +70,8 @@ import MessageStreak from "./message-streak";
 import { ImageViewer } from "./image-viewer";
 import { GifView, StickerButton, StickerView } from './sticker-picker';
 import { VoiceMessage, VoiceRecorder } from './voice-message';
+import { MessageText } from './message-text';
+import { CreateGroup, GroupThread, useGroups } from './group-chat';
 
 type Message = Models["DirectMessageDto"];
 type Conversation = Models["ConversationDto"];
@@ -275,6 +282,7 @@ function Ticks({ message }: { message: Message }) {
 function Stamp({ message, own }: { message: Message; own: boolean }) {
   return (
     <span className="dm-stamp">
+      {message.editedAt&&<span className="dm-edited">Edited</span>}
       <time dateTime={message.createdAt}>{clock(message.createdAt)}</time>
       {own && <Ticks message={message} />}
     </span>
@@ -495,7 +503,7 @@ function MessageSticker({sticker}:{sticker:Models['StickerDto']}) {
   </div>;
 }
 
-function MessageItem({
+export function MessageItem({
   message,
   own,
   peer,
@@ -505,6 +513,8 @@ function MessageItem({
   onJump,
   onUnsend,
   onCall,
+  onEdit,
+  replyAuthor,
 }: {
   message: Message;
   own: boolean;
@@ -516,6 +526,8 @@ function MessageItem({
   onUnsend: (message: Message) => void;
   /** Calls the peer again from a call history entry; absent while calling is unavailable. */
   onCall?: (kind: "audio" | "video") => void;
+  onEdit?: (message: Message) => void;
+  replyAuthor?: string;
 }) {
   const toast = useToast();
   /**
@@ -539,6 +551,7 @@ function MessageItem({
   };
   const menuRef = useRef<HTMLDivElement>(null);
   const press = useRef<number | undefined>(undefined);
+  const openingPress = useRef(false);
   useEffect(() => {
     if (!menu) return;
     const close = (e: PointerEvent) => {
@@ -566,23 +579,29 @@ function MessageItem({
   const quoteAuthor = message.replyTo
     ? message.replyTo.senderId === user?.id
       ? "You"
-      : peer.displayName
+      : replyAuthor ?? peer.displayName
     : "";
   const hasText = !!message.content;
   return (
     <li
       id={`msg-${message.id}`}
       className={`dm-message ${own ? "own" : ""} ${first ? "first" : ""} ${last ? "last" : ""}`}
+      onClickCapture={event=>{if(openingPress.current){event.preventDefault();event.stopPropagation();openingPress.current=false;}}}
       style={drag ? { transform: `translateX(${drag}px)` } : undefined}
       // Touch: swipe a message to the right to reply, like WhatsApp.
       onPointerDown={(e) => {
         if (e.pointerType !== "touch") return;
         // Scrubbing a voice note or using a player must not start a swipe-to-reply or the menu.
-        if ((e.target as Element).closest(".wa-voice-wave, .wa-voice-play, .wa-voice-rate, video, audio, input")) return;
+        if(menu)return;
+        const interactive=(e.target as Element).closest("button, a, .wa-voice-wave, video, audio, input");
+        if(interactive&&!interactive.matches('.dm-photo'))return;
         swipe.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
         // Long-press opens the message menu (Reply / Copy / Unsend), like Instagram.
         window.clearTimeout(press.current);
         press.current = window.setTimeout(() => {
+          // The finger can end over a newly mounted action. Ignore that synthetic click;
+          // a fresh pointer-down in the menu enables its actions again.
+          openingPress.current = true;
           swipe.current = null;
           setDrag(0);
           haptic("tap");
@@ -674,7 +693,7 @@ function MessageItem({
                 onJump={() => onJump(message.replyTo!.id)}
               />
             )}
-            <p>{message.content}</p>
+            <MessageText text={message.content!}/>
             <Stamp message={message} own={own} />
           </div>
         )}
@@ -701,7 +720,9 @@ function MessageItem({
       </div>
       {menu &&
         createPortal(
-          <div className={`dm-menu-layer ${menu.mode}`}>
+          <div className={`dm-menu-layer ${menu.mode}`}
+            onPointerDownCapture={()=>{openingPress.current=false;}}
+            onPointerDown={event=>{if(event.target===event.currentTarget){event.preventDefault();setMenu(null);}}} onClick={event=>{if(event.target===event.currentTarget)setMenu(null);}}>
             <div
               className={`dm-message-menu ${menu.mode}`}
               role="menu"
@@ -734,6 +755,7 @@ function MessageItem({
                   <Copy size={18} /> Copy
                 </button>
               )}
+              {own && message.content && !message.viewOnce && onEdit && <button type="button" role="menuitem" onClick={()=>{setMenu(null);onEdit(message);}}><Pencil size={18}/> Edit message</button>}
               {own && (
                 <button
                   type="button"
@@ -840,6 +862,7 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
   const client = useQueryClient();
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [editing, setEditing] = useState<Message|null>(null);
   const [viewOnce, setViewOnce] = useState(false);
   const [voiceActive,setVoiceActive]=useState(false);
   const [previewOpen,setPreviewOpen]=useState(false);
@@ -998,6 +1021,11 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
       void status.refetch();
     },
   });
+  const edit = useMutation({
+    mutationFn:()=>api('messagesEdit',{params:{id:editing!.id},body:{content:text.trim()}}),
+    onSuccess:()=>{setEditing(null);setText('');void client.invalidateQueries({queryKey:['messages']});},
+    onError:error=>toast(error.message,true),
+  });
   const [contactAction,setContactAction]=useState<"block"|"unblock"|null>(null);
   const contact=useMutation({
     mutationFn:(block:boolean)=>api(block?"followsBlock":"followsUnblock",{params:{id:peer.id}}),
@@ -1018,6 +1046,7 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
     !attachment.error &&
     (!!text.trim() || !!attachment.media);
   const submit = () => {
+    if(editing){if(text.trim()&&!edit.isPending)edit.mutate();return;}
     if (!canSend) return;
     const draft: Draft = {
       content: text.trim() || undefined,
@@ -1057,7 +1086,7 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
           </span>
           <span>
             <strong>
-              {peer.displayName}
+              <span className="dm-peer-name">{peer.displayName}</span>
               {peer.isVerified && <VerifiedBadge />}
             </strong>
             <small className={typing ? "typing" : ""} aria-live="polite">
@@ -1065,12 +1094,13 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
             </small>
           </span>
         </Link>
-        <button type="button" className="dm-icon" aria-label="Start voice call" disabled={!canCall} onClick={()=>calls.start(peer,"audio")}><Phone size={21}/></button>
+        <div className="dm-thread-actions">
+        <button type="button" className="dm-icon" aria-label="Start voice call" title="Voice call" disabled={!canCall} onClick={()=>calls.start(peer,"audio")}><Phone size={21}/></button>
         <button type="button" className="dm-icon" aria-label="Start video call" disabled={!canCall} onClick={()=>calls.start(peer,"video")}><Video size={22}/></button>
         {!unavailable&&<Link className="dm-icon dm-info" href={`/profile/${peer.username}`} aria-label="View profile">
           <Info size={24} />
         </Link>}
-        <Dropdown label="Chat options" className="dm-chat-menu" summaryClassName="dm-icon" summary={<MoreHorizontal size={24} />}>
+        <Dropdown label="Chat options" className="dm-chat-menu" summaryClassName="dm-icon" summary={<EllipsisVertical size={21} />}>
           {!unavailable&&<Link href={`/profile/${peer.username}`}>
             <Info size={16} /> View profile
           </Link>}
@@ -1090,6 +1120,7 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
             <Trash2 size={16} /> Delete chat
           </button>
         </Dropdown>
+        </div>
       </header>
       {contactAction&&<ConfirmDialog className="ig-block-dialog" title={contactAction==="block"?"Block this account?":"Unblock this account?"}
         description={contactAction==="block"?"You won't be able to message or call each other. Your previous messages will stay in this chat. Follows are removed; their likes and comments on your posts are removed. They won't be notified.":"You can contact each other again, subject to account privacy. Previous follows, likes and comments are not restored."}
@@ -1181,6 +1212,7 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
                   onReply={startReply}
                   onJump={jumpTo}
                   onUnsend={setUnsending}
+                  onEdit={message=>{setEditing(message);setReplyTo(null);setText(message.content??'');attachment.clear();textRef.current?.focus({preventScroll:true});}}
                   onCall={canCall ? (kind) => calls.start(peer, kind) : undefined}
                 />
               </Fragment>
@@ -1238,6 +1270,7 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
             submit();
           }}
         >
+          {editing&&<div className="dm-replying dm-editing"><Pencil size={17}/><span><strong>Editing message</strong><small>{editing.content}</small></span><button type="button" className="dm-icon" aria-label="Cancel edit" onClick={()=>{setEditing(null);setText('');}}><X size={18}/></button></div>}
           {awaiting && (
             <p className="dm-notice">
               Message request sent. You can send more once {peer.displayName} accepts.
@@ -1338,6 +1371,35 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
             </p>
           )}
           <div className="dm-compose-row">
+            <button type="button" className="dm-camera-launch dm-icon" aria-label="Attach photo or video" hidden={!!text.trim()||!!media||!!editing} disabled={!canMessage||attachment.busy||voiceActive} onClick={()=>inputRef.current?.click()}><ImagePlus size={21}/></button>
+            <textarea
+              ref={textRef}
+              aria-label="Message"
+              placeholder="Message..."
+              maxLength={2000}
+              value={text}
+              // Never disabled while sending: disabling would blur it and close the phone keyboard.
+              disabled={!canMessage}
+              onChange={(e) => {
+                setText(e.target.value);
+                signalTyping(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {setReplyTo(null);if(editing){setEditing(null);setText('');}}
+                // Enter sends on devices with a keyboard; Shift+Enter keeps a new line.
+                if (
+                  e.key === "Enter" &&
+                  !e.shiftKey &&
+                  !e.nativeEvent.isComposing &&
+                  window.matchMedia("(hover: hover)").matches
+                ) {
+                  e.preventDefault();
+                  submit();
+                }
+              }}
+              rows={1}
+            />
+            <div className="dm-compose-actions" hidden={!!text.trim()||!!editing||!!media}>
             <EmojiButton
               disabled={!canMessage||voiceActive}
               onPick={(emoji) => {
@@ -1358,33 +1420,8 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
               onGif={gif=>{send.mutate({gifId:gif.id,replyToId:replyTo?.id});setReplyTo(null);}}/>
             {!calls.busy&&<VoiceRecorder disabled={!canMessage||attachment.busy||!!media||send.isPending} onActiveChange={setVoiceActive}
               onSend={async id=>{await send.mutateAsync({audioId:id,replyToId:replyTo?.id});setReplyTo(null);}}/>}
-            <textarea
-              ref={textRef}
-              aria-label="Message"
-              placeholder="Message..."
-              maxLength={2000}
-              value={text}
-              // Never disabled while sending: disabling would blur it and close the phone keyboard.
-              disabled={!canMessage}
-              onChange={(e) => {
-                setText(e.target.value);
-                signalTyping(e.target.value);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Escape" && replyTo) setReplyTo(null);
-                // Enter sends on devices with a keyboard; Shift+Enter keeps a new line.
-                if (
-                  e.key === "Enter" &&
-                  !e.shiftKey &&
-                  !e.nativeEvent.isComposing &&
-                  window.matchMedia("(hover: hover)").matches
-                ) {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
-              rows={1}
-            />
+            </div>
+
             <input
               ref={inputRef}
               hidden
@@ -1396,26 +1433,16 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
                 void attachment.select(file);
               }}
             />
-            {!text.trim() && !media ? (
-              <button
-                type="button"
-                className="dm-icon"
-                aria-label="Attach photo or video"
-                disabled={!canMessage || attachment.busy||voiceActive}
-                onClick={() => inputRef.current?.click()}
-              >
-                <ImageIcon size={24} />
-              </button>
-            ) : (
+            {(!!text.trim() || !!media || !!editing) && (
               <button
                 type="submit"
                 className="dm-send"
-                aria-label="Send message"
-                disabled={!canSend}
+                aria-label={editing?'Save edit':'Send message'}
+                disabled={editing?(!text.trim()||edit.isPending):!canSend}
                 // Keep focus in the textarea so the phone keyboard stays open after sending.
                 onPointerDown={(e) => e.preventDefault()}
               >
-                Send
+                <Send size={21}/><span className="sr-only">{editing?'Save edit':'Send'}</span>
               </button>
             )}
           </div>
@@ -1492,7 +1519,10 @@ export default function Messages() {
   const params = useSearchParams();
   const router = useRouter();
   const to = params.get("to") ?? "";
+  const groupId=params.get('group')??'';
   const [creating, setCreating] = useState(false);
+  const [creatingGroup,setCreatingGroup]=useState(false);
+  const groups=useGroups();
   const [folder, setFolder] = useState<Folder>("primary");
   const [search, setSearch] = useState("");
   const primary = useConversations("primary", !!user);
@@ -1515,7 +1545,7 @@ export default function Messages() {
   // Mobile: an open chat covers the whole screen (header and bottom navigation included) and
   // follows the visual viewport, so the composer stays above the on-screen keyboard.
   useEffect(() => {
-    if (!to) return;
+    if (!to&&!groupId) return;
     const root = document.documentElement;
     root.classList.add("dm-chat-open");
     const viewport = window.visualViewport;
@@ -1533,7 +1563,7 @@ export default function Messages() {
       root.style.removeProperty("--dm-viewport");
       root.style.removeProperty("--dm-viewport-top");
     };
-  }, [to]);
+  }, [to,groupId]);
   if (loading) return <p role="status">Loading...</p>;
   if (!user)
     return (
@@ -1550,20 +1580,25 @@ export default function Messages() {
       c.user.displayName.toLowerCase().includes(term),
   );
   const requestCount = requests.data?.pages.flatMap((p) => p.items).length ?? 0;
+  const groupItems=folder==='primary'?(groups.data?.pages.flatMap(page=>page.items)??[]).filter(group=>!term||group.name.toLowerCase().includes(term)):[];
   return (
-    <div className={`dm-shell card ${to ? "has-chat" : ""}`}>
+    <div className={`dm-shell card ${to||groupId ? "has-chat" : ""}`}>
       <h1 className="sr-only">Messages</h1>
       <aside className="dm-sidebar" aria-label="Conversations">
         <header className="dm-sidebar-head">
-          <strong>{user.username}</strong>
+          <div className="dm-inbox-heading"><strong>Messages</strong><small>@{user.username}</small></div>
+          <div className="dm-inbox-actions">
+          <button type="button" className="dm-icon" aria-label="New group chat" title="New group chat" onClick={()=>setCreatingGroup(true)}><Users size={21}/></button>
           <button
             type="button"
-            className="dm-icon"
+            className="dm-icon dm-new-message"
             aria-label="New message"
+            title="New message"
             onClick={() => setCreating(true)}
           >
-            <SquarePen size={24} />
+            <SquarePen size={21} />
           </button>
+          </div>
         </header>
         <label className="dm-search">
           <Search size={16} />
@@ -1610,6 +1645,7 @@ export default function Messages() {
             />
           )}
           <ul className="dm-list">
+            {groupItems.map(group=><li key={group.id}><Link href={`/messages?group=${group.id}`} className={`dm-row dm-group-row ${groupId===group.id?'active':''}`} aria-current={groupId===group.id?'page':undefined}><span className="group-avatar"><Users size={23}/></span><span className="dm-row-copy"><strong>{group.name}</strong><span className="dm-row-preview">{group.lastMessage??`${group.memberCount} members`}</span></span>{group.unreadCount>0&&<span className="group-unread" aria-label={`${group.unreadCount} unread`}>{group.unreadCount}</span>}</Link></li>)}
             {items.map((c) => (
               <ConversationRow
                 key={c.user.id}
@@ -1619,7 +1655,7 @@ export default function Messages() {
               />
             ))}
           </ul>
-          {!conversations.isPending && !conversations.error && !items.length && (
+          {!conversations.isPending && !conversations.error && !items.length && !groupItems.length && (
             <p className="dm-list-empty">
               {term
                 ? "No conversations match your search."
@@ -1633,10 +1669,11 @@ export default function Messages() {
             pending={conversations.isFetchingNextPage}
             onClick={() => void conversations.fetchNextPage()}
           />
+          {folder==='primary'&&<LoadMore hasMore={groups.hasNextPage} pending={groups.isFetchingNextPage} onClick={()=>void groups.fetchNextPage()}/>}
         </div>
       </aside>
       <div className="dm-main">
-        {to ? (
+        {groupId?<GroupThread key={groupId} id={groupId} renderMessage={(message,actions)=><MessageItem message={message} peer={{...message.sender,isUnavailable:!message.sender.username,isBlocking:false,isFollowing:false}} {...actions}/>}/>:to ? (
           peer.isPending ? (
             <p className="dm-status" role="status">
               Loading conversation...
@@ -1656,7 +1693,7 @@ export default function Messages() {
         ) : (
           <div className="dm-empty">
             <span className="dm-empty-icon">
-              <Send size={44} strokeWidth={1.4} />
+              <MessagesSquare size={38} strokeWidth={1.5} />
             </span>
             <h2>Your messages</h2>
             <p>Send private messages, videos and Reels to a friend.</p>
@@ -1666,6 +1703,7 @@ export default function Messages() {
           </div>
         )}
       </div>
+      {creatingGroup&&<CreateGroup onClose={()=>setCreatingGroup(false)}/>}
       {creating && (
         <Modal title="New message" onClose={() => setCreating(false)}>
           <RecipientPicker

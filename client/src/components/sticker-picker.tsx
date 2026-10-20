@@ -14,10 +14,11 @@ export type Gif = Models["GifDto"];
 
 /** A sent GIF: a looping silent video when GIPHY offers one (lighter), else the animated image. */
 export function GifView({ gif, className = "", maxWidth = 240 }: { gif: Gif; className?: string; maxWidth?: number }) {
+  const [failed,setFailed]=useState<string|null>(null);
   const ratio = gif.width && gif.height ? `${gif.width}/${gif.height}` : undefined;
-  return gif.mp4 ? (
+  return gif.mp4&&failed!==gif.mp4 ? (
     <video className={`gif-view ${className}`} src={gif.mp4} poster={gif.previewUrl} autoPlay loop muted playsInline
-      aria-label={gif.title} style={{ aspectRatio: ratio, maxWidth }} />
+      aria-label={gif.title} style={{ aspectRatio: ratio, maxWidth }} onError={()=>setFailed(gif.mp4)} />
   ) : (
     <img className={`gif-view ${className}`} src={gif.url} alt={gif.title} style={{ aspectRatio: ratio, maxWidth }} loading="lazy" />
   );
@@ -34,7 +35,7 @@ function GifPanel({ onPick, disabled }: { onPick: (gif: Gif) => void; disabled?:
     getNextPageParam: (page) => page.nextOffset ?? undefined,
     staleTime: 5 * 60_000,
   });
-  const items = gifs.data?.pages.flatMap((page) => page.items) ?? [];
+  const items = [...new Map((gifs.data?.pages.flatMap((page) => page.items) ?? []).map(gif=>[gif.id,gif])).values()];
   const enabled = gifs.data?.pages[0]?.enabled ?? true;
   // Loads more when the end comes into view, whichever element scrolls (tray or popover).
   const sentinel = useRef<HTMLDivElement>(null);
@@ -53,7 +54,7 @@ function GifPanel({ onPick, disabled }: { onPick: (gif: Gif) => void; disabled?:
       </label>
       {!enabled ? <p className="sticker-hint">GIFs aren’t set up on this server yet.</p>
         : gifs.isPending ? <p className="sticker-hint">Loading GIFs…</p>
-        : gifs.error ? <p className="sticker-hint" role="alert">{gifs.error.message}</p>
+        : gifs.error ? <div className="sticker-hint" role="alert"><p>{gifs.error.message}</p><button type="button" className="button secondary small" onClick={()=>void gifs.refetch()}>Retry GIFs</button></div>
         : items.length ? (
           <div className="gif-grid">
             {items.map((gif) => (
@@ -63,6 +64,7 @@ function GifPanel({ onPick, disabled }: { onPick: (gif: Gif) => void; disabled?:
               </button>
             ))}
             <div ref={sentinel} className="gif-sentinel" aria-hidden="true" />
+            {isFetchingNextPage&&<span role="status" className="sticker-hint">Loading more GIFs…</span>}
           </div>
         ) : <p className="sticker-hint">No GIFs found. Try another word.</p>}
       {enabled && <small className="gif-credit">Powered by GIPHY</small>}
@@ -153,6 +155,7 @@ export function StickerButton({
   const box = useRef<HTMLDivElement>(null);
   const file = useRef<HTMLInputElement>(null);
   const panel=useRef<HTMLDivElement>(null);
+  const pointerActivated=useRef(false);
   /** Conversation tray: its full height, and how much of it the keyboard still covers. */
   const [trayHeight,setTrayHeight]=useState(0);
   const [overlap,setOverlap]=useState(0);
@@ -282,6 +285,20 @@ export function StickerButton({
           </>}
           <input ref={file} hidden type="file" accept="image/png,image/webp,image/jpeg,image/gif" onChange={e=>{const image=e.target.files?.[0];e.target.value='';if(image)create.mutate(image);}}/>
         </>;
+  const toggleConversation=(button:HTMLButtonElement)=>{
+    haptic('tap');
+    const field=box.current?.closest('form')?.querySelector('textarea');
+    if(open){setOpen(false);field?.focus({preventScroll:true});return;}
+    const covered=keyboardOverlap();
+    if(covered>150)rememberKeyboard(covered);
+    setTrayHeight(covered>150?covered:rememberedKeyboard());
+    setOverlap(covered);
+    // Hand focus away from the editable field during the tap itself.
+    field?.blur();
+    if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
+    button.focus({preventScroll:true});
+    setOpen(true);
+  };
   return (
     <div className="sticker-picker-anchor" ref={box}>
       <button
@@ -290,19 +307,17 @@ export function StickerButton({
         aria-label={conversation&&open?"Show keyboard":"Send a sticker"}
         aria-expanded={open}
         disabled={disabled}
-        onPointerDown={event=>{if(conversation)event.preventDefault();}}
-        onClick={() => {
+        onPointerDown={event=>{
+          if(!conversation||event.button!==0)return;
+          event.preventDefault();
+          pointerActivated.current=true;
+          toggleConversation(event.currentTarget);
+        }}
+        onKeyDown={event=>{if(event.key==='Enter'||event.key===' ')pointerActivated.current=false;}}
+        onClick={event => {
           if(conversation){
-            haptic("tap");
-            const field=box.current?.closest("form")?.querySelector("textarea");
-            // WhatsApp: the button toggles between the sticker tray and the keyboard.
-            if(open){field?.focus({preventScroll:true});if(!field)setOpen(false);return;}
-            const typing=document.activeElement instanceof HTMLTextAreaElement||document.activeElement instanceof HTMLInputElement;
-            const covered=keyboardOverlap();
-            setTrayHeight(typing&&covered>150?covered:rememberedKeyboard());
-            setOverlap(covered);
-            setOpen(true);
-            if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
+            if(pointerActivated.current){pointerActivated.current=false;return;}
+            toggleConversation(event.currentTarget);
             return;
           }
           const rect = box.current?.getBoundingClientRect();
@@ -310,7 +325,7 @@ export function StickerButton({
           setOpen((o) => !o);
         }}
       >
-        {conversation&&open?<Keyboard size={19}/>:<StickerIcon size={17} />}
+        {conversation&&open?<Keyboard size={21}/>:<StickerIcon size={20} strokeWidth={1.75} />}
       </button>
       {open && conversation&&dock?createPortal(<div ref={panel} className="dm-sticker-tray" role="region" aria-label="Stickers"
         style={{height:Math.max(0,trayHeight-overlap)}}

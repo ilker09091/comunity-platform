@@ -8,6 +8,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Patch,
   Query,
   UploadedFile,
   UseInterceptors,
@@ -46,6 +47,7 @@ import {
   CreateStickerDto,
   CreateStoryDto,
   DirectMessageDto,
+  EditMessageDto,
   MessageStatusDto,
   MessagePeerDto,
   MessageDeliveryDto,
@@ -74,6 +76,8 @@ import { NotesService } from './notes.service.js';
 import { PushService } from './push.service.js';
 import { StickersService } from './stickers.service.js';
 import { StoriesService } from './stories.service.js';
+import { GroupsService } from './groups.service.js';
+import { GroupsController } from './groups.controller.js';
 
 @ApiTags('Messages')
 @ApiAuth()
@@ -81,6 +85,10 @@ import { StoriesService } from './stories.service.js';
 @Controller('messages')
 export class MessagesController {
   constructor(private readonly messages: MessagesService,private readonly audio:MessageAudioService) {}
+  @Patch(':id')
+  @ApiOperation({operationId:'messagesEdit',summary:'Edit the text of your own message'})
+  @ApiOkResponse({type:DirectMessageDto})
+  edit(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string,@Body() dto:EditMessageDto){return this.messages.editMessage(u.id,id,dto.content);}
   @Get('delivery')
   @ApiOperation({operationId:'messagesPendingDelivery',summary:'IDs awaiting device acknowledgment; does not change receipts'})
   @ApiOkResponse({type:MessageDeliveryDto})
@@ -88,7 +96,7 @@ export class MessagesController {
   @Post('delivery') @HttpCode(204)
   @ApiOperation({operationId:'messagesDelivered',summary:'Acknowledge only messages this recipient device has received'})
   @ApiNoContentResponse()
-  delivered(@CurrentUser() u:AuthUser,@Body() dto:MessageDeliveryDto){return this.messages.delivered(u.id,dto.messageIds);}
+  delivered(@CurrentUser() u:AuthUser,@Body() dto:MessageDeliveryDto){return this.messages.delivered(u.id,dto.messageIds,dto.groupMessageIds);}
   @Post('audio') @UseInterceptors(FileInterceptor('file',{limits:{fileSize:10*1024*1024,files:1,fields:0}}))
   @ApiConsumes('multipart/form-data') @ApiBody({type:MessageAudioUploadDto})
   @ApiOperation({operationId:'messagesUploadAudio',summary:'Normalize a voice recording for a direct message'})
@@ -503,7 +511,7 @@ export class PushController {
 }
 @Module({
   imports: [MediaModule, UsersModule, PostsModule, UploadsMulterModule, GifsModule],
-  controllers: [MessagesController, StoriesController, StickersController, NotesController, PushController, CallsController, StreaksController],
-  providers: [MessagesService, MessageAudioService, StoriesService, StickersService, NotesService, PushService, CallsService, StreaksService],
+  controllers: [MessagesController, GroupsController, StoriesController, StickersController, NotesController, PushController, CallsController, StreaksController],
+  providers: [MessagesService, GroupsService, MessageAudioService, StoriesService, StickersService, NotesService, PushService, CallsService, StreaksService],
 })
 export class SocialModule {}

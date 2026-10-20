@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, type ReactNode, type HTMLAttributes } from "react";
 import Link from "next/link";
 import { ArrowRight, AlertCircle, Compass, X, Loader2, AlertTriangle, BadgeCheck } from "lucide-react";
 import type { Models } from "@/lib/api/client";
@@ -134,6 +134,7 @@ export function Modal({
   closeOnBackdrop = true,
   modal = true,
   headerActions,
+  dialogProps,
 }: {
   title: string;
   children: ReactNode;
@@ -145,6 +146,7 @@ export function Modal({
   /** Keep the same media elements mounted while a call switches to a non-modal window. */
   modal?: boolean;
   headerActions?: ReactNode;
+  dialogProps?: Pick<HTMLAttributes<HTMLDialogElement>,'style'|'onPointerDown'|'onPointerMove'|'onPointerUp'|'onPointerCancel'>;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const closing = useRef(false);
@@ -175,6 +177,7 @@ export function Modal({
   };
   return (
     <dialog
+      {...dialogProps}
       ref={ref}
       className={`modal ${className}`}
       onCancel={(e) => {
@@ -262,7 +265,25 @@ export function LoadMore({
   pending: boolean;
   onClick: () => void;
 }) {
+  const sentinel = useRef<HTMLDivElement>(null);
+  const load = useRef(onClick);
+  const busy = useRef(false);
+  useEffect(() => { load.current = onClick; }, [onClick]);
+  useEffect(() => { busy.current = pending; }, [pending]);
+  useEffect(() => {
+    const node = sentinel.current;
+    if (!node || !hasMore || pending || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting) && !busy.current) {
+        busy.current = true;
+        load.current();
+      }
+    }, { rootMargin: '180px' });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, pending]);
   return hasMore ? (
+    <div ref={sentinel} className="auto-load-more" role="status" aria-live="polite">
     <button
       className="button secondary load-more"
       onClick={onClick}
@@ -271,6 +292,7 @@ export function LoadMore({
       {pending ? <Loader2 size={17} className="spin" /> : null}
       {pending ? "Loading…" : "Load more"}
     </button>
+    </div>
   ) : null;
 }
 

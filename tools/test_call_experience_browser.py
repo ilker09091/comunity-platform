@@ -164,11 +164,22 @@ def run():
             left.locator('a[href="/explore"]').first.click()
             left.wait_for_url('**/explore')
             assert left.evaluate('window.__qaPCs.at(-1)===window.__callPeer && document.querySelector(".call-audio")===window.__callAudio && window.__callAudio.srcObject===window.__callSource')
+            mini=left.locator('.call-dialog')
+            box=mini.bounding_box()
+            left.mouse.move(box['x']+40,box['y']+55);left.mouse.down();left.mouse.move(50,150,steps=12);left.mouse.up()
+            left.wait_for_timeout(200)
+            moved=mini.bounding_box()
+            assert moved['x']<=10 and moved['y']>=0,moved
+            assert mini.evaluate('(d)=>!d.matches(":modal")')
+            left.mouse.click(moved['x']+35,moved['y']+55)
+            left.wait_for_function('document.querySelector(".call-dialog")?.matches(":modal")')
+            assert left.evaluate('window.__qaPCs.at(-1)===window.__callPeer && window.__callAudio.srcObject===window.__callSource')
+            left.get_by_role('button',name='Minimize call',exact=True).click()
             left.screenshot(path=str(OUT/'minimized-navigation.png'))
             left.get_by_role('button',name='Restore call',exact=True).click()
             assert left.locator('.call-dialog').evaluate('(d)=>d.matches(":modal")')
             assert packets(left)>before
-            print('PASS minimized call stays alive through client navigation and restore')
+            print('PASS minimized call stays alive through navigation, drag docks to edge and tapping restores')
             # A signaling outage must not hang up an otherwise viable media connection.
             contexts[0].set_offline(True)
             left.wait_for_timeout(5000)
@@ -193,6 +204,14 @@ def run():
                 left.wait_for_timeout(200)
                 box=left.locator('.call-dialog').bounding_box()
                 assert box and box['x']>=0 and box['y']>=0 and box['x']+box['width']<=width+1 and box['y']+box['height']<=height+1,box
+                if width==390:
+                    right.get_by_role('button',name='Camera on',exact=True).click()
+                    left.wait_for_function("document.querySelector('.call-remote')?.dataset.videoActive==='true'")
+                    left.wait_for_timeout(200)
+                    box=left.locator('.call-dialog').bounding_box()
+                    assert box['x']>=0 and box['y']>=0 and box['x']+box['width']<=width+1 and box['y']+box['height']<=height+1,box
+                    right.get_by_role('button',name='Camera off',exact=True).click()
+                    left.wait_for_function("document.querySelector('.call-remote')?.dataset.videoActive==='false'")
                 left.get_by_role('button',name='Restore call',exact=True).click()
             print('PASS 320px, 390px and landscape call controls and mini window bounds')
             right.get_by_role('button',name='End call',exact=True).click()

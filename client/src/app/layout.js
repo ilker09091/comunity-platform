@@ -12,6 +12,8 @@ import "./circles.css";
 import "./call-experience.css";
 import "./dark.css";
 import "./dark-generated.css";
+import "./messaging-upgrade.css";
+import "./messaging-design.css";
 import Providers from "@/components/providers";
 import { Suspense } from "react";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme-boot";

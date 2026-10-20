@@ -42,7 +42,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       appSecret: 'YOUR_APP_SECRET',
       serviceId: 'server',
     }),
-    ConfigModule.forRoot({ isGlobal: true, cache: true, load: [appConfig] }),
+    ConfigModule.forRoot({ isGlobal: true, cache: true, envFilePath: ['../.env.giphy','.env'], load: [appConfig] }),
     TypeOrmModule.forRootAsync({
       inject: [appConfig.KEY],
       useFactory: (config: ConfigType<typeof appConfig>) => {

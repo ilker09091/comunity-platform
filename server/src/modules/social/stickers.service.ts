@@ -63,7 +63,9 @@ export class StickersService {
     const row=await sqlOne(m,`SELECT sk.id FROM stickers sk WHERE sk.id=$2 AND (
       (sk.deleted_at IS NULL AND (sk.owner_id IS NULL OR sk.owner_id=$1))
       OR EXISTS(SELECT 1 FROM sticker_favorites f WHERE f.user_id=$1 AND f.sticker_id=sk.id)
-      OR EXISTS(SELECT 1 FROM direct_messages d WHERE d.recipient_id=$1 AND d.sticker_id=sk.id)) FOR SHARE`,[viewerId,id]);
+      OR EXISTS(SELECT 1 FROM direct_messages d WHERE d.recipient_id=$1 AND d.sticker_id=sk.id)
+      OR EXISTS(SELECT 1 FROM group_messages g JOIN chat_group_members gm ON gm.group_id=g.group_id
+        WHERE gm.user_id=$1 AND g.sticker_id=sk.id)) FOR SHARE`,[viewerId,id]);
     if(!row)throw AppException.notFound(ErrorCode.NOT_FOUND,'Sticker not found');
   }
 
@@ -121,6 +123,7 @@ export class StickersService {
         m,
         `SELECT media_id, (EXISTS (SELECT 1 FROM comments c WHERE c.sticker_id = s.id)
           OR EXISTS(SELECT 1 FROM direct_messages d WHERE d.sticker_id=s.id)
+          OR EXISTS(SELECT 1 FROM group_messages g WHERE g.sticker_id=s.id)
           OR EXISTS(SELECT 1 FROM sticker_favorites f WHERE f.sticker_id=s.id)) AS used
         FROM stickers s WHERE s.id = $1 AND s.owner_id = $2 AND s.deleted_at IS NULL FOR UPDATE`,
         [stickerId, ownerId],

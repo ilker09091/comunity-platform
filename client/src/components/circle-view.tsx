@@ -15,6 +15,7 @@ import { Avatar, ConfirmDialog, Dropdown, EmptyState, ErrorState, LoadMore, Load
 import { MediaVideo } from "./media-video";
 import { ImageViewer } from "./image-viewer";
 import { AvatarStack, CircleForm, CircleMark, KIND_LABEL, ProgressRing, StreakChip, streakMessage, type Circle } from "./circles";
+import { ShareLinkDialog } from './share-link';
 
 type Post = Models["CirclePostDto"];
 type Prompt = Models["CirclePromptDto"];
@@ -491,6 +492,7 @@ function MembersTab({ circle }: { circle: Circle }) {
 // ---- Invite and settings ------------------------------------------------------------------------
 
 function InviteDialog({ circle, onClose }: { circle: Circle; onClose: () => void }) {
+  const [sharing,setSharing]=useState(false);
   const toast = useToast(), refresh = useRefresh(circle.id);
   const link = `${typeof window === "undefined" ? "" : window.location.origin}/circles/join/${circle.inviteCode}`;
   const reset = useMutation({
@@ -508,6 +510,7 @@ function InviteDialog({ circle, onClose }: { circle: Circle; onClose: () => void
           {circle.inviteCode}<Copy size={16} />
         </button>
         <div className="circle-invite-actions">
+          <button type="button" className="button" onClick={()=>setSharing(true)}><Send size={16}/> Send in Circle</button>
           <button type="button" className="button" onClick={() => copy(link, "Link")}><Link2 size={16} /> Copy link</button>
           {typeof navigator !== "undefined" && "share" in navigator && (
             <button type="button" className="button secondary" onClick={() => void navigator.share({ title: circle.name, text: `Join ${circle.name} on Circle`, url: link }).catch(() => {})}>
@@ -517,6 +520,7 @@ function InviteDialog({ circle, onClose }: { circle: Circle; onClose: () => void
         </div>
         {isAdmin(circle) && <button type="button" className="text-button muted" disabled={reset.isPending} onClick={() => reset.mutate()}><RefreshCw size={14} /> Reset link</button>}
       </div>
+      {sharing&&<ShareLinkDialog title={`Join ${circle.name}`} path={`/circles/join/${circle.inviteCode}`} onClose={()=>setSharing(false)}/>}
     </Modal>
   );
 }

@@ -123,7 +123,7 @@ export class MessagesService {
     }
   }
 
-  private async hydrate(
+  async hydrate(
     rows: Record<string, any>[],
     viewerId: string,
   ): Promise<DirectMessageDto[]> {
@@ -226,6 +226,7 @@ export class MessagesService {
     const stickers=await this.stickers.hydrate([...new Set(rows.map(r=>r.sticker_id).filter(Boolean))],viewerId);
     return rows.map((r) => ({
       gif: r.gif ?? null,
+      editedAt: iso(r.edited_at),
       call: r.call_id
         ? { kind: r.call_kind, status: r.call_status, durationSeconds: r.call_duration_s ?? null }
         : null,
@@ -487,16 +488,24 @@ export class MessagesService {
     const rows=await sqlRows<{id:string}>(this.db,`SELECT d.id FROM direct_messages d JOIN users u ON u.id=d.sender_id
       WHERE d.recipient_id=$1 AND d.delivered_at IS NULL AND u.status='ACTIVE' AND ${notBlockedSql('d.sender_id','$1')}
       ORDER BY d.created_at,d.id LIMIT 100`,[viewerId]);
-    return {messageIds:rows.map(r=>r.id)};
+    const groups=await sqlRows<{id:string}>(this.db,`SELECT DISTINCT ON(msg.group_id) msg.id FROM group_messages msg
+      JOIN chat_group_members gm ON gm.group_id=msg.group_id AND gm.user_id=$1 JOIN users u ON u.id=msg.sender_id
+      WHERE msg.seq>gm.delivered_seq AND msg.sender_id<>$1 AND u.status='ACTIVE' AND ${notBlockedSql('msg.sender_id','$1')}
+      ORDER BY msg.group_id,msg.seq DESC LIMIT 100`,[viewerId]);
+    return {messageIds:rows.map(r=>r.id),groupMessageIds:groups.map(r=>r.id)};
   }
   /** Explicit acknowledgment from a device that received these message IDs. */
-  async delivered(viewerId: string, ids:string[]) {
+  async delivered(viewerId: string, ids:string[], groupIds:string[] = []) {
     await sqlRows(
       this.db,
       `UPDATE direct_messages d SET delivered_at = now() WHERE recipient_id = $1 AND id=ANY($2::uuid[])
         AND delivered_at IS NULL AND ${notBlockedSql('d.sender_id','$1')}`,
       [viewerId,ids],
     );
+    if(groupIds.length)await sqlRows(this.db,`UPDATE chat_group_members gm SET delivered_seq=greatest(gm.delivered_seq,received.seq)
+      FROM(SELECT msg.group_id,max(msg.seq) seq FROM group_messages msg JOIN users u ON u.id=msg.sender_id
+        WHERE msg.id=ANY($2::uuid[]) AND msg.sender_id<>$1 AND u.status='ACTIVE' AND ${notBlockedSql('msg.sender_id','$1')} GROUP BY msg.group_id) received
+      WHERE gm.user_id=$1 AND gm.group_id=received.group_id`,[viewerId,groupIds]);
   }
 
   async typing(viewerId: string, peerId: string) {
@@ -575,6 +584,14 @@ export class MessagesService {
   }
 
   /** Unsend: permanently deletes one of your own messages (and its attachment) for both people. */
+  async editMessage(viewerId:string,messageId:string,content:string) {
+    if(!content.trim())throw AppException.badRequest(ErrorCode.VALIDATION_ERROR,'Write a message');
+    const row=await sqlOne(this.db,`UPDATE direct_messages d SET content=$3,edited_at=now() WHERE id=$1 AND sender_id=$2 AND content IS NOT NULL AND NOT view_once
+      AND NOT EXISTS(SELECT 1 FROM blocks b WHERE (b.blocker_id=d.sender_id AND b.blocked_id=d.recipient_id) OR (b.blocker_id=d.recipient_id AND b.blocked_id=d.sender_id)) RETURNING *`,[messageId,viewerId,content.trim()]);
+    if(!row)throw AppException.notFound(ErrorCode.NOT_FOUND,'Message not found or cannot be edited');
+    return (await this.hydrate([row],viewerId))[0];
+  }
+
   async removeMessage(viewerId: string, messageId: string) {
     const files = await this.db.transaction(async (m) => {
       const row = await sqlOne<{ media_id: string | null }>(
@@ -643,9 +660,11 @@ export class MessagesService {
         (
           await sqlOne(
             this.db,
-            `SELECT count(*)::int AS n FROM direct_messages d
+            `SELECT ((SELECT count(*) FROM direct_messages d
       JOIN users u ON u.id = d.sender_id WHERE d.recipient_id = $1 AND d.read_at IS NULL
-      AND u.status = 'ACTIVE' AND ${notBlockedSql('u.id', '$1')}`,
+      AND u.status = 'ACTIVE' AND ${notBlockedSql('u.id', '$1')}) +
+      (SELECT count(*) FROM group_messages msg JOIN chat_group_members gm ON gm.group_id=msg.group_id AND gm.user_id=$1
+       JOIN users gu ON gu.id=msg.sender_id WHERE msg.seq>gm.read_seq AND msg.sender_id<>$1 AND gu.status='ACTIVE' AND ${notBlockedSql('msg.sender_id','$1')}))::int AS n`,
             [viewerId],
           )
         )?.n ?? 0,

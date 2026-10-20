@@ -220,6 +220,7 @@ export class MediaService implements OnModuleInit {
               (EXISTS (SELECT 1 FROM post_media pm WHERE pm.media_id = m.id AND pm.post_id IS DISTINCT FROM $3::uuid)
                OR EXISTS (SELECT 1 FROM users u WHERE u.avatar_media_id = m.id OR u.cover_media_id = m.id)
                OR EXISTS (SELECT 1 FROM direct_messages dm WHERE dm.media_id = m.id)
+               OR EXISTS (SELECT 1 FROM group_messages gm WHERE gm.media_id = m.id)
                OR EXISTS (SELECT 1 FROM stories st WHERE st.media_id = m.id)
                OR EXISTS (SELECT 1 FROM stickers sk WHERE sk.media_id = m.id)
                OR EXISTS (SELECT 1 FROM circle_posts cp WHERE cp.media_id = m.id)) AS in_use
@@ -253,6 +254,7 @@ export class MediaService implements OnModuleInit {
       `SELECT * FROM media WHERE id = $1 AND owner_id = $2 AND status <> 'READY'
           AND NOT EXISTS (SELECT 1 FROM post_media pm WHERE pm.media_id = media.id)
           AND NOT EXISTS (SELECT 1 FROM direct_messages dm WHERE dm.media_id = media.id)
+          AND NOT EXISTS (SELECT 1 FROM group_messages gm WHERE gm.media_id = media.id)
           AND NOT EXISTS (SELECT 1 FROM stories st WHERE st.media_id = media.id)
           AND NOT EXISTS (SELECT 1 FROM stickers sk WHERE sk.media_id = media.id)
           AND NOT EXISTS (SELECT 1 FROM circle_posts cp WHERE cp.media_id = media.id)`,
@@ -288,6 +290,7 @@ export class MediaService implements OnModuleInit {
         OR EXISTS (SELECT 1 FROM notes n WHERE n.audio_key = $1 AND n.expires_at > now())
         OR EXISTS (SELECT 1 FROM note_audio a WHERE a.storage_key = $1)
         OR EXISTS (SELECT 1 FROM direct_messages d WHERE d.audio_key = $1)
+          OR EXISTS (SELECT 1 FROM group_messages g WHERE g.audio_key = $1)
         OR EXISTS (SELECT 1 FROM message_audio_uploads a WHERE a.storage_key = $1)`,
       [storageKey],
     );
@@ -341,6 +344,7 @@ export class MediaService implements OnModuleInit {
               AND NOT EXISTS (SELECT 1 FROM post_media pm WHERE pm.media_id = m.id)
               AND NOT EXISTS (SELECT 1 FROM users u WHERE u.avatar_media_id = m.id OR u.cover_media_id = m.id)
               AND NOT EXISTS (SELECT 1 FROM direct_messages dm WHERE dm.media_id = m.id)
+          AND NOT EXISTS (SELECT 1 FROM group_messages gm WHERE gm.media_id = m.id)
               AND NOT EXISTS (SELECT 1 FROM stories st WHERE st.media_id = m.id)
               AND NOT EXISTS (SELECT 1 FROM stickers sk WHERE sk.media_id = m.id)
               AND NOT EXISTS (SELECT 1 FROM circle_posts cp WHERE cp.media_id = m.id)

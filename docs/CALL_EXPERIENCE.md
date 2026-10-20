@@ -73,6 +73,25 @@ docker compose ps turn api
 docker compose logs --tail=50 turn
 ```
 
+### TURN yardım metni yazıp kapanıyorsa
+
+Bu güncelleme, sabitlenen Coturn 4.18.0 sürümünün kaldırdığı `--no-dtls`
+seçeneğini kaldırır. DTLS artık varsayılan olarak kapalıdır ve bu sürümde
+`--dtls` ile açılır. Eski seçenek, paylaşılan logdaki gibi yardım metni basıp
+çıkılmasına neden olur. Yönetim CLI'si `--cli=false` ile kapatılır.
+[Sabitlenen sürümün seçenek ayrıştırıcısı](https://github.com/coturn/coturn/blob/4.18.0/src/apps/relay/mainrelay.c)
+bu değişikliği doğrular.
+
+TURN imajı derlenirken gerçek `turnserver` aynı giriş betiği ve seçeneklerle
+kısa süre başlatılır; seçenek hatası varsa imaj derlemesi başarısız olur.
+Çalışan konteynerin sağlık kontrolü de yerel STUN isteği gönderir. Bu kontrol
+aktarıcı portlarının VPS dışından erişilebilir olduğunu kanıtlamaz; farklı
+ağlardaki iki cihazla `relay` adayını ayrıca doğrulayın.
+
+Küçültülen arama, kenara sürüklenebilen bir önizleme olarak kalır. Önizlemeye
+dokunmak aramayı büyütür; mikrofon, kamera ve kapatma düğmeleri kullanılabilir.
+Sürüklemek veya uygulamada başka sayfaya gitmek medya bağlantısını yeniden kurmaz.
+
 Giriş yapılmış tarayıcıda `/api/backend/api/calls/config` yanıtında
 `relayConfigured: true` görülmelidir. Bu yalnızca ayarın yüklendiğini gösterir.
 Farklı mobil/Wi-Fi ağlarındaki iki cihazla arama yapın; `chrome://webrtc-internals`

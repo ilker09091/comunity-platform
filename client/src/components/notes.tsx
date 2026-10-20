@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Music2, Pause, Play, Plus, Send, Trash2, X } from "lucide-react";
 import { api, ApiError, type Models } from "@/lib/api/client";
@@ -138,6 +139,7 @@ function NoteSheet({
   onReplace: () => void;
 }) {
   const client = useQueryClient();
+  const router = useRouter();
   const toast = useToast();
   const player = useClipPlayer();
   const [reply, setReply] = useState("");
@@ -162,6 +164,7 @@ function NoteSheet({
       toast(`Sent to ${note.author.username}.`);
       void client.invalidateQueries({ queryKey: ["messages"] });
       onClose();
+      router.push(`/messages?to=${encodeURIComponent(note.author.username)}`);
     },
     onError: (e) => toast(e.message, true),
   });
@@ -228,7 +231,7 @@ function NoteSheet({
               onChange={(e) => setReply(e.target.value)}
               data-autofocus
             />
-            <button type="submit" className="dm-icon" aria-label="Send reply" disabled={!reply.trim() || send.isPending}>
+            <button type="submit" className="dm-icon" aria-label="Send reply" onPointerDown={event=>event.preventDefault()} disabled={!reply.trim() || send.isPending}>
               <Send size={20} />
             </button>
           </form>

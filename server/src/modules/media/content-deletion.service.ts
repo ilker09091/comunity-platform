@@ -119,6 +119,7 @@ export class ContentDeletionService implements OnModuleInit {
           AND NOT EXISTS (SELECT 1 FROM post_media pm WHERE pm.media_id = md.id)
           AND NOT EXISTS (SELECT 1 FROM users u WHERE u.avatar_media_id = md.id OR u.cover_media_id = md.id)
           AND NOT EXISTS (SELECT 1 FROM direct_messages dm WHERE dm.media_id = md.id)
+          AND NOT EXISTS (SELECT 1 FROM group_messages gm WHERE gm.media_id = md.id)
           AND NOT EXISTS (SELECT 1 FROM stories st WHERE st.media_id = md.id)
           AND NOT EXISTS (SELECT 1 FROM stickers sk WHERE sk.media_id = md.id)
           AND NOT EXISTS (SELECT 1 FROM circle_posts cp WHERE cp.media_id = md.id)
@@ -181,6 +182,7 @@ export class ContentDeletionService implements OnModuleInit {
           OR EXISTS(SELECT 1 FROM notes WHERE audio_key=$1 AND expires_at>now())
           OR EXISTS(SELECT 1 FROM note_audio WHERE storage_key=$1)
           OR EXISTS(SELECT 1 FROM direct_messages WHERE audio_key=$1)
+          OR EXISTS(SELECT 1 FROM group_messages WHERE audio_key=$1)
           OR EXISTS(SELECT 1 FROM message_audio_uploads WHERE storage_key=$1)`, [key]);
         if (inUse.length) {
           await sqlRows(m, `DELETE FROM media_file_deletions WHERE storage_key = $1`, [key]);

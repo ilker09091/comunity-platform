@@ -46,7 +46,7 @@ export class NotesService {
   async list(viewerId: string): Promise<NoteDto[]> {
     const rows = await sqlRows(
       this.db,
-      `SELECT n.*, ${USER_SUMMARY_COLUMNS} FROM notes n JOIN users u ON u.id = n.author_id ${USER_AVATAR_JOIN}
+      `SELECT n.*, ${USER_SUMMARY_COLUMNS}, n.id AS note_id FROM notes n JOIN users u ON u.id = n.author_id ${USER_AVATAR_JOIN}
       WHERE n.expires_at > now() AND u.status = 'ACTIVE' AND ${notBlockedSql('u.id', '$1')}
         AND (u.id = $1 OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.following_id = u.id))
       ORDER BY (u.id = $1) DESC, n.created_at DESC LIMIT 100`,
@@ -57,7 +57,7 @@ export class NotesService {
 
   private dto(r: Record<string, any>, viewerId: string): NoteDto {
     return {
-      id: r.id,
+      id: r.note_id,
       author: this.users.toSummary({ ...r, id: r.author_id } as any),
       text: r.text,
       songTitle: r.song_title ?? null,

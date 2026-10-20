@@ -3,7 +3,8 @@ set -eu
 
 # The API creates this key before it starts serving requests. Keep it across rebuilds.
 attempt=0
-until [ -s /run/circle-turn/key ]; do
+key_file="${CALL_TURN_SECRET_FILE:-/run/circle-turn/key}"
+until [ -s "$key_file" ]; do
   attempt=$((attempt + 1))
   if [ "$attempt" -ge 180 ]; then
     echo 'TURN: waiting for API to initialize the shared key; restarting.' >&2
@@ -11,13 +12,13 @@ until [ -s /run/circle-turn/key ]; do
   fi
   sleep 1
 done
-secret="${CALL_TURN_SECRET:-$(cat /run/circle-turn/key)}"
+secret="${CALL_TURN_SECRET:-$(cat "$key_file")}"
 
 exec turnserver -n --log-file=stdout --fingerprint --use-auth-secret \
   --static-auth-secret="$secret" \
   --realm=circle-calls --external-ip="${TURN_PUBLIC_IP:-13.140.148.251}" \
   --listening-port=3478 --min-port=49160 --max-port=49260 \
-  --no-cli --no-tls --no-dtls --no-multicast-peers --no-tcp-relay \
+  --cli=false --no-tls --no-multicast-peers --no-tcp-relay \
   --denied-peer-ip=0.0.0.0-0.255.255.255 \
   --denied-peer-ip=10.0.0.0-10.255.255.255 \
   --denied-peer-ip=100.64.0.0-100.127.255.255 \

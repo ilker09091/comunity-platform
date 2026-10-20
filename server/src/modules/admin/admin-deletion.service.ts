@@ -136,7 +136,8 @@ export class AdminDeletionService {
       const clips=await sqlRows<{storage_key:string}>(m,`SELECT storage_key FROM note_audio WHERE owner_id=$1
         UNION SELECT audio_key FROM notes WHERE author_id=$1 AND audio_key IS NOT NULL
         UNION SELECT storage_key FROM message_audio_uploads WHERE owner_id=$1
-        UNION SELECT audio_key FROM direct_messages WHERE (sender_id=$1 OR recipient_id=$1) AND audio_key IS NOT NULL`,[userId]);
+        UNION SELECT audio_key FROM direct_messages WHERE (sender_id=$1 OR recipient_id=$1) AND audio_key IS NOT NULL
+        UNION SELECT audio_key FROM group_messages WHERE (sender_id=$1 OR group_id IN(SELECT id FROM chat_groups WHERE owner_id=$1)) AND audio_key IS NOT NULL`,[userId]);
       const audio=await sqlRows<{path:string}>(m,'SELECT path FROM audio_uploads WHERE owner_id=$1',[userId]);
       const uploads=await sqlRows<{id:string}>(m,'SELECT id FROM media_upload_sessions WHERE owner_id=$1',[userId]);
       await this.deletion.queuePrivateFiles(m,[...audio.map(a=>a.path),...uploads.map(u=>join('.incoming','uploads',u.id+'.part')),

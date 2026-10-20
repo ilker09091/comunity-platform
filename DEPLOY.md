@@ -5,6 +5,10 @@ Production stack: PostgreSQL + NestJS API + Next.js web, all in Docker Compose.
 TURN is included in the main Compose file. On the existing stack, update calls with
 `docker compose up -d --build --no-deps web api turn`.
 The API generates a persistent relay key automatically.
+GIF search reads `GIPHY_API_KEY` from the root `.env` or the optional private
+`.env.giphy` file. The local key is saved in `.env.giphy`, which is ignored by
+Git: copy that file separately to the VPS project directory before rebuilding.
+Do not put the key in a `NEXT_PUBLIC_*` variable. See [messaging changes](docs/MESSAGING_UPGRADE.md).
 Set `SITE_URL` (default `https://rosefly.store`) for link previews, canonical URLs and the sitemap. See [ports and call quality settings](docs/CALL_EXPERIENCE.md).
 
 ## 1. Prepare the server

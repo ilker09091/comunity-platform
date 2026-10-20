@@ -102,6 +102,7 @@ export class CallLogDto {
   durationSeconds: number | null;
 }
 export class DirectMessageDto {
+  @ApiProperty({type:String,nullable:true,format:'date-time'}) editedAt: string|null;
   @ApiProperty({ type: () => GifDto, nullable: true }) gif: GifDto | null;
   @ApiProperty({ type: CallLogDto, nullable: true, description: 'Set on call history entries; the sender is the caller' })
   call: CallLogDto | null;
@@ -155,6 +156,10 @@ export class DirectMessageDto {
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) readAt:
     string | null;
 }
+export class EditMessageDto {
+  @ApiProperty({maxLength:2000}) @IsString() @MinLength(1) @MaxLength(2000)
+  @SanitizedText({multiline:true}) content:string;
+}
 export class MessagePeerDto extends UserSummaryDto {
   @ApiProperty() isUnavailable: boolean;
   @ApiProperty() isBlocking: boolean;
@@ -163,6 +168,8 @@ export class MessagePeerDto extends UserSummaryDto {
 export class MessageDeliveryDto {
   @ApiProperty({type:String,isArray:true,format:'uuid'})
   @IsArray() @ArrayMaxSize(100) @IsUUID('all',{each:true}) messageIds: string[];
+  @ApiPropertyOptional({type:String,isArray:true,format:'uuid',description:'Group messages received by this device; membership is checked again on acknowledgment'})
+  @IsOptional() @IsArray() @ArrayMaxSize(100) @IsUUID('all',{each:true}) groupMessageIds?: string[];
 }
 export class MessageAudioDto {
   @ApiProperty({format:'uuid'}) id: string;

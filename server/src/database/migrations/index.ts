@@ -30,6 +30,7 @@ import { CallMessages1760192000000 } from './1760192000000-CallMessages.js';
 import { Circles1760192100000 } from './1760192100000-Circles.js';
 import { AdminUserNotes1760192200000 } from './1760192200000-AdminUserNotes.js';
 import { GifAttachments1760192300000 } from './1760192300000-GifAttachments.js';
+import { GroupMessaging1760192400000 } from './1760192400000-GroupMessaging.js';
 export const migrations = [
   CreateUsersAndAuth1760180000000,
   CreateMedia1760180100000,
@@ -61,4 +62,5 @@ export const migrations = [
   Circles1760192100000,
   AdminUserNotes1760192200000,
   GifAttachments1760192300000,
+  GroupMessaging1760192400000,
 ];

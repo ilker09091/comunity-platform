@@ -32,7 +32,7 @@ const PAGE = 24;
 const ALLOWED_HOSTS = /^https:\/\/(media\d*|i)\.giphy\.com\//;
 
 interface GiphyImage { url?: string; webp?: string; mp4?: string; width?: string; height?: string }
-interface GiphyGif { id: string; title?: string; images?: Record<string, GiphyImage> }
+interface GiphyGif { id: string; title?: string; rating?: string; images?: Record<string, GiphyImage> }
 
 /**
  * Server-side GIPHY access: the key never reaches browsers, results are rated (default pg-13),
@@ -63,13 +63,20 @@ export class GifsService {
       this.logger.warn({ message: 'GIF provider error', status: response.status });
       throw AppException.unprocessable(ErrorCode.FEATURE_DISABLED, 'GIFs are unavailable right now. Try again later.');
     }
-    const value = (await response.json()) as T;
+    let value: T;
+    try { value = (await response.json()) as T; }
+    catch { throw AppException.unprocessable(ErrorCode.FEATURE_DISABLED, 'GIF provider returned an invalid response. Try again later.'); }
     if (this.cache.size > 500) this.cache.clear();
     this.cache.set(cacheKey, { at: Date.now(), value });
     return value;
   }
 
   private toDto(gif: GiphyGif): GifDto | null {
+    if(!gif || typeof gif.id!=='string')return null;
+    const ratings=['g','pg','pg-13','r'];
+    const limit=ratings.indexOf(process.env.GIPHY_RATING||'pg-13');
+    if(gif.rating&&(ratings.indexOf(gif.rating)<0||ratings.indexOf(gif.rating)>(limit<0?2:limit)))return null;
+    if(!GIF_ID.test(gif.id))return null;
     const show = gif.images?.fixed_width ?? gif.images?.downsized ?? gif.images?.original;
     const small = gif.images?.fixed_width_small ?? gif.images?.fixed_height_small ?? show;
     const url = show?.webp || show?.url;
@@ -90,6 +97,7 @@ export class GifsService {
       { limit: String(PAGE), offset: String(offset), ...(term ? { q: term, lang: 'tr' } : {}) },
       term ? 5 * 60_000 : 15 * 60_000,
     );
+    if(!Array.isArray(data.data))throw AppException.unprocessable(ErrorCode.FEATURE_DISABLED,'GIF provider returned an invalid response. Try again later.');
     const items = data.data.map(gif => this.toDto(gif)).filter((gif): gif is GifDto => !!gif);
     const total = data.pagination?.total_count ?? 0;
     return { enabled: true, items, nextOffset: offset + PAGE < Math.min(total, 5000) && data.data.length === PAGE ? offset + PAGE : null };
