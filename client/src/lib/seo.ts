@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cacheLife } from "next/cache";
 import type { components } from "./api/schema";
 
 type Post = components["schemas"]["PostDto"];
@@ -48,6 +49,9 @@ const unavailable = (title: string): Metadata => ({
 });
 
 export async function postMetadata(id: string): Promise<Metadata> {
+  // Public data (what a signed-out visitor sees): cached briefly so link previews never block rendering.
+  "use cache";
+  cacheLife("minutes");
   const post = await fetchPost(id);
   if (!post) return unavailable("Post");
   const source = post.kind === "REPOST" && post.referencedPost ? post.referencedPost : post;
@@ -76,6 +80,9 @@ export async function postMetadata(id: string): Promise<Metadata> {
 }
 
 export async function profileMetadata(username: string): Promise<Metadata> {
+  // Public data (what a signed-out visitor sees): cached briefly so link previews never block rendering.
+  "use cache";
+  cacheLife("minutes");
   const profile = await fetchProfile(username);
   if (!profile) return unavailable("Profile");
   const title = `${profile.displayName} (@${profile.username})`;

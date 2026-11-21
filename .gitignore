@@ -30,3 +30,9 @@ Thumbs.db
 # Local Python caches and private runtime credentials
 **/__pycache__/
 server/storage/
+
+# Local test accounts for design screenshots (never commit)
+*.local.json
+
+# Raw generated art (sliced into public/baby by scripts; too big to commit)
+client/public/baby/raw/

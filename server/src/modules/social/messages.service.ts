@@ -13,8 +13,8 @@ import { MediaUrlService } from '../media/media-url.service.js';
 import { StickersService } from './stickers.service.js';
 import { GifsService } from '../gifs/gifs.js';
 import type { ChatTheme } from '../../database/migrations/1760192700000-StrictStreaksAndChatThemes.js';
-import type { GameKind } from '../../database/migrations/1760193000000-MoreChatGames.js';
-import { applyMove, GameRuleError, initialState, THIS_OR_THAT, type BoardState, type GameState, type MemoryState, type RpsState, type TotState } from './games.js';
+import type { GameKind } from '../../database/migrations/1760193400000-TalkGames.js';
+import { applyMove, GameRuleError, initialState, THIS_OR_THAT, type BoardState, type GameState, type MemoryState, type RpsState, type TotState, type QaState, type TodState, type GameMove } from './games.js';
 import { PostsQueryService } from '../posts/posts-query.service.js';
 import {
   USER_AVATAR_JOIN,
@@ -378,7 +378,7 @@ export class MessagesService {
     // Wake the recipient's phones/browsers (the service worker fetches and shows the message).
     this.push.notifyUser(recipientId);
     // Talking to each other is part of raising your baby together.
-    void this.babies.onMessage(senderId, recipientId);
+    void this.babies.onMessage(senderId, recipientId, dto.content ?? null);
     return (await this.hydrate([row], senderId))[0];
   }
 
@@ -623,7 +623,9 @@ export class MessagesService {
     const rps=kind==='rps'?state as RpsState:null;
     const memory=kind==='memory'?state as MemoryState:null;
     const tot=kind==='thisorthat'?state as TotState:null;
-    const board=!rps&&!memory&&!tot?state as BoardState:null;
+    const qa=kind==='qa'?state as QaState:null;
+    const tod=kind==='tod'?state as TodState:null;
+    const board=!rps&&!memory&&!tot&&!qa&&!tod?state as BoardState:null;
     const picks=rps?.picks??tot?.picks??null;
     const label=(q:number)=>[...(THIS_OR_THAT[q]??['',''])];
     return {
@@ -638,9 +640,14 @@ export class MessagesService {
       owners:memory?.owners??[],
       flipped:memory?[...memory.flipped,...memory.shown]:[],
       prompt:tot&&tot.round<tot.order.length?label(tot.order[tot.round]):[],
-      round:tot?.round??0,totalRounds:tot?.order.length??0,
       myChoice:picks&&me>=0?picks[me]??null:null,
       peerReady:!!(picks&&me>=0&&picks[1-me]),
+      phase:qa?.phase??tod?.phase??null,
+      turns:qa?qa.rounds.map(r=>({who:r.asker,pick:null,question:r.question,clarify:r.clarify,clarification:r.clarification,answer:r.answer,passed:false}))
+        :tod?tod.rounds.map(r=>({who:r.player,pick:r.pick,question:r.prompt,clarify:null,clarification:null,answer:r.reply,passed:r.passed})):[],
+      chances:qa?.chances??tod?.chances??[],
+      round:tot?.round??(qa?qa.rounds.length-1:tod?tod.rounds.length-1:0),
+      totalRounds:tot?.order.length??qa?.total??tod?.total??0,
       updatedAt:iso(g.updated_at)!,
     };
   }
@@ -697,7 +704,7 @@ export class MessagesService {
     return this.gameDto(g,viewerId);
   }
 
-  async move(viewerId:string,gameId:string,move:{cell?:number;choice?:string}) {
+  async move(viewerId:string,gameId:string,move:GameMove) {
     const g=await this.db.transaction(async m=>{
       const g=await this.gameRow(m,viewerId,gameId,true);
       const players=g.players as string[], me=players.indexOf(viewerId);

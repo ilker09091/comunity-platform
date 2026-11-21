@@ -1,0 +1,241 @@
+=====================================================================
+  BEBEĞİMİZ 2. BÖLÜM: CHATGPT / CODEX GÖRSEL PROMPTLARI (12 görsel)
+=====================================================================
+
+NASIL KULLANILIR
+----------------
+1) İlk görselleri yaptığın ESKİ sohbete devam et (karakter orada kayıtlı).
+   O sohbet yoksa yeni sohbet aç ve ÖNCE şu iki dosyayı yükle:
+       client/public/baby/raw/ref-girl.png
+       client/public/baby/raw/ref-boy.png
+   ve şunu yaz: "These are the reference sheets of the two children. Keep
+   them exactly the same in every image I ask for."
+
+2) Her prompt "----- KOPYALA BAŞLANGIÇ -----" ile
+   "----- KOPYALA BİTİŞ -----" arasında. Sadece aradaki İngilizce metni kopyala.
+
+3) Gelen görseli başlıkta yazan isimle kaydet ve şu klasöre koy:
+       client/public/baby/raw/
+
+4) Hepsi gelmese de olur. Eksik görsellerin yerinde emoji ya da mevcut
+   resim görünüyor, her şey şimdiden çalışıyor. Geldikçe ekle,
+   "görseller hazır" yaz, ben parçalayıp yerleştiririm.
+
+SORUN ÇIKARSA ŞUNLARI YAZ
+-------------------------
+- Arka plan şeffaf değilse:
+    Make the background fully transparent (PNG with alpha). Keep everything else exactly the same.
+- Şeffaflık hiç olmuyorsa (ben silerim):
+    Use a solid pure magenta (#FF00FF) background instead, and make sure nothing in the drawing uses magenta.
+- Çocuk değiştiyse:
+    Keep the exact same child as in the reference sheet (same face, hair, eyes, skin tone).
+- Yazı, numara veya filigran çıktıysa:
+    Remove all text, numbers, labels and watermarks. Keep everything else the same.
+- Parçalar birbirine değiyorsa:
+    Make every figure smaller so each one fits fully inside its own cell with clear empty space around it.
+- Gölge veya renk geçişi olduysa:
+    Use flat solid colors only: no gradients, no soft shading, no shadows.
+
+
+=====================================================================
+  1 / 12   →   girl-moods2.png   (KIZ: GIDIKLANMA / HAPŞIRMA / HASTA)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+Using the exact same girl from the reference sheet, make a grid of 4 columns and 3 rows (12 figures). The 4 columns are her four ages from the reference sheet, in the same order: baby sitting (8 months), toddler (2 years), child (6 years), child (10 years). The 3 rows are reactions; in every cell she wears the plain white outfit:
+
+Row 1 (top): laughing out loud because she is being tickled, eyes squeezed shut into happy upside-down curves, mouth wide open in a big laugh, cheeks extra rosy, arms pulled in towards her tummy.
+Row 2 (middle): in the middle of a big sneeze, eyes shut tight, nose scrunched, head tilted slightly forward, shoulders lifted, mouth open in an "achoo". A few tiny cartoon droplet sparkles near the nose are fine, but no letters.
+Row 3 (bottom): poorly with a little cold, droopy eyes, flushed red cheeks and a red nose, a small white thermometer in her mouth, wrapped in a soft light-blue blanket around her shoulders.
+
+Same scale and same position in every cell, same standing or sitting pose as in the reference sheet for each age, clear empty space around every figure, nothing touching. Landscape image, 1536 x 1024.
+
+Style: cute flat 2D vector illustration, kawaii chibi proportions (big head, small body), soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no ground shadows, no text, no labels, no numbers, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel).
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  2 / 12   →   boy-moods2.png   (ERKEK: GIDIKLANMA / HAPŞIRMA / HASTA)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+Using the exact same boy from the reference sheet, make a grid of 4 columns and 3 rows (12 figures). The 4 columns are his four ages from the reference sheet, in the same order: baby sitting (8 months), toddler (2 years), child (6 years), child (10 years). The 3 rows are reactions; in every cell he wears the plain white outfit:
+
+Row 1 (top): laughing out loud because he is being tickled, eyes squeezed shut into happy upside-down curves, mouth wide open in a big laugh, cheeks extra rosy, arms pulled in towards his tummy.
+Row 2 (middle): in the middle of a big sneeze, eyes shut tight, nose scrunched, head tilted slightly forward, shoulders lifted, mouth open in an "achoo". A few tiny cartoon droplet sparkles near the nose are fine, but no letters.
+Row 3 (bottom): poorly with a little cold, droopy eyes, flushed red cheeks and a red nose, a small white thermometer in his mouth, wrapped in a soft light-blue blanket around his shoulders.
+
+Same scale and same position in every cell, same standing or sitting pose as in the reference sheet for each age, clear empty space around every figure, nothing touching. Landscape image, 1536 x 1024.
+
+Style: cute flat 2D vector illustration, kawaii chibi proportions (big head, small body), soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no ground shadows, no text, no labels, no numbers, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel).
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  3 / 12   →   toys2.png   (DÜKKAN OYUNCAKLARI: 6 ADET)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+A grid of 3 columns and 2 rows with 6 separate toys, one toy per cell, all the same size, centered in their cells, with clear empty space around each one and nothing touching. Same style as the earlier toys image. In this exact order (left to right, top row first):
+
+1. small toy rocket, white with a red nose cone, red fins and a round blue window
+2. friendly green toy dinosaur (round, chubby, small spikes on its back)
+3. colorful toy xylophone with rainbow bars and two little mallets
+4. bubble wand with a few round soap bubbles floating around it (bubbles drawn as simple light-blue outlined circles)
+5. small wooden toy train engine with one wagon, red, blue and yellow
+6. cute small robot toy with a square head, round eyes, an antenna and a heart on its chest
+
+Landscape image, 1536 x 1024.
+
+Style: cute flat 2D vector illustration, soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no shadows, no text, no labels, no numbers, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel).
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  4 / 12   →   hangs.png   (ODAYA ASILANLAR: 4 ADET)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+A grid of 2 columns and 2 rows with 4 separate hanging room decorations for a child's bedroom, one per cell, centered, with clear empty space around each one and nothing touching. In this exact order (left to right, top row first):
+
+1. a wide bunting garland: a gently drooping string with 7 small triangle flags in pastel pink, mint, yellow and light blue, stretching across most of the cell width
+2. a wide string of fairy lights: a gently drooping thin wire with 9 small round bulbs in warm yellow, pink and mint (bulbs are flat solid circles, no glow)
+3. a bunch of 4 balloons (pink, light blue, yellow, mint) with curly strings tied together at the bottom, tall and narrow
+4. a hanging baby mobile: a small wooden ring at the top with 5 strings holding a crescent moon, two stars, a small cloud and a heart
+
+Landscape image, 1536 x 1024.
+
+Style: cute flat 2D vector illustration, soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no shadows, no glow, no text, no labels, no numbers, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel).
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  5 / 12   →   floor.png   (YERE KONANLAR: 4 ADET)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+A grid of 2 columns and 2 rows with 4 separate pieces of child's bedroom furniture and toys that stand on the floor, one per cell, all seen from the front at a similar size, centered, with clear empty space around each one and nothing touching. In this exact order (left to right, top row first):
+
+1. a wooden rocking horse with a cream body, a brown mane and a small red saddle
+2. a small play tent (teepee) made of cream fabric with pastel pink triangle flags on top and the front flaps tied open
+3. an open wooden toy box with a teddy ear, a ball and a few blocks peeking out of the top
+4. a big soft plush bunny sitting on the floor, light pink with long floppy ears
+
+Landscape image, 1536 x 1024.
+
+Style: cute flat 2D vector illustration, soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no ground shadows, no text, no labels, no numbers, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel).
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  6 / 12   →   care.png   (KÜVET, ALTIN, İLAÇ)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+A grid of 3 columns and 1 row with 3 separate items, one per cell, centered, with clear empty space around each one and nothing touching. In this exact order (left to right):
+
+1. the FRONT SIDE of a white bathtub seen straight from the front, wide and short (about twice as wide as tall), with small golden feet and a thick layer of fluffy white foam bubbles piled along the whole top edge. The inside of the tub is NOT visible: only the front side and the foam on top, so a child can be placed behind it later.
+2. one shiny gold coin seen from the front, with a small heart embossed in the middle (flat colors: golden yellow with a darker gold rim)
+3. a small medicine syrup bottle with a pink label showing only a simple heart symbol, next to a little measuring spoon
+
+Landscape image, 1536 x 1024.
+
+Style: cute flat 2D vector illustration, soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no shadows, no text, no labels, no numbers, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel).
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  ODALAR: 6 GÖRSEL (her tema için GÜNDÜZ + GECE)
+=====================================================================
+ÖNEMLİ: Her odanın yerleşimi ilk odayla AYNI olmalı (yatak solda,
+ortada boş halı, ortası boş). Çocuk ortada halının üstünde duruyor,
+fotoğraf çerçevesi sol üstte duvarda asılı; o bölgeler boş kalmalı.
+Bu yüzden GÜNDÜZ promptunu gönderdikten hemen sonra GECE promptunu gönder.
+
+
+=====================================================================
+  7 / 12   →   room-ocean-day.png   (OKYANUS ODASI: GÜNDÜZ)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+A cozy ocean-themed child's bedroom seen straight from the front, with NO people or characters in it. Use exactly the same layout as the earlier bedroom: a window at the top center, a small bed on the left side, shelves on the right side, a plant or decoration in a corner, and a round rug on the floor in the lower middle. Theme: soft aqua-blue walls with a few simple white wave lines and tiny fish shapes painted on them, a bed with a navy and white striped blanket, a small ship's wheel on the wall on the right, a round sandy-beige rug, a white-and-blue shelf with a toy sailboat and a seashell. The window shows a sunny blue sky.
+
+VERY IMPORTANT: keep the center of the image (the rug area and the space above it, from about 35% to 85% of the image height) empty and uncluttered, and keep the wall area just above the bed on the left plain, because a child character and a photo frame will be placed there later.
+
+Portrait image, 1024 x 1536.
+
+Style: flat 2D vector illustration matching the characters, soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no text, no labels, no watermark. Warm pastel palette. Full opaque background (this image is NOT transparent).
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  8 / 12   →   room-ocean-night.png   (OKYANUS ODASI: GECE)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+The exact same ocean bedroom as the previous image, with every object in exactly the same place, but at night: the window shows a dark navy sky with small stars and a crescent moon, the walls are a darker muted aqua as if softly lit, and a small glowing nightlight shaped like a jellyfish is switched on near the bed, with a small flat circle of warm light. Calm and cozy. Still NO people or characters, and the center of the rug area is still empty.
+
+Portrait image, 1024 x 1536.
+
+Style: flat 2D vector illustration matching the characters, soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only (the light is a flat solid circle, not a gradient). No gradients, no soft shading, no textures, no text, no labels, no watermark. Full opaque background (this image is NOT transparent).
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  9 / 12   →   room-space-day.png   (UZAY ODASI: GÜNDÜZ)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+A cozy space-themed child's bedroom seen straight from the front, with NO people or characters in it. Use exactly the same layout as the earlier bedroom: a window at the top center, a small bed on the left side, shelves on the right side, a decoration in a corner, and a round rug on the floor in the lower middle. Theme: soft lavender-purple walls with small painted yellow stars and a ringed planet, a bed with a dark blue blanket covered in little stars, a shelf with a toy rocket and a small globe, a round rug shaped like a pale yellow planet with a ring, and a small telescope standing in the right corner. The window shows a sunny blue sky.
+
+VERY IMPORTANT: keep the center of the image (the rug area and the space above it, from about 35% to 85% of the image height) empty and uncluttered, and keep the wall area just above the bed on the left plain, because a child character and a photo frame will be placed there later.
+
+Portrait image, 1024 x 1536.
+
+Style: flat 2D vector illustration matching the characters, soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no text, no labels, no watermark. Warm pastel palette. Full opaque background (this image is NOT transparent).
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  10 / 12   →   room-space-night.png   (UZAY ODASI: GECE)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+The exact same space bedroom as the previous image, with every object in exactly the same place, but at night: the window shows a dark navy sky full of stars and a crescent moon, the walls are a deep muted purple, and the painted stars on the walls glow softly in pale yellow (drawn as flat solid shapes). A small moon-shaped nightlight next to the bed is switched on with a small flat circle of warm light. Calm and cozy. Still NO people or characters, and the center of the rug area is still empty.
+
+Portrait image, 1024 x 1536.
+
+Style: flat 2D vector illustration matching the characters, soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only (lights are flat solid shapes, not gradients). No gradients, no soft shading, no textures, no text, no labels, no watermark. Full opaque background (this image is NOT transparent).
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  11 / 12   →   room-garden-day.png   (BAHÇE ODASI: GÜNDÜZ)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+A cozy garden-themed child's bedroom seen straight from the front, with NO people or characters in it. Use exactly the same layout as the earlier bedroom: a window at the top center, a small bed on the left side, shelves on the right side, a plant in a corner, and a round rug on the floor in the lower middle. Theme: soft mint-green walls with small painted flowers, leaves and a couple of butterflies near the edges, a bed with a pale yellow blanket with daisies, a shelf with small flower pots and a watering can, a big leafy plant in the right corner, and a round rug that looks like a soft green lawn with a few tiny flowers. The window shows a sunny blue sky and a tree branch.
+
+VERY IMPORTANT: keep the center of the image (the rug area and the space above it, from about 35% to 85% of the image height) empty and uncluttered, and keep the wall area just above the bed on the left plain, because a child character and a photo frame will be placed there later.
+
+Portrait image, 1024 x 1536.
+
+Style: flat 2D vector illustration matching the characters, soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no text, no labels, no watermark. Warm pastel palette. Full opaque background (this image is NOT transparent).
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  12 / 12   →   room-garden-night.png   (BAHÇE ODASI: GECE)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+The exact same garden bedroom as the previous image, with every object in exactly the same place, but at night: the window shows a dark navy sky with small stars, a crescent moon and a few tiny yellow fireflies outside, the walls are a darker muted green, and a small flower-shaped nightlight next to the bed is switched on with a small flat circle of warm light. Calm and cozy. Still NO people or characters, and the center of the rug area is still empty.
+
+Portrait image, 1024 x 1536.
+
+Style: flat 2D vector illustration matching the characters, soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only (the light is a flat solid circle, not a gradient). No gradients, no soft shading, no textures, no text, no labels, no watermark. Full opaque background (this image is NOT transparent).
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  KONTROL LİSTESİ: client/public/baby/raw/ içine
+=====================================================================
+[ ] girl-moods2.png      kız: gıdıklanma, hapşırma, hasta
+[ ] boy-moods2.png       erkek: gıdıklanma, hapşırma, hasta
+[ ] toys2.png            roket, dinozor, ksilofon, baloncuk, tren, robot
+[ ] hangs.png            flama, ışıklar, balonlar, dönence
+[ ] floor.png            sallanan at, çadır, oyuncak kutusu, dev tavşan
+[ ] care.png             küvet, altın, ilaç
+[ ] room-ocean-day.png   [ ] room-ocean-night.png
+[ ] room-space-day.png   [ ] room-space-night.png
+[ ] room-garden-day.png  [ ] room-garden-night.png
+
+Hazır olunca "görseller hazır" yaz, parçalayıp yerleştiririm.

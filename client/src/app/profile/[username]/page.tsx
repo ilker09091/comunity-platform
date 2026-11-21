@@ -1,12 +1,20 @@
-"use client";
-import { useParams } from "next/navigation";
-import Profile from "@/components/profile";
-import MainLayout from "@/components/main-layout";
+import { Suspense } from "react";
+import { connection } from "next/server";
+import ProfilePage from "./profile-page";
+
+/** Rendered per request on purpose: the link preview metadata depends on the URL. */
+async function Connection() {
+  await connection();
+  return null;
+}
+
 export default function Page() {
-  const { username } = useParams<{ username: string }>();
   return (
-    <MainLayout>
-      <Profile username={username} />
-    </MainLayout>
+    <>
+      <ProfilePage />
+      <Suspense>
+        <Connection />
+      </Suspense>
+    </>
   );
 }

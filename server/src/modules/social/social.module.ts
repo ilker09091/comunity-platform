@@ -70,7 +70,7 @@ import {
   StickerDto,
   StoryDto,
   StoryReplyDto,
-  StoryViewerDto, ChatGameDto, GameMoveDto, StartGameDto, ChatPrefsDto, ChatPrefsResultDto, BabyDto, BabyStateDto, StartBabyDto, BabyItemDto, BabyOutfitDto } from './social.dto.js';
+  StoryViewerDto, ChatGameDto, GameMoveDto, StartGameDto, ChatPrefsDto, ChatPrefsResultDto, BabyDto, BabyStateDto, StartBabyDto, BabyItemDto, BabyOutfitDto, BabyBuyDto, BabyPlaceDto, BabyPhotoDto, BabyTeachDto, BabyMemoriesDto, BabyHereDto, BabyTogetherDto, BabySendSignalDto } from './social.dto.js';
 import { MessagesService } from './messages.service.js';
 import { MessageAudioService } from './message-audio.service.js';
 import { CallsController, StreaksController } from './calls.controller.js';
@@ -154,7 +154,43 @@ export class MessagesController {
   babyFeed(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string,@Body() _dto:BabyItemDto){return this.babies.feed(u.id,id);}
   @Post('baby/:babyId/play') @HttpCode(200)
   @ApiOperation({operationId:'babyPlay',summary:'Play with your baby (three times a day per parent)'}) @ApiOkResponse({type:BabyDto})
-  babyPlay(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string,@Body() _dto:BabyItemDto){return this.babies.play(u.id,id);}
+  babyPlay(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string,@Body() dto:BabyItemDto){return this.babies.play(u.id,id,dto.item);}
+  @Post('baby/:babyId/bath') @HttpCode(200)
+  @ApiOperation({operationId:'babyBath',summary:'Give your baby a bath (twice a day per parent)'}) @ApiOkResponse({type:BabyDto})
+  babyBath(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string){return this.babies.bath(u.id,id);}
+  @Post('baby/:babyId/sleep') @HttpCode(200)
+  @ApiOperation({operationId:'babySleep',summary:'Put your baby to bed'}) @ApiOkResponse({type:BabyDto})
+  babySleep(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string){return this.babies.sleep(u.id,id);}
+  @Post('baby/:babyId/wake') @HttpCode(200)
+  @ApiOperation({operationId:'babyWake',summary:'Wake your baby up'}) @ApiOkResponse({type:BabyDto})
+  babyWake(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string){return this.babies.wake(u.id,id);}
+  @Post('baby/:babyId/hug') @HttpCode(200)
+  @ApiOperation({operationId:'babyHug',summary:'Hug your baby; both parents within minutes is a family hug'}) @ApiOkResponse({type:BabyDto})
+  babyHug(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string){return this.babies.hug(u.id,id);}
+  @Post('baby/:babyId/medicine') @HttpCode(200)
+  @ApiOperation({operationId:'babyMedicine',summary:'Give medicine for a cold (one dose per parent)'}) @ApiOkResponse({type:BabyDto})
+  babyMedicine(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string){return this.babies.medicine(u.id,id);}
+  @Post('baby/:babyId/shop') @HttpCode(200)
+  @ApiOperation({operationId:'babyBuy',summary:'Buy a toy or decoration with the shared coins'}) @ApiOkResponse({type:BabyDto})
+  babyBuy(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string,@Body() dto:BabyBuyDto){return this.babies.buy(u.id,id,dto.item);}
+  @Put('baby/:babyId/decor')
+  @ApiOperation({operationId:'babyPlace',summary:'Put up or take down a decoration you own'}) @ApiOkResponse({type:BabyDto})
+  babyPlace(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string,@Body() dto:BabyPlaceDto){return this.babies.place(u.id,id,dto.slot,dto.item??null);}
+  @Put('baby/:babyId/photo')
+  @ApiOperation({operationId:'babyPhoto',summary:'Choose the photo in the frame (a photo from this chat)'}) @ApiOkResponse({type:BabyDto})
+  babyPhoto(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string,@Body() dto:BabyPhotoDto){return this.babies.setPhoto(u.id,id,dto.messageId??null);}
+  @Post('baby/:babyId/words') @HttpCode(200)
+  @ApiOperation({operationId:'babyTeach',summary:'Teach your toddler a word'}) @ApiOkResponse({type:BabyDto})
+  babyTeach(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string,@Body() dto:BabyTeachDto){return this.babies.teach(u.id,id,dto.word);}
+  @Post('baby/:babyId/here') @HttpCode(200)
+  @ApiOperation({operationId:'babyHere',summary:'Check in while the baby is open: where you are, and whether the other parent is here'}) @ApiOkResponse({type:BabyTogetherDto})
+  babyHere(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string,@Body() dto:BabyHereDto){return this.babies.here(u.id,id,dto.scene,dto.since);}
+  @Post('baby/:babyId/signal') @HttpCode(204)
+  @ApiOperation({operationId:'babySignal',summary:'Send the other parent a heart, wave, kiss or star'}) @ApiNoContentResponse()
+  async babySignal(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string,@Body() dto:BabySendSignalDto){await this.babies.signal(u.id,id,dto.kind);}
+  @Get('baby/:babyId/memories')
+  @ApiOperation({operationId:'babyMemories',summary:'The memory book and every word your child knows'}) @ApiOkResponse({type:BabyMemoriesDto})
+  babyMemories(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string){return this.babies.memories(u.id,id);}
   @Put('baby/:babyId/outfit')
   @ApiOperation({operationId:'babyOutfit',summary:'Dress your baby (both parents see it)'}) @ApiOkResponse({type:BabyDto})
   babyOutfit(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string,@Body() dto:BabyOutfitDto){return this.babies.setOutfit(u.id,id,dto.outfit);}

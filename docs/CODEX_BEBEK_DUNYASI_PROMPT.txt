@@ -1,0 +1,198 @@
+You are generating the complete art asset pack for "Our Baby World", a cozy virtual-pet game inside a couples' chat app. Two partners raise one child together: they walk the child around a little house and outdoors, bathe, feed, dress and play with them. Your job in this task is ONLY to create image files (PNG) exactly as specified below, plus one manifest file. Do NOT modify, create or delete any source code, styles or configuration in the repository. Another engineer is writing the game code against the exact file names, sizes and anchors in this document, so follow them precisely. If an image cannot be produced perfectly, still produce the closest possible version with the exact file name and canvas size, and list it under "warnings" in the manifest.
+
+====================================================================
+1. OUTPUT LOCATION AND FORMAT
+====================================================================
+- Root folder: client/public/baby/world/
+- Every file is PNG. "Opaque" means a fully painted background. "Transparent" means a real alpha channel with a fully transparent background (no white, no checkerboard pattern painted in, no magenta).
+- Never put text, letters, numbers, logos, signatures, UI labels or watermarks inside any image.
+- Never crop a subject at the canvas edge unless this document says the subject is part of a full background.
+- When everything is done, write client/public/baby/world/manifest.json listing every file you created as { "path": "...", "width": n, "height": n, "transparent": true|false } plus a "warnings" array (empty if none).
+
+====================================================================
+2. ART STYLE BIBLE (applies to EVERY image)
+====================================================================
+Look: a premium, cozy mobile pet game with a soft 3D cartoon look, like smooth vinyl toys or polished clay figures rendered in a modern 3D cartoon film style. Rounded, chunky, friendly shapes; no sharp corners anywhere. Everything should feel touchable and squishy.
+- Lighting: soft warm key light from the TOP-LEFT on every single asset, soft fill light from the right, gentle ambient occlusion in creases, subtle rim light on characters. Lighting direction must be identical across all files so pieces combine into one believable scene.
+- Materials: matte to satin plastics, soft fabrics with visible but gentle fold volume, warm wood with smooth rounded edges, glossy ceramics in the bathroom, shiny water.
+- Color: warm pastel palette with clear contrast: peach, cream, butter yellow, mint, sky blue, lavender, coral pink, warm wood browns. Avoid neon. Avoid gray, muddy or dark-heavy images (night images are dark blue and cozy, never black).
+- Depth: backgrounds use real perspective (see camera rules) with atmospheric depth: things farther away are slightly lighter and less saturated.
+- Shadows: transparent assets have NO cast shadow on the ground (the game adds shadows), but DO have their own soft self-shading and ambient occlusion so they look 3D.
+- Consistency: every character, prop and room must look like it belongs to the same game, made by the same studio, on the same day.
+
+====================================================================
+3. CAMERA RULES FOR SCENES (critical for the game to work)
+====================================================================
+All scene backgrounds share ONE camera:
+- Front view, camera at the eye height of a small child, tilted very slightly down, so the floor is clearly visible and walls rise behind it.
+- Canvas 3072 x 1536 (wide 2:1 panorama; the game pans the camera left and right as the child walks).
+- The line where the back wall meets the floor (or the horizon outdoors) is a straight horizontal line at exactly 56% of the image height (y = 860).
+- The WALKING BAND is the floor area from y = 1000 to y = 1460, across the full width. Keep this band completely free of furniture, objects, rugs with strong patterns, or anything a child could look like they are standing inside. Floors there must be plain and calm (wood planks, tiles, grass, path) so a character can stand anywhere on it.
+- Furniture and decorations in the background stand against the back wall (bottom edges between y = 860 and y = 1000) or at the far left/right ends of the panorama.
+- Leave the left 10% and right 10% of the image as natural "ends" of the room (a wall corner, a door, a big plant, a fence) so panning never reveals emptiness.
+- Scale reference: a door in a back wall is 620 px tall. A 10-year-old child standing on the walking band is about 700 px tall.
+
+====================================================================
+4. THE CHILDREN (two characters, four ages each)
+====================================================================
+If the files client/public/baby/raw/ref-girl.png and client/public/baby/raw/ref-boy.png exist, use them as the identity reference (face shape, hair style and color, eye color, skin tone, family resemblance) and re-render that same identity in the soft 3D style above. If they do not exist, use this description:
+
+GIRL: warm chestnut-brown hair (#7A4A2A) with a small yellow star hair clip on the right side; big round dark-brown eyes with two white highlights; light warm skin; rosy round cheeks; small button nose; a sweet open smile.
+BOY: the girl's brother: same chestnut-brown hair (short, slightly tousled, with a little cowlick on top), same big dark-brown eyes, same skin tone, rosy cheeks, friendly grin.
+
+Ages (the "stage" number is used in file names):
+- stage 1: baby, about 8 months, sitting/crawling, very round, tiny tuft of hair, big head (head is about 50% of total height).
+- stage 2: toddler, about 2 years, standing a bit wobbly, chubby, head about 42% of height.
+- stage 3: child, about 6 years, head about 36% of height.
+- stage 4: big kid, about 10 years, head about 31% of height.
+Chibi proportions throughout (big heads, small bodies, short limbs) but each age must clearly read as older than the previous one.
+
+CHARACTER CANVAS AND ANCHOR (every character file, no exceptions):
+- Canvas 600 x 720, transparent.
+- The character is horizontally centered. The lowest point of the character (feet, or bottom when sitting/crawling) touches y = 696 exactly (24 px empty margin below).
+- Within one stage, every file uses exactly the same scale, so switching poses never makes the child grow or shrink. Stage 4 standing fills about 640 px of height; stage 1 sitting fills about 430 px; stage 2 about 520 px; stage 3 about 590 px.
+- Facing: front-facing (looking at the viewer) unless the pose says "side view". Side views ALWAYS face to the RIGHT (the game mirrors them for walking left).
+
+DEFAULT CLOTHES used in all poses (not outfits):
+- stage 1: a plain soft white onesie.
+- stage 2: white t-shirt with a tiny yellow star and light-blue overalls.
+- stage 3: mint t-shirt, blue shorts or a blue skirt (girl), white sneakers.
+- stage 4: soft pink hoodie (girl) / navy hoodie (boy), grey joggers, white sneakers.
+
+FILES PER CHILD: for gender in [girl, boy] and stage in [1, 2, 3, 4], create all of these in client/public/baby/world/char/{gender}/{stage}/ :
+
+Outfits (front-facing, standing; stage 1 sitting), relaxed happy pose, same pose in all six:
+  outfit-0.png  (the default clothes above)
+  outfit-1.png  stage1 bunny-ear hooded onesie (pink for girl, light blue for boy) | stage2 green dinosaur hoodie with soft spikes | stage3 superhero costume with cape and small eye mask (red/blue for boy, purple/pink for girl) | stage4 school uniform (navy blazer, white shirt, skirt or trousers, backpack on one shoulder)
+  outfit-2.png  stage1 yellow duckling onesie with a little beak hood | stage2 yellow raincoat and red rain boots | stage3 football kit holding a ball | stage4 summer beach outfit with straw sun hat
+  outfit-3.png  stage1 cream knitted sweater set with a matching hat | stage2 cozy pajamas with clouds holding a small teddy | stage3 party outfit (girl: twirly tulle dress; boy: shirt with bow tie) with a party hat | stage4 cozy winter outfit with a red scarf and boots
+  outfit-4.png  stage1 brown teddy-bear onesie with round ears | stage2 strawberry dress (girl) / suspenders and checkered shirt (boy) | stage3 pajamas with stars | stage4 tennis outfit holding a racket
+  outfit-5.png  stage1 white-and-navy sailor outfit | stage2 snowsuit with a pom-pom hat | stage3 artist smock with paint splashes holding a brush | stage4 special-day outfit (girl: lavender dress; boy: light-blue shirt and navy waistcoat)
+
+Moods and actions (default clothes, front-facing unless stated):
+  idle.png      calm happy standing pose, gentle smile (stage 1: sitting)
+  happy.png     very happy, eyes closed in smiling curves, hands raised a little
+  laugh.png     laughing hard as if tickled, eyes squeezed shut, mouth wide open, arms hugging the tummy
+  sneeze.png    mid-sneeze: eyes shut tight, nose scrunched, head tilted forward, shoulders up
+  sad.png       a little sad: pouting, eyebrows up, one small tear
+  cry.png       crying loudly: mouth open, two streams of cartoon tears, eyes shut
+  hungry.png    hungry: holding the tummy, small hopeful pout, looking up
+  sick.png      has a cold: droopy eyes, red nose and cheeks, thermometer in mouth, small blanket around the shoulders
+  sleepy.png    very sleepy: yawning wide, rubbing one eye with a fist
+  sleep.png     asleep sitting/standing upright with eyes closed as soft curves and head tilted (this is shown behind a bed blanket, so the upper body matters most)
+  eat.png       eating happily: holding a small spoon, cheeks puffed, eyes squinting with joy
+  wave.png      waving hello with one hand, big smile
+  jump.png      jumping for joy: both feet off the ground (bottom of the feet at y = 650 instead of 696), arms up (stage 1: bouncing while sitting, arms up)
+  sit.png       sitting on a seat, legs dangling forward, hands resting on the seat edge, front view (the seat itself is NOT drawn; this is used in the high chair, on the swing and in the bath). Bottom of the character at y = 696.
+  bath.png      sitting with the hair full of white foam bubbles, splashing happily with both hands raised (no tub drawn; the tub is a separate layer). Bottom at y = 696.
+  brush.png     brushing teeth with a small toothbrush, foam around the mouth, eyes happy
+  hug.png       arms wide open asking for a hug, big smile
+  dance.png     dancing happily, one leg lifted, arms out
+  walk-1.png, walk-2.png, walk-3.png, walk-4.png
+                SIDE VIEW FACING RIGHT, a smooth 4-frame walk cycle (frame 1 right foot forward contact, 2 passing, 3 left foot forward contact, 4 passing). Stage 1 is a 4-frame CRAWL cycle on hands and knees instead. Same scale and same baseline as every other file of that stage. The head bobs slightly between frames; the body never jumps in position.
+
+That is 26 files per stage, 104 per child, 208 character files in total.
+
+====================================================================
+5. SCENES (backgrounds, foregrounds, interactive props)
+====================================================================
+For each scene create, in client/public/baby/world/scene/{scene}/ :
+  bg-day.png    3072 x 1536, opaque, follows the camera rules
+  bg-night.png  3072 x 1536, opaque, the EXACT same scene and layout at night (only lighting changes: windows show a dark navy sky with stars and a moon, lamps are on with warm cozy pools of light, colors shift to calm blues and warm yellows)
+  fg.png        3072 x 1536, transparent: a few foreground objects very close to the camera that partly frame the view from the bottom corners only (for parallax depth). Keep them low: nothing above y = 1200, nothing in the middle 60% of the width. Examples per scene below.
+Props are separate transparent PNGs with tight canvases (sizes given), drawn from the same camera angle as the background, sized to match the scale reference (door = 620 px tall).
+
+SCENE "nursery" (the child's bedroom, the home screen):
+  Background: soft peach walls with subtle wallpaper of tiny clouds, light warm wooden floor, a big arched window in the center-back with curtains, a door on the far left that leads to the hallway, a shelf with books and plush toys at the back right, a cozy reading corner far right. Walls and floor stay calm in the walking band. Leave an empty, plain wall area 500 px wide centered at x = 1000, y = 450 (a photo frame is placed there by the game).
+  fg.png: a soft plush pillow corner at bottom-left and a potted plant at bottom-right.
+  Props:
+    nursery/bed.png            900 x 700   a small rounded wooden child's bed seen from the front, pillow at the top, with the blanket folded down (child will be placed IN it)
+    nursery/bed-blanket.png    900 x 700   ONLY the blanket of that bed in the exact same position, as if pulled up to the child's chest (drawn over the sleeping child)
+    nursery/lamp-off.png       260 x 420   a cute mushroom-shaped bedside lamp, light off
+    nursery/lamp-on.png        260 x 420   the same lamp switched on, glowing warm
+    nursery/wardrobe.png       560 x 760   a rounded pastel wardrobe with closed doors
+    nursery/wardrobe-open.png  560 x 760   the same wardrobe with doors open, tiny clothes on hangers inside
+    nursery/toybox.png         420 x 340   an open toy box with toys peeking out
+  Night: moon and stars in the window, mushroom lamp glow, a soft nightlight star projector pattern on the ceiling.
+  Theme variants (same layout, same camera, same door/window positions, only the decoration changes), each with day and night:
+    bg-ocean-day.png, bg-ocean-night.png   aqua walls with painted waves and little fish, ship's wheel, seashell shelf
+    bg-space-day.png, bg-space-night.png   lavender walls with planets and stars (stars glow at night), toy rocket shelf, telescope corner
+    bg-garden-day.png, bg-garden-night.png mint walls with painted flowers and butterflies, flower pots, fireflies outside at night
+
+SCENE "kitchen":
+  Background: a bright cozy kitchen with butter-yellow cabinets, mint tiles, a window over the sink with a plant, hanging pans, a fridge on the far right, an archway door on the far left. Wooden floor in the walking band.
+  fg.png: the corner of a fruit basket bottom-left, a kitchen stool bottom-right.
+  Props:
+    kitchen/highchair.png        520 x 820   a rounded wooden high chair seen from the front, empty seat (the child is drawn behind the tray)
+    kitchen/highchair-tray.png   520 x 820   ONLY the front tray of that high chair, same position, drawn over the seated child
+    kitchen/fridge-closed.png    560 x 980   a rounded retro pastel fridge, closed, with a few cute magnets (no text)
+    kitchen/fridge-open.png      560 x 980   the same fridge open, shelves with milk, fruit, a cake and vegetables, a soft inner light
+    kitchen/plate.png            260 x 160   a small plate with a spoon
+
+SCENE "bathroom":
+  Background: a fresh bathroom with white and light-blue tiles, a round mirror, a sink on the left side of the back wall, shelves with towels and bath toys, a small window with frosted glass, a door on the far left. Light tiled floor in the walking band.
+  fg.png: a fluffy bath mat corner bottom-left, a potted fern bottom-right.
+  Props:
+    bathroom/tub-back.png    1000 x 620   the back part of a rounded white clawfoot bathtub with golden feet, filled with light-blue water and foam (everything BEHIND the child)
+    bathroom/tub-front.png   1000 x 620   ONLY the front side of that same tub with a thick pile of white foam bubbles along the rim, same position (drawn IN FRONT of the child so the child appears to sit inside)
+    bathroom/sink.png        420 x 620    a small pedestal sink with a cup and toothbrushes
+    bathroom/duck.png        200 x 200    a glossy yellow rubber duck
+    bathroom/towel.png       320 x 360    a soft hooded towel with bunny ears, folded
+    bathroom/bubble.png      160 x 160    one shiny soap bubble with a rainbow sheen highlight
+    bathroom/foam.png        220 x 180    a fluffy clump of white soap foam
+
+SCENE "garden" (outside the house):
+  Background: a sunny backyard: the side of the cozy house with the back door on the far left, a white picket fence along the back, flower beds, a big round tree at the far right, blue sky with soft clouds, rolling green hills far away. Short soft grass in the walking band.
+  bg-night: starry sky, crescent moon, fireflies as tiny warm dots, glowing porch light by the door.
+  fg.png: tall grass tufts and flowers in the bottom corners.
+  Props:
+    garden/swing-frame.png   900 x 1000   a wooden A-frame swing set (frame only, no seat)
+    garden/swing-seat.png    300 x 760    the swing seat with its two ropes; the rope tops are at the very top center of the canvas (that point is the pivot the game rotates around)
+    garden/sandbox.png       700 x 360    a wooden sandbox with a small bucket and spade
+    garden/ball.png          200 x 200    a glossy red-and-white beach ball
+    garden/butterfly-1.png   160 x 140    a pastel butterfly, wings open
+    garden/butterfly-2.png   160 x 140    the same butterfly, wings half closed
+    garden/flower-pot.png    220 x 280    a terracotta pot with tulips
+    garden/puppy-idle.png    420 x 380    a small fluffy cream-colored puppy companion with floppy ears, sitting, front view, very cute
+    garden/puppy-run-1.png   420 x 380    the same puppy running, side view facing right, frame 1
+    garden/puppy-run-2.png   420 x 380    the same puppy running, side view facing right, frame 2
+    garden/puppy-happy.png   420 x 380    the same puppy jumping happily, tongue out
+
+SCENE "park" (an outing):
+  Background: a cheerful city park: a winding path, a pond on the right side of the back with lily pads, trees, a small ice-cream kiosk in the back left, a playground in the distance, distant city rooftops, blue sky. A light sand-colored path fills the walking band.
+  bg-night: lanterns along the path glowing warm, stars, moon reflected in the pond.
+  fg.png: a park bench end bottom-left, flower bush bottom-right.
+  Props:
+    park/slide.png          800 x 900   a rounded playground slide with steps, pastel colors
+    park/duck-1.png         220 x 180   a cute white duck swimming, side view facing right
+    park/duck-2.png         220 x 180   the same duck, head dipped to eat
+    park/bread.png          140 x 110   a small piece of bread
+    park/icecream.png       200 x 320   a two-scoop ice cream cone (strawberry and vanilla)
+    park/kite.png           360 x 420   a diamond kite in pink and blue with a wavy tail
+    park/balloon.png        200 x 420   a single heart-shaped balloon on a string
+
+====================================================================
+6. ITEMS (transparent, 256 x 256, item centered with 20 px margin)
+====================================================================
+client/public/baby/world/item/
+  food-0 ... food-11: milk bottle, baby food jar with spoon, red apple, banana, chocolate chip cookie, pizza slice, strawberry cake slice, carrot, bowl of soup, orange juice with straw, pink ice cream cone, sandwich. Each food has a tiny cute happy face.
+  toy-0 ... toy-11: teddy bear with bow tie, rubber duck, wooden blocks, red star ball, diamond kite, picture book (no readable text), toy rocket, green chubby dinosaur, rainbow xylophone, bubble wand with bubbles, wooden toy train, friendly robot with a heart.
+  decor-bunting (wide garland of pastel triangle flags; canvas 768 x 256), decor-lights (wide string of round fairy lights; canvas 768 x 256), decor-balloons (bunch of 4 balloons; 256 x 512), decor-mobile (hanging moon-and-stars mobile; 256 x 384), decor-horse (wooden rocking horse; 512 x 512), decor-tent (play teepee with flags; 512 x 512), decor-bunny (big plush pink bunny; 512 x 512)
+  coin.png (a shiny gold coin with an embossed heart), coin-pile.png (a small pile of those coins), medicine.png (pink syrup bottle with a heart symbol and a measuring spoon), thermometer.png, soap.png (a bar of soap with bubbles), toothbrush.png, piggy-bank.png (a cute pink piggy bank), gift.png (a wrapped present with a bow), heart.png (a glossy red heart), star.png (a glossy golden star), photo-frame.png (an empty rounded wooden photo frame, 4:5, with a fully transparent opening in the middle; canvas 256 x 320)
+
+====================================================================
+7. UI ICONS (transparent, 192 x 192, glossy soft-3D app-icon style, no background tile)
+====================================================================
+client/public/baby/world/ui/
+  icon-feed (spoon and bowl), icon-play (teddy and ball), icon-bath (bathtub with bubbles), icon-sleep (crescent moon with a nightcap), icon-wake (smiling sun), icon-hug (two hearts hugging), icon-dress (little shirt on a hanger), icon-shop (shopping bag with a heart), icon-memories (photo album with a heart), icon-map (folded map with a pin), icon-walk (small footprints), icon-medicine (syrup bottle), icon-words (speech bubble with a heart), icon-game (game controller with a heart), icon-outside (door with a sun), icon-home (cozy house), icon-together (two hands making a heart)
+  scene-nursery, scene-kitchen, scene-bathroom, scene-garden, scene-park: small round "location" badges, 256 x 256 transparent, each a tiny 3D diorama of that place on a round floating island base, all in the same style.
+
+====================================================================
+8. FINAL CHECK BEFORE YOU FINISH
+====================================================================
+- Every listed file exists with the exact path, name, canvas size and transparency.
+- The children look like the same two children in every file, and each age is recognizable.
+- All character files of one stage share the same scale and the y = 696 baseline (jump.png is the only exception).
+- Day and night versions of each scene line up pixel for pixel in layout.
+- No text, no watermarks, no cast ground shadows on transparent assets, consistent top-left lighting.
+- manifest.json is written.

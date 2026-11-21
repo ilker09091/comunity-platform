@@ -94,6 +94,68 @@ function AuthField({ id, label, icon, optional, hint, warning, errors, trailing,
 }
 
 /** Product preview on the brand panel: what using Circle looks like. Decorative only. */
+/** A phone cycling through the feed, a chat and the baby world. */
+function PhoneMock() {
+  const people = [
+    { name: "Your story", tone: "#fde2e4", initial: "+" },
+    { name: "deniz", tone: "#d0ebff", initial: "D" },
+    { name: "mert", tone: "#d3f9d8", initial: "M" },
+    { name: "ece", tone: "#fff3bf", initial: "E" },
+    { name: "selin", tone: "#e5dbff", initial: "S" },
+  ];
+  return (
+    <div className="auth2-phone-wrap">
+      <div className="auth2-phone">
+        <span className="auth2-notch" />
+        <div className="auth2-screens">
+          {/* Feed */}
+          <div className="auth2-screen s1">
+            <div className="auth2-bar"><b>Circle</b><span><Heart size={15} /><MessageCircle size={15} /></span></div>
+            <div className="auth2-stories">
+              {people.map((p, i) => (
+                <span key={p.name} className={i > 0 && i < 4 ? "auth2-ring" : ""}>
+                  <i style={{ background: p.tone }}>{p.initial}</i>
+                  <small>{p.name}</small>
+                </span>
+              ))}
+            </div>
+            <div className="auth2-post">
+              <div className="auth2-post-head"><i style={{ background: "#d0ebff" }}>D</i><b>deniz</b><small>· 2m</small></div>
+              <img src="/chatthemes/sunset.webp" alt="" />
+              <div className="auth2-post-actions"><Heart size={15} fill="#ff3040" color="#ff3040" /><MessageCircle size={15} /><Repeat2 size={15} /><Bookmark size={15} /></div>
+              <p><b>128 likes</b></p>
+              <p><b>deniz</b> Sunset walk by the sea tonight 🌅</p>
+            </div>
+          </div>
+          {/* Chat */}
+          <div className="auth2-screen s2">
+            <div className="auth2-bar chat"><i style={{ background: "#fff3bf" }}>E</i><span><b>ece</b><small>Active now</small></span></div>
+            <div className="auth2-chat">
+              <p className="in">Günaydın ☀️</p>
+              <p className="out">Günaydın! Kahve? ☕</p>
+              <p className="in">Akşam film izleyelim mi? 🎬</p>
+              <p className="out">Olur, ben seçiyorum 😄</p>
+              <p className="in">Tamam tamam 🙈</p>
+              <p className="out love">❤️</p>
+            </div>
+            <div className="auth2-compose">Message…</div>
+          </div>
+          {/* Our baby */}
+          <div className="auth2-screen s3">
+            <img className="auth2-world" src="/baby/world/scene/garden/bg-day.webp" alt="" />
+            <img className="auth2-kid" src="/baby/girl-2-1.webp" alt="" />
+            <img className="auth2-pup" src="/baby/world/garden/puppy-idle.webp" alt="" />
+            <span className="auth2-world-tag"><b>Ada</b> · Toddler 💗</span>
+            <span className="auth2-world-hearts"><i>💗</i><i>💕</i><i>💗</i></span>
+          </div>
+        </div>
+      </div>
+      <span className="auth2-float f1"><UserPlus size={14} /> <b>Ece</b> started following you</span>
+      <span className="auth2-float f2"><Heart size={14} fill="#ff3040" color="#ff3040" /> <b>Mert</b> liked your photo</span>
+    </div>
+  );
+}
+
 function Showcase() {
   return (
     <aside className="auth-showcase" aria-hidden="true">
@@ -106,30 +168,8 @@ function Showcase() {
         <p>Post photos and videos, follow the people you care about and join conversations, all in one calm, friendly place.</p>
       </div>
 
-      <div className="auth-stage">
-        <div className="auth-preview-card">
-          <div className="auth-preview-head">
-            <span className="auth-preview-avatar a1">D</span>
-            <div><strong>Deniz</strong><small>@deniz · 2m</small></div>
-          </div>
-          <p>Sunset walk by the sea tonight. Who&apos;s coming next time? 🌅</p>
-          <div className="auth-preview-media"><span /></div>
-          <div className="auth-preview-actions">
-            <span className="liked"><Heart size={15} fill="currentColor" />128</span>
-            <span><MessageCircle size={15} />24</span>
-            <span><Repeat2 size={15} />9</span>
-            <span className="end"><Bookmark size={15} /></span>
-          </div>
-        </div>
-        <div className="auth-toast t1">
-          <span className="auth-preview-avatar a2">E</span>
-          <div><strong>Ece</strong> started following you</div>
-          <UserPlus size={15} />
-        </div>
-        <div className="auth-toast t2">
-          <span className="auth-preview-avatar a3">M</span>
-          <div><strong>Mert</strong> replied: “Count me in!”</div>
-        </div>
+      <div className="auth-stage auth-stage-phone">
+        <PhoneMock />
       </div>
 
       <ul className="auth-showcase-points">

@@ -166,9 +166,18 @@ for (const g of ["girl", "boy"]) {
     names: moods.flatMap((m) => [1, 2, 3, 4].map((s) => `${g}-${s}-${m}`)),
     // Each column is one stage: same scale within a column.
     groups: [0, 1, 2, 3].map((c) => [c, c + 4, c + 8]) });
+  // Part two: reactions to touch and a cold.
+  const moods2 = ["laugh", "sneeze", "sick"];
+  jobs.push({ file: `${g}-moods2.png`, cols: 4, rows: 3, kind: "chars",
+    names: moods2.flatMap((m) => [1, 2, 3, 4].map((s) => `${g}-${s}-${m}`)),
+    groups: [0, 1, 2, 3].map((c) => [c, c + 4, c + 8]) });
 }
 jobs.push({ file: "food.png", cols: 4, rows: 3, kind: "items", size: 256, names: Array.from({ length: 12 }, (_, i) => `food-${i}`) });
 jobs.push({ file: "toys.png", cols: 3, rows: 2, kind: "items", size: 256, names: Array.from({ length: 6 }, (_, i) => `toy-${i}`) });
+jobs.push({ file: "toys2.png", cols: 3, rows: 2, kind: "items", size: 256, names: Array.from({ length: 6 }, (_, i) => `toy-${i + 6}`) });
+jobs.push({ file: "hangs.png", cols: 2, rows: 2, kind: "items", size: 768, names: ["hang-bunting", "hang-lights", "hang-balloons", "hang-mobile"] });
+jobs.push({ file: "floor.png", cols: 2, rows: 2, kind: "items", size: 512, names: ["floor-horse", "floor-tent", "floor-toybox", "floor-bunny"] });
+jobs.push({ file: "care.png", cols: 3, rows: 1, kind: "items", size: 512, names: ["care-tub", "coin", "care-medicine"] });
 jobs.push({ file: "stork.png", cols: 1, rows: 1, kind: "items", size: 512, names: ["stork"] });
 
 fs.mkdirSync(OUT, { recursive: true });
@@ -182,7 +191,8 @@ for (const job of jobs) {
   else await writeItems(img, boxes, job.names, job.size);
   done++;
 }
-for (const room of ["room-day", "room-night"]) {
+const rooms = ["room", "room-ocean", "room-space", "room-garden"].flatMap((r) => [`${r}-day`, `${r}-night`]);
+for (const room of rooms) {
   const file = `${room}.png`;
   if (!fs.existsSync(path.join(RAW, file))) { missing.push(file); continue; }
   console.log(`- ${file}`);

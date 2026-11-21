@@ -1,0 +1,334 @@
+/* =====================================================================
+   Sign in / sign up: the phone showing Circle in the showcase panel.
+   ===================================================================== */
+.auth2 {
+  --a2-line: var(--border);
+  --a2-blue: #0095f6;
+  --a2-field: var(--surface-muted);
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: 32px 20px;
+  background: var(--background);
+  color: var(--text);
+}
+:root[data-theme="dark"] .auth2 {
+  --a2-blue: #1d9bf0;
+  background: #000;
+}
+.auth2-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  width: 100%;
+  max-width: 935px;
+}
+
+/* ---------- The phone ---------- */
+.auth2-phone-wrap {
+  position: relative;
+  display: none;
+  flex: none;
+}
+@media (min-width: 900px) {
+  .auth2-phone-wrap {
+    display: block;
+  }
+}
+.auth2-phone {
+  position: relative;
+  width: 300px;
+  height: 610px;
+  padding: 12px;
+  border-radius: 46px;
+  background: #111317;
+  box-shadow: 0 0 0 2px #2b2f36 inset, 0 30px 60px -20px rgba(20, 24, 40, 0.45);
+  transform: rotate(-3deg);
+}
+.auth2-notch {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  z-index: 3;
+  width: 92px;
+  height: 24px;
+  border-radius: 99px;
+  background: #111317;
+  transform: translateX(-50%);
+}
+.auth2-screens {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 36px;
+  background: #fff;
+  color: #111;
+}
+.auth2-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 46px 12px 12px;
+  background: #fff;
+  opacity: 0;
+  animation: auth2-cycle 15s infinite;
+}
+.auth2-screen.s1 { animation-delay: 0s; }
+.auth2-screen.s2 { animation-delay: 5s; }
+.auth2-screen.s3 { animation-delay: 10s; padding: 0; }
+@keyframes auth2-cycle {
+  0% { opacity: 0; transform: translateY(10px); }
+  4%, 30% { opacity: 1; transform: none; }
+  34%, 100% { opacity: 0; transform: translateY(-6px); }
+}
+.auth2-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 17px;
+}
+.auth2-bar b {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+.auth2-bar span {
+  display: flex;
+  gap: 10px;
+}
+.auth2-bar.chat {
+  justify-content: flex-start;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #efefef;
+  font-size: 13px;
+}
+.auth2-bar.chat span {
+  flex-direction: column;
+  gap: 0;
+}
+.auth2-bar.chat small {
+  color: #8e8e8e;
+  font-size: 10.5px;
+}
+.auth2-phone i {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: #333;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+}
+.auth2-stories {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.auth2-stories span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 46px;
+}
+.auth2-stories i {
+  width: 42px;
+  height: 42px;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #dbdbdb;
+  font-size: 15px;
+}
+.auth2-stories .auth2-ring i {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #ff3d71;
+}
+.auth2-stories small {
+  max-width: 46px;
+  overflow: hidden;
+  color: #262626;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.auth2-post {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0 -12px;
+  font-size: 11px;
+}
+.auth2-post-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+}
+.auth2-post-head small {
+  color: #8e8e8e;
+}
+.auth2-post img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+.auth2-post-actions {
+  display: flex;
+  gap: 10px;
+  padding: 2px 12px 0;
+}
+.auth2-post-actions svg:last-child {
+  margin-left: auto;
+}
+.auth2-post p {
+  margin: 0;
+  padding: 0 12px;
+  line-height: 1.35;
+}
+.auth2-chat {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 8px 0;
+  font-size: 12px;
+}
+.auth2-chat p {
+  max-width: 78%;
+  margin: 0;
+  padding: 7px 11px;
+  border-radius: 16px;
+  line-height: 1.3;
+}
+.auth2-chat .in {
+  align-self: flex-start;
+  background: #efefef;
+}
+.auth2-chat .out {
+  align-self: flex-end;
+  background: #3b82f6;
+  color: #fff;
+}
+.auth2-chat .out.love {
+  padding: 0;
+  background: none;
+  font-size: 26px;
+}
+.auth2-compose {
+  padding: 9px 12px;
+  border: 1px solid #dbdbdb;
+  border-radius: 99px;
+  color: #8e8e8e;
+  font-size: 12px;
+}
+.auth2-world {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 38% 50%;
+}
+.auth2-kid {
+  position: absolute;
+  left: 50%;
+  bottom: 9%;
+  width: 52%;
+  transform: translateX(-50%);
+  animation: auth2-bounce 2.4s ease-in-out infinite;
+}
+.auth2-pup {
+  position: absolute;
+  right: 6%;
+  bottom: 8%;
+  width: 30%;
+}
+@keyframes auth2-bounce {
+  50% { transform: translateX(-50%) translateY(-4%); }
+}
+.auth2-world-tag {
+  position: absolute;
+  top: 48px;
+  left: 14px;
+  padding: 6px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+}
+.auth2-world-hearts i {
+  position: absolute;
+  left: 50%;
+  bottom: 52%;
+  width: auto;
+  height: auto;
+  font-size: 18px;
+  animation: auth2-heart 2.6s ease-out infinite;
+}
+.auth2-world-hearts i:nth-child(2) { animation-delay: 0.8s; margin-left: 24px; }
+.auth2-world-hearts i:nth-child(3) { animation-delay: 1.6s; margin-left: -28px; }
+@keyframes auth2-heart {
+  0% { opacity: 0; transform: translateY(10px) scale(0.6); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-70px) scale(1.1); }
+}
+.auth2-float {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 13px;
+  border: 1px solid var(--a2-line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 12px 30px -12px rgba(20, 24, 40, 0.35);
+  color: var(--text);
+  font-size: 12.5px;
+  white-space: nowrap;
+  animation: auth2-float 5s ease-in-out infinite;
+}
+.auth2-float.f1 {
+  top: 90px;
+  right: -64px;
+}
+.auth2-float.f2 {
+  bottom: 110px;
+  left: -60px;
+  animation-delay: 2.5s;
+}
+@keyframes auth2-float {
+  50% { transform: translateY(-8px); }
+}
+
+/* ---------- Inside the classic showcase panel ---------- */
+.auth-stage-phone {
+  place-items: center;
+}
+.auth-stage-phone .auth2-phone-wrap {
+  --a2-line: rgba(255, 255, 255, 0.5);
+  display: block;
+  margin: 8px auto;
+  zoom: 0.66;
+}
+@media (min-height: 980px) {
+  .auth-stage-phone .auth2-phone-wrap { zoom: 0.8; }
+}
+@media (max-height: 760px) {
+  .auth-stage-phone .auth2-phone-wrap { zoom: 0.52; }
+}
+.auth-stage-phone .auth2-phone {
+  box-shadow: 0 0 0 2px #2b2f36 inset, 0 40px 80px -24px rgba(10, 14, 40, 0.6);
+}
+.auth-stage-phone .auth2-screen {
+  background: #fff;
+  color: #111;
+}
+.auth-stage-phone .auth2-float {
+  background: #fff;
+  color: #111;
+}

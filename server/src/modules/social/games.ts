@@ -1,4 +1,4 @@
-import type { GameKind } from '../../database/migrations/1760193000000-MoreChatGames.js';
+import type { GameKind } from '../../database/migrations/1760193400000-TalkGames.js';
 
 /** Pure rules for the in-chat mini games; the service only stores and authorizes. */
 
@@ -9,7 +9,14 @@ export type RpsState = { picks: (RpsChoice | null)[]; scores: number[]; rounds: 
 /** Memory: `shown` is the last mismatched pair, visible until the next card is turned. */
 export type MemoryState = { cards: string[]; owners: number[]; flipped: number[]; shown: number[]; scores: number[] };
 export type TotState = { order: number[]; round: number; picks: (TotChoice | null)[]; rounds: { q: number; answers: TotChoice[] }[] };
-export type GameState = BoardState | RpsState | MemoryState | TotState;
+/** Q&A: one asks, the other answers; "what do you mean?" lets the answerer ask back first. */
+export type QaRound = { asker: number; question: string | null; clarify: string | null; clarification: string | null; answer: string | null };
+export type QaState = { rounds: QaRound[]; phase: 'ask' | 'answer' | 'explain'; chances: number[]; total: number };
+/** Truth or dare: `player` picks, the other writes the question or dare, `player` replies (or passes). */
+export type TodRound = { player: number; pick: 'truth' | 'dare' | null; prompt: string | null; reply: string | null; passed: boolean };
+export type TodState = { rounds: TodRound[]; phase: 'pick' | 'prompt' | 'reply'; chances: number[]; total: number };
+export type GameState = BoardState | RpsState | MemoryState | TotState | QaState | TodState;
+export type GameMove = { cell?: number; choice?: string; action?: string; text?: string };
 export type GameStatus = 'active' | 'won' | 'draw' | 'done';
 
 export type Outcome = { state: GameState; next: number | null; status: GameStatus; winner: number | null };
@@ -49,7 +56,26 @@ export const THIS_OR_THAT: [string, string][] = [
   ['Chocolate', 'Ice cream'],
 ];
 
+/** Q&A: six questions (three each), and two "what do you mean?" per player. */
+export const QA_ROUNDS = 6;
+export const QA_CLARIFY = 2;
+/** Truth or dare: eight turns (four each), and two passes per player. */
+export const TOD_ROUNDS = 8;
+export const TOD_PASSES = 2;
+export const TEXT_MAX = 300;
+
 export class GameRuleError extends Error {}
+
+const qaRound = (asker: number): QaRound => ({ asker, question: null, clarify: null, clarification: null, answer: null });
+const todRound = (player: number): TodRound => ({ player, pick: null, prompt: null, reply: null, passed: false });
+
+/** Written moves: trimmed, never empty, never longer than TEXT_MAX. */
+function written(text: string | undefined) {
+  const t = (text ?? '').trim();
+  if (!t) throw new GameRuleError('Write something first');
+  if (t.length > TEXT_MAX) throw new GameRuleError(`Keep it under ${TEXT_MAX} characters`);
+  return t;
+}
 
 function shuffle<T>(items: T[], random: () => number) {
   const out = [...items];
@@ -70,6 +96,10 @@ export function initialState(kind: GameKind, random: () => number = Math.random)
       return { order: shuffle(THIS_OR_THAT.map((_, i) => i), random).slice(0, TOT_ROUNDS), round: 0, picks: [null, null], rounds: [] };
     case 'gomoku':
       return { board: new Array(GOMOKU_SIZE * GOMOKU_SIZE).fill(0), line: [] };
+    case 'qa':
+      return { rounds: [qaRound(0)], phase: 'ask', chances: [QA_CLARIFY, QA_CLARIFY], total: QA_ROUNDS };
+    case 'tod':
+      return { rounds: [todRound(0)], phase: 'pick', chances: [TOD_PASSES, TOD_PASSES], total: TOD_ROUNDS };
     case 'connect4':
       return { board: new Array(C4_COLS * C4_ROWS).fill(0), line: [] };
     default:
@@ -114,7 +144,7 @@ export function applyMove(
   current: GameState,
   player: number,
   turn: number | null,
-  move: { cell?: number; choice?: string },
+  move: GameMove,
 ): Outcome {
   if (kind === 'rps') {
     const state = structuredClone(current as RpsState);
@@ -149,6 +179,68 @@ export function applyMove(
   }
 
   if (turn !== player) throw new GameRuleError("It's not your turn");
+
+  if (kind === 'qa') {
+    const state = structuredClone(current as QaState);
+    const round = state.rounds[state.rounds.length - 1];
+    const answerer = 1 - round.asker;
+    if (state.phase === 'ask') {
+      if (move.action !== 'ask') throw new GameRuleError('Ask your question');
+      round.question = written(move.text);
+      state.phase = 'answer';
+      return { state, next: answerer, status: 'active', winner: null };
+    }
+    if (state.phase === 'explain') {
+      if (move.action !== 'explain') throw new GameRuleError('Explain what you meant');
+      round.clarification = written(move.text);
+      state.phase = 'answer';
+      return { state, next: answerer, status: 'active', winner: null };
+    }
+    if (move.action === 'clarify') {
+      if (round.clarify !== null) throw new GameRuleError('You already asked about this question');
+      if (state.chances[player] <= 0) throw new GameRuleError('No "what do you mean?" left');
+      round.clarify = written(move.text);
+      state.chances[player]--;
+      state.phase = 'explain';
+      return { state, next: round.asker, status: 'active', winner: null };
+    }
+    if (move.action !== 'answer') throw new GameRuleError('Answer the question');
+    round.answer = written(move.text);
+    if (state.rounds.length >= state.total) return { state, next: null, status: 'done', winner: null };
+    // Roles swap: whoever answered asks next.
+    state.rounds.push(qaRound(answerer));
+    state.phase = 'ask';
+    return { state, next: answerer, status: 'active', winner: null };
+  }
+
+  if (kind === 'tod') {
+    const state = structuredClone(current as TodState);
+    const round = state.rounds[state.rounds.length - 1];
+    const other = 1 - round.player;
+    if (state.phase === 'pick') {
+      if (move.action !== 'pick' || (move.choice !== 'truth' && move.choice !== 'dare')) throw new GameRuleError('Pick truth or dare');
+      round.pick = move.choice;
+      state.phase = 'prompt';
+      return { state, next: other, status: 'active', winner: null };
+    }
+    if (state.phase === 'prompt') {
+      if (move.action !== 'prompt') throw new GameRuleError(round.pick === 'dare' ? 'Write a dare' : 'Write a question');
+      round.prompt = written(move.text);
+      state.phase = 'reply';
+      return { state, next: round.player, status: 'active', winner: null };
+    }
+    if (move.action === 'pass') {
+      if (state.chances[player] <= 0) throw new GameRuleError('No passes left');
+      state.chances[player]--;
+      round.passed = true;
+    } else if (move.action === 'reply') {
+      round.reply = written(move.text);
+    } else throw new GameRuleError('Reply or pass');
+    if (state.rounds.length >= state.total) return { state, next: null, status: 'done', winner: null };
+    state.rounds.push(todRound(other));
+    state.phase = 'pick';
+    return { state, next: other, status: 'active', winner: null };
+  }
 
   if (kind === 'memory') {
     const state = structuredClone(current as MemoryState);

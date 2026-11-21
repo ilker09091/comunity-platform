@@ -555,6 +555,66 @@ export const endpoints = {
     "method": "POST",
     "authenticated": true
   },
+  "babyBath": {
+    "path": "/api/messages/baby/{babyId}/bath",
+    "method": "POST",
+    "authenticated": true
+  },
+  "babySleep": {
+    "path": "/api/messages/baby/{babyId}/sleep",
+    "method": "POST",
+    "authenticated": true
+  },
+  "babyWake": {
+    "path": "/api/messages/baby/{babyId}/wake",
+    "method": "POST",
+    "authenticated": true
+  },
+  "babyHug": {
+    "path": "/api/messages/baby/{babyId}/hug",
+    "method": "POST",
+    "authenticated": true
+  },
+  "babyMedicine": {
+    "path": "/api/messages/baby/{babyId}/medicine",
+    "method": "POST",
+    "authenticated": true
+  },
+  "babyBuy": {
+    "path": "/api/messages/baby/{babyId}/shop",
+    "method": "POST",
+    "authenticated": true
+  },
+  "babyPlace": {
+    "path": "/api/messages/baby/{babyId}/decor",
+    "method": "PUT",
+    "authenticated": true
+  },
+  "babyPhoto": {
+    "path": "/api/messages/baby/{babyId}/photo",
+    "method": "PUT",
+    "authenticated": true
+  },
+  "babyTeach": {
+    "path": "/api/messages/baby/{babyId}/words",
+    "method": "POST",
+    "authenticated": true
+  },
+  "babyHere": {
+    "path": "/api/messages/baby/{babyId}/here",
+    "method": "POST",
+    "authenticated": true
+  },
+  "babySignal": {
+    "path": "/api/messages/baby/{babyId}/signal",
+    "method": "POST",
+    "authenticated": true
+  },
+  "babyMemories": {
+    "path": "/api/messages/baby/{babyId}/memories",
+    "method": "GET",
+    "authenticated": true
+  },
   "babyOutfit": {
     "path": "/api/messages/baby/{babyId}/outfit",
     "method": "PUT",

@@ -17,11 +17,12 @@ import {
   MinLength,
 } from 'class-validator';
 import { CursorQueryDto } from '../../common/dto/common.dto.js';
-import { GAME_KINDS, type GameKind } from '../../database/migrations/1760193000000-MoreChatGames.js';
+import { GAME_KINDS, type GameKind } from '../../database/migrations/1760193400000-TalkGames.js';
 import { CHAT_THEMES, type ChatTheme } from '../../database/migrations/1760192700000-StrictStreaksAndChatThemes.js';
 import { SanitizedText } from '../../common/utils/sanitize.js';
 import { MediaDto } from '../media/dto/media.dto.js';
 import { PostDto } from '../posts/dto/post.dto.js';
+import { DECOR_SLOTS, SCENES, SHOP_IDS, SIGNALS, type DecorSlot, type Scene, type Signal } from './baby.js';
 import { UserSummaryDto } from '../users/dto/user.dto.js';
 
 export class SendMessageDto {
@@ -176,6 +177,33 @@ export class BabyCareDto {
   @ApiProperty() plays: number;
   @ApiProperty() chats: number;
   @ApiProperty() games: number;
+  @ApiProperty() baths: number;
+  @ApiProperty() sleeps: number;
+}
+export class BabyDecorStateDto {
+  @ApiProperty({ type: String, nullable: true, description: 'Room theme item id; null is the default room' }) room: string | null;
+  @ApiProperty({ type: String, nullable: true }) hang: string | null;
+  @ApiProperty({ type: String, nullable: true }) floor: string | null;
+  @ApiProperty({ type: String, nullable: true, description: '"frame" when the photo frame hangs on the wall' }) frame: string | null;
+}
+export class BabyMomentDto {
+  @ApiProperty({ format: 'uuid' }) id: string;
+  @ApiProperty({ enum: ['born', 'stage', 'word', 'firsthug', 'healed', 'bought'] }) kind: string;
+  @ApiProperty({ type: Number, nullable: true, description: 'Stage at that moment (born, stage)' }) stage: number | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'Outfit at that moment (born, stage)' }) outfit: number | null;
+  @ApiProperty({ type: String, nullable: true, description: 'The word (word)' }) word: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Shop item id (bought)' }) item: string | null;
+  @ApiProperty({ type: String, nullable: true, format: 'uuid', description: 'Parent who made it happen, if one did' }) byId: string | null;
+  @ApiProperty({ format: 'date-time' }) createdAt: string;
+}
+export class BabyWordDto {
+  @ApiProperty() word: string;
+  @ApiProperty({ type: String, nullable: true, format: 'uuid' }) taughtBy: string | null;
+  @ApiProperty({ format: 'date-time' }) learnedAt: string;
+}
+export class BabyMemoriesDto {
+  @ApiProperty({ type: () => BabyMomentDto, isArray: true, description: 'Newest first' }) moments: BabyMomentDto[];
+  @ApiProperty({ type: () => BabyWordDto, isArray: true, description: 'Newest first' }) words: BabyWordDto[];
 }
 export class BabyDto extends BabyInviteDto {
   @ApiProperty({ type: String, nullable: true, format: 'date-time' }) bornAt: string | null;
@@ -187,7 +215,23 @@ export class BabyDto extends BabyInviteDto {
   @ApiProperty({ type: Number, nullable: true, description: 'XP for the next stage; null at the last stage' }) nextStageXp: number | null;
   @ApiProperty({ description: '0-100, runs down over about 16 hours' }) fullness: number;
   @ApiProperty({ description: '0-100, runs down over about 36 hours' }) happiness: number;
-  @ApiProperty({ enum: ['happy', 'hungry', 'sad'] }) mood: 'happy' | 'hungry' | 'sad';
+  @ApiProperty({ description: '0-100, runs down over about 40 hours; a bath fills it' }) clean: number;
+  @ApiProperty({ description: '0-100: runs down while awake, fills up while asleep' }) energy: number;
+  @ApiProperty() asleep: boolean;
+  @ApiProperty({ description: 'Has a cold: grows at half speed until both parents give medicine' }) sick: boolean;
+  @ApiProperty({ description: 'You already gave medicine for this cold' }) medicineMine: boolean;
+  @ApiProperty({ description: 'The other parent already gave medicine for this cold' }) medicineTheirs: boolean;
+  @ApiProperty({ enum: ['happy', 'hungry', 'sad', 'sick', 'sleepy', 'dirty'] }) mood: 'happy' | 'hungry' | 'sad' | 'sick' | 'sleepy' | 'dirty';
+  @ApiProperty({ description: 'Shared piggy bank' }) coins: number;
+  @ApiProperty({ type: String, isArray: true, description: 'Shop items bought' }) owned: string[];
+  @ApiProperty({ type: () => BabyDecorStateDto }) decor: BabyDecorStateDto;
+  @ApiProperty({ type: String, nullable: true, description: 'Photo in the frame on the wall' }) photoUrl: string | null;
+  @ApiProperty({ type: String, nullable: true, format: 'date-time' }) myHugAt: string | null;
+  @ApiProperty({ type: String, nullable: true, format: 'date-time' }) theirHugAt: string | null;
+  @ApiProperty({ description: 'You both hugged within a few minutes of each other today' }) familyHugToday: boolean;
+  @ApiProperty() familyHugs: number;
+  @ApiProperty({ type: String, isArray: true, description: 'Words the child can say, newest first (up to 40)' }) words: string[];
+  @ApiProperty({ type: () => BabyMomentDto, nullable: true, description: 'Newest page of the memory book' }) latestMoment: BabyMomentDto | null;
   @ApiProperty({ description: 'Outfit index 0-5 for the current stage' }) outfit: number;
   @ApiProperty({ type: () => BabyCareDto, description: 'What you did today (UTC day)' }) mine: BabyCareDto;
   @ApiProperty({ type: () => BabyCareDto, description: 'What the other parent did today' }) theirs: BabyCareDto;
@@ -204,6 +248,41 @@ export class StartBabyDto {
 export class BabyItemDto {
   @ApiProperty({ description: 'Food (0-11) or toy (0-5) index' }) @Type(() => Number) @IsInt() @Min(0) @Max(11) item: number;
 }
+export class BabyBuyDto {
+  @ApiProperty({ enum: SHOP_IDS }) @IsIn(SHOP_IDS) item: string;
+}
+export class BabyPlaceDto {
+  @ApiProperty({ enum: DECOR_SLOTS }) @IsIn([...DECOR_SLOTS]) slot: DecorSlot;
+  @ApiProperty({ type: String, nullable: true, enum: SHOP_IDS, description: 'An item you own for that slot; null clears it' })
+  @IsOptional() @IsIn(SHOP_IDS) item: string | null;
+}
+export class BabyPhotoDto {
+  @ApiProperty({ type: String, nullable: true, format: 'uuid', description: 'A photo message from this chat; null removes the photo' })
+  @IsOptional() @IsUUID() messageId: string | null;
+}
+export class BabyTeachDto {
+  @ApiProperty({ minLength: 1, maxLength: 20 }) @IsString() @MinLength(1) @MaxLength(20) @SanitizedText() word: string;
+}
+export class BabyHereDto {
+  @ApiProperty({ enum: SCENES, description: 'Where you are in the baby world' }) @IsIn([...SCENES]) scene: Scene;
+  @ApiPropertyOptional({ description: 'Last signal id you already have; only newer ones come back' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) since?: number;
+}
+export class BabySignalDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ enum: SIGNALS }) kind: Signal;
+  @ApiProperty({ format: 'uuid' }) fromId: string;
+  @ApiProperty({ format: 'date-time' }) createdAt: string;
+}
+export class BabyTogetherDto {
+  @ApiProperty({ description: 'The other parent has the baby open right now' }) partnerHere: boolean;
+  @ApiProperty({ type: String, nullable: true, enum: SCENES, description: 'Where the other parent is, while here' }) partnerScene: Scene | null;
+  @ApiProperty({ type: () => BabySignalDto, isArray: true, description: 'Signals from the other parent newer than `since`' }) signals: BabySignalDto[];
+  @ApiProperty({ description: 'Pass this as `since` next time' }) cursor: number;
+}
+export class BabySendSignalDto {
+  @ApiProperty({ enum: SIGNALS }) @IsIn([...SIGNALS]) kind: Signal;
+}
 export class BabyOutfitDto {
   @ApiProperty({ minimum: 0, maximum: 5 }) @Type(() => Number) @IsInt() @Min(0) @Max(5) outfit: number;
 }
@@ -211,6 +290,15 @@ export class GameRoundDto {
   @ApiProperty({ type: String, isArray: true, description: 'Choices of players[0] and players[1]' }) choices: string[];
   @ApiProperty({ type: Number, nullable: true, description: 'Index of the round winner in players; null for a tie' }) winner: number | null;
   @ApiProperty({ type: String, isArray: true, description: 'This or That: the two options of that question' }) labels: string[];
+}
+export class GameTurnDto {
+  @ApiProperty({ description: 'Q&A: index of who asks. Truth or Dare: index of who picks and replies' }) who: number;
+  @ApiProperty({ type: String, nullable: true, enum: ['truth', 'dare'] }) pick: 'truth' | 'dare' | null;
+  @ApiProperty({ type: String, nullable: true, description: 'The question (Q&A) or the truth question / dare' }) question: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Q&A: "what do you mean?" from the answerer' }) clarify: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Q&A: what the asker meant' }) clarification: string | null;
+  @ApiProperty({ type: String, nullable: true }) answer: string | null;
+  @ApiProperty({ description: 'Truth or Dare: skipped with a pass' }) passed: boolean;
 }
 export class ChatGameDto {
   @ApiProperty({ format: 'uuid' }) id: string;
@@ -234,6 +322,9 @@ export class ChatGameDto {
   @ApiProperty({ type: String, nullable: true, description: "Your pick in the current rock-paper-scissors round (theirs stays hidden)" })
   myChoice: string | null;
   @ApiProperty({ description: 'The other player already picked in the current round' }) peerReady: boolean;
+  @ApiProperty({ type: String, nullable: true, description: 'Q&A: ask | answer | explain. Truth or Dare: pick | prompt | reply' }) phase: string | null;
+  @ApiProperty({ type: () => GameTurnDto, isArray: true, description: 'Q&A and Truth or Dare turns so far (the last one is in progress)' }) turns: GameTurnDto[];
+  @ApiProperty({ type: Number, isArray: true, description: 'Q&A: "what do you mean?" left; Truth or Dare: passes left (per player)' }) chances: number[];
   @ApiProperty({ format: 'date-time' }) updatedAt: string;
 }
 export class StartGameDto {
@@ -242,8 +333,13 @@ export class StartGameDto {
 export class GameMoveDto {
   @ApiPropertyOptional({ description: 'Board cell (XOX, Five in a Row, Memory) or column (Connect Four)' })
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(80) cell?: number;
-  @ApiPropertyOptional({ enum: ['rock', 'paper', 'scissors', 'a', 'b'], description: 'Rock-paper-scissors pick, or This or That answer' })
-  @IsOptional() @IsIn(['rock', 'paper', 'scissors', 'a', 'b']) choice?: 'rock' | 'paper' | 'scissors' | 'a' | 'b';
+  @ApiPropertyOptional({ enum: ['rock', 'paper', 'scissors', 'a', 'b', 'truth', 'dare'], description: 'Rock-paper-scissors pick, This or That answer, or truth/dare' })
+  @IsOptional() @IsIn(['rock', 'paper', 'scissors', 'a', 'b', 'truth', 'dare']) choice?: 'rock' | 'paper' | 'scissors' | 'a' | 'b' | 'truth' | 'dare';
+  @ApiPropertyOptional({ enum: ['ask', 'answer', 'clarify', 'explain', 'pick', 'prompt', 'reply', 'pass'], description: 'Q&A and Truth or Dare moves' })
+  @IsOptional() @IsIn(['ask', 'answer', 'clarify', 'explain', 'pick', 'prompt', 'reply', 'pass'])
+  action?: 'ask' | 'answer' | 'clarify' | 'explain' | 'pick' | 'prompt' | 'reply' | 'pass';
+  @ApiPropertyOptional({ maxLength: 300, description: 'Written move: a question, answer, dare or explanation' })
+  @IsOptional() @IsString() @MaxLength(300) @SanitizedText({ multiline: true }) text?: string;
 }
 export class ChatPrefsResultDto {
   @ApiProperty({ type: String, nullable: true }) nickname: string | null;

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronRight, ImagePlus, Loader2, Palette, RotateCcw, Trash2 } from "lucide-react";
+import { Check, ChevronRight, ImagePlus, Loader2, Palette, RotateCcw, Send, Trash2 } from "lucide-react";
 import { api, upload, type Models } from "@/lib/api/client";
 import { compressImage } from "@/lib/compress-image";
 import { haptic } from "@/lib/haptics";
@@ -16,6 +16,8 @@ export type GameKind = Game["kind"];
 type Peer = Models["MessagePeerDto"];
 
 export const GAMES: { kind: GameKind; name: string; blurb: string; icon: string; tone: string }[] = [
+  { kind: "qa", name: "Q&A", blurb: "Ask each other anything, take turns", icon: "💬", tone: "#e6fcf5" },
+  { kind: "tod", name: "Truth or Dare", blurb: "Pick truth or dare, the other one decides", icon: "🎲", tone: "#ffe8f0" },
   { kind: "thisorthat", name: "This or That", blurb: "Answer in secret, see if you think alike", icon: "💞", tone: "#ffe3ec" },
   { kind: "memory", name: "Memory", blurb: "Find the pairs, take turns", icon: "🃏", tone: "#e7f5ff" },
   { kind: "xox", name: "Tic-tac-toe", blurb: "Three in a row wins", icon: "⭕", tone: "#fff0f6" },
@@ -37,7 +39,7 @@ export const GESTURES = [
 
 const RPS = { rock: "✊", paper: "✋", scissors: "✌️" } as const;
 type RpsChoice = keyof typeof RPS;
-type Move = { cell?: number; choice?: RpsChoice | "a" | "b" };
+type Move = { cell?: number; choice?: RpsChoice | "a" | "b" | "truth" | "dare"; action?: Models["GameMoveDto"]["action"]; text?: string };
 const C4_COLS = 7;
 const C4_ROWS = 6;
 
@@ -45,6 +47,8 @@ const C4_ROWS = 6;
 function predict(game: Game, me: number, move: Move): Game {
   if (game.kind === "rps" || game.kind === "thisorthat") return { ...game, myChoice: move.choice ?? null };
   if (game.kind === "memory") return game;
+  // Written games: just lock the controls until the server answers.
+  if (game.kind === "qa" || game.kind === "tod") return { ...game, turnId: null };
   const board = [...game.board];
   let cell = move.cell!;
   if (game.kind === "connect4") {
@@ -98,7 +102,8 @@ export function GameCard({
       return typeof document !== "undefined" && document.visibilityState === "visible" ? 1500 : false;
     },
   });
-  const game = query.data;
+  // Older servers don't send the written-game fields yet: default them so nothing breaks.
+  const game: Game = { ...query.data, turns: query.data.turns ?? [], chances: query.data.chances ?? [], phase: query.data.phase ?? null };
   const me = game.players.indexOf(user?.id ?? "");
   const move = useMutation({
     mutationFn: (body: Move) => api("messagesGameMove", { params: { gameId: game.id }, body }),
@@ -135,7 +140,13 @@ export function GameCard({
       : game.status === "draw"
         ? "It's a draw 🤝"
         : game.status === "done"
-          ? `You think alike on ${matches} of ${game.rounds.length} 💞`
+          ? game.kind === "qa" ? "Great talk 💬" : game.kind === "tod" ? "What a game 🎲" : `You think alike on ${matches} of ${game.rounds.length} 💞`
+          : game.kind === "qa" || game.kind === "tod"
+            ? myTurn
+              ? game.kind === "qa"
+                ? game.phase === "ask" ? "Your turn to ask" : game.phase === "explain" ? `${peerName} asks what you mean` : "Your turn to answer"
+                : game.phase === "pick" ? "Truth or dare?" : game.phase === "prompt" ? `Write ${peerName}'s ${game.turns[game.turns.length - 1]?.pick === "dare" ? "dare" : "question"}` : "Your turn to reply"
+              : `${peerName}'s turn`
           : simultaneous
             ? game.myChoice
               ? `Waiting for ${peerName}…`
@@ -306,10 +317,180 @@ export function GameCard({
         </div>
       )}
 
+      {(game.kind === "qa" || game.kind === "tod") && (
+        <TalkBoard game={game} me={me} peer={peer} busy={move.isPending} myTurn={playable} onMove={(m) => move.mutate(m)} />
+      )}
+
       {game.status !== "active" && onRematch && (
         <button type="button" className="dm-game-rematch" onClick={() => onRematch(game.kind)}>
           <RotateCcw size={15} /> Play again
         </button>
+      )}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------------------------- */
+/* Q&A and Truth or Dare: games you play by writing to each other.                               */
+
+/** A written move: you type it yourselves, then send. */
+function TalkInput({ placeholder, initial = "", busy, onSend, cta = "Send" }: {
+  placeholder: string; initial?: string; busy: boolean; onSend: (text: string) => void; cta?: string;
+}) {
+  const [text, setText] = useState(initial);
+  const area = useRef<HTMLTextAreaElement>(null);
+  return (
+    <form className="dm-talk-input" onSubmit={(e) => { e.preventDefault(); if (text.trim() && !busy) onSend(text.trim()); }}>
+      <textarea
+        ref={area}
+        value={text}
+        rows={2}
+        maxLength={300}
+        placeholder={placeholder}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (text.trim() && !busy) onSend(text.trim()); } }}
+      />
+      <span className="dm-talk-input-row">
+        <small>{text.length}/300</small>
+        <button type="submit" className="dm-talk-send" disabled={!text.trim() || busy}>
+          {busy ? <Loader2 size={15} className="spin" /> : <Send size={15} />} {cta}
+        </button>
+      </span>
+    </form>
+  );
+}
+
+/** One finished or ongoing turn, as a little conversation. */
+function TalkTurn({ game, turn, index, me, peer }: { game: Game; turn: Models["GameTurnDto"]; index: number; me: number; peer: Peer }) {
+  const { user } = useSession();
+  const qa = game.kind === "qa";
+  const who = (i: number) => (game.players[i] === user?.id ? user : peer);
+  const name = (i: number) => (i === me ? "You" : peer.displayName.split(" ")[0]);
+  const asker = qa ? turn.who : 1 - turn.who;
+  const answerer = 1 - asker;
+  if (!turn.question && !(game.kind === "tod" && turn.pick)) return null;
+  return (
+    <li className="dm-talk-turn">
+      <span className="dm-talk-num">{index + 1}</span>
+      {game.kind === "tod" && turn.pick && (
+        <span className={`dm-talk-pick ${turn.pick}`}>{name(turn.who)} picked {turn.pick === "truth" ? "Truth 🤫" : "Dare 🔥"}</span>
+      )}
+      {turn.question && (
+        <div className={`dm-talk-line q ${asker === me ? "mine" : ""}`}>
+          <Avatar user={who(asker)} size={20} />
+          <p><b>{qa ? "Q" : turn.pick === "dare" ? "Dare" : "Truth"}</b>{turn.question}</p>
+        </div>
+      )}
+      {turn.clarify && (
+        <div className={`dm-talk-line ask ${answerer === me ? "mine" : ""}`}>
+          <Avatar user={who(answerer)} size={20} />
+          <p><b>🤔</b>{turn.clarify}</p>
+        </div>
+      )}
+      {turn.clarification && (
+        <div className={`dm-talk-line explain ${asker === me ? "mine" : ""}`}>
+          <Avatar user={who(asker)} size={20} />
+          <p><b>💡</b>{turn.clarification}</p>
+        </div>
+      )}
+      {turn.answer && (
+        <div className={`dm-talk-line a ${answerer === me ? "mine" : ""}`}>
+          <Avatar user={who(answerer)} size={20} />
+          <p><b>{qa ? "A" : turn.pick === "dare" ? "✓" : "A"}</b>{turn.answer}</p>
+        </div>
+      )}
+      {turn.passed && <span className="dm-talk-passed">{name(turn.who)} passed 🙈</span>}
+    </li>
+  );
+}
+
+/** Q&A and Truth or Dare boards: history, then what you can do right now. */
+function TalkBoard({ game, me, peer, busy, myTurn, onMove }: {
+  game: Game; me: number; peer: Peer; busy: boolean; myTurn: boolean; onMove: (move: Move) => void;
+}) {
+  const [clarifying, setClarifying] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const peerName = peer.displayName.split(" ")[0];
+  const turns = game.turns;
+  const current = turns[turns.length - 1];
+  const active = game.status === "active";
+  // While playing, the last two turns; afterwards, everything.
+  const visible = active && !showAll ? turns.slice(-2) : turns;
+  const offset = turns.length - visible.length;
+  const chancesLeft = game.chances[me] ?? 0;
+  const qa = game.kind === "qa";
+  return (
+    <div className={`dm-talk ${game.kind}`}>
+      <div className="dm-talk-progress" aria-label={`Turn ${Math.min(turns.length, game.totalRounds)} of ${game.totalRounds}`}>
+        {Array.from({ length: game.totalRounds }, (_, i) => (
+          <i key={i} className={i < turns.length - (active ? 1 : 0) ? "done" : i === turns.length - 1 && active ? "now" : ""} />
+        ))}
+      </div>
+      {offset > 0 && (
+        <button type="button" className="dm-talk-more" onClick={() => setShowAll(true)}>Show {offset} earlier</button>
+      )}
+      {visible.some((t) => t.question || t.pick) && (
+        <ol className="dm-talk-turns">
+          {visible.map((t, i) => <TalkTurn key={offset + i} game={game} turn={t} index={offset + i} me={me} peer={peer} />)}
+        </ol>
+      )}
+
+      {active && current && !myTurn && (
+        <p className="dm-talk-wait">
+          <span className="dm-talk-dots" aria-hidden="true"><i /><i /><i /></span>
+          {qa
+            ? game.phase === "ask" ? `${peerName} is writing a question…` : game.phase === "explain" ? `${peerName} is explaining…` : `${peerName} is answering…`
+            : game.phase === "pick" ? `${peerName} is choosing truth or dare…` : game.phase === "prompt" ? `${peerName} is writing your ${current.pick === "dare" ? "dare" : "question"}…` : `${peerName} is replying…`}
+        </p>
+      )}
+
+      {active && current && myTurn && qa && game.phase === "ask" && (
+        <TalkInput key={`ask-${turns.length}`} placeholder={`Ask ${peerName} anything…`} busy={busy} cta="Ask" onSend={(text) => onMove({ action: "ask", text })} />
+      )}
+      {active && current && myTurn && qa && game.phase === "answer" && (
+        clarifying ? (
+          <div className="dm-talk-clarify">
+            <TalkInput key={`clarify-${turns.length}`} placeholder="What didn't you understand?" initial="What do you mean? 🤔" busy={busy} cta="Ask back"
+              onSend={(text) => { setClarifying(false); onMove({ action: "clarify", text }); }} />
+            <button type="button" className="dm-talk-link" onClick={() => setClarifying(false)}>Never mind, I&apos;ll answer</button>
+          </div>
+        ) : (
+          <>
+            <TalkInput key={`answer-${turns.length}`} placeholder="Your answer…" busy={busy} cta="Answer" onSend={(text) => onMove({ action: "answer", text })} />
+            {!current.clarify && (
+              <button type="button" className="dm-talk-chance" disabled={chancesLeft <= 0 || busy} onClick={() => { haptic("tap"); setClarifying(true); }}>
+                🤔 Didn&apos;t get it? Ask what they mean <em>{chancesLeft} left</em>
+              </button>
+            )}
+          </>
+        )
+      )}
+      {active && current && myTurn && qa && game.phase === "explain" && (
+        <TalkInput key={`explain-${turns.length}`} placeholder={`Explain your question to ${peerName}…`} busy={busy} cta="Explain" onSend={(text) => onMove({ action: "explain", text })} />
+      )}
+
+      {active && current && myTurn && !qa && game.phase === "pick" && (
+        <div className="dm-tod-picks" role="group" aria-label="Truth or dare">
+          <button type="button" className="truth" disabled={busy} onClick={() => onMove({ action: "pick", choice: "truth" })}>
+            <span>🤫</span><b>Truth</b><small>Answer honestly</small>
+          </button>
+          <button type="button" className="dare" disabled={busy} onClick={() => onMove({ action: "pick", choice: "dare" })}>
+            <span>🔥</span><b>Dare</b><small>Do the challenge</small>
+          </button>
+        </div>
+      )}
+      {active && current && myTurn && !qa && game.phase === "prompt" && (
+        <TalkInput key={`prompt-${turns.length}`} placeholder={current.pick === "dare" ? `Write a dare for ${peerName}…` : `Ask ${peerName} a truth question…`} busy={busy} cta={current.pick === "dare" ? "Dare" : "Ask"}
+          onSend={(text) => onMove({ action: "prompt", text })} />
+      )}
+      {active && current && myTurn && !qa && game.phase === "reply" && (
+        <>
+          <TalkInput key={`reply-${turns.length}`} placeholder={current.pick === "dare" ? "Tell how it went (or send it in the chat)…" : "Your honest answer…"}
+            initial={current.pick === "dare" ? "Done ✓" : ""} busy={busy} cta="Reply" onSend={(text) => onMove({ action: "reply", text })} />
+          <button type="button" className="dm-talk-chance" disabled={chancesLeft <= 0 || busy} onClick={() => onMove({ action: "pass" })}>
+            🙈 Pass this one <em>{chancesLeft} left</em>
+          </button>
+        </>
       )}
     </div>
   );

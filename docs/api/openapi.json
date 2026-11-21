@@ -9209,6 +9209,1091 @@
         ]
       }
     },
+    "/api/messages/baby/{babyId}/bath": {
+      "post": {
+        "operationId": "babyBath",
+        "parameters": [
+          {
+            "name": "babyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BabyDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Give your baby a bath (twice a day per parent)",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/api/messages/baby/{babyId}/sleep": {
+      "post": {
+        "operationId": "babySleep",
+        "parameters": [
+          {
+            "name": "babyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BabyDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Put your baby to bed",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/api/messages/baby/{babyId}/wake": {
+      "post": {
+        "operationId": "babyWake",
+        "parameters": [
+          {
+            "name": "babyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BabyDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Wake your baby up",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/api/messages/baby/{babyId}/hug": {
+      "post": {
+        "operationId": "babyHug",
+        "parameters": [
+          {
+            "name": "babyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BabyDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Hug your baby; both parents within minutes is a family hug",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/api/messages/baby/{babyId}/medicine": {
+      "post": {
+        "operationId": "babyMedicine",
+        "parameters": [
+          {
+            "name": "babyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BabyDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Give medicine for a cold (one dose per parent)",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/api/messages/baby/{babyId}/shop": {
+      "post": {
+        "operationId": "babyBuy",
+        "parameters": [
+          {
+            "name": "babyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BabyBuyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BabyDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Buy a toy or decoration with the shared coins",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/api/messages/baby/{babyId}/decor": {
+      "put": {
+        "operationId": "babyPlace",
+        "parameters": [
+          {
+            "name": "babyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BabyPlaceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BabyDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Put up or take down a decoration you own",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/api/messages/baby/{babyId}/photo": {
+      "put": {
+        "operationId": "babyPhoto",
+        "parameters": [
+          {
+            "name": "babyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BabyPhotoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BabyDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Choose the photo in the frame (a photo from this chat)",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/api/messages/baby/{babyId}/words": {
+      "post": {
+        "operationId": "babyTeach",
+        "parameters": [
+          {
+            "name": "babyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BabyTeachDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BabyDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Teach your toddler a word",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/api/messages/baby/{babyId}/here": {
+      "post": {
+        "operationId": "babyHere",
+        "parameters": [
+          {
+            "name": "babyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BabyHereDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BabyTogetherDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Check in while the baby is open: where you are, and whether the other parent is here",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/api/messages/baby/{babyId}/signal": {
+      "post": {
+        "operationId": "babySignal",
+        "parameters": [
+          {
+            "name": "babyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BabySendSignalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Send the other parent a heart, wave, kiss or star",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/api/messages/baby/{babyId}/memories": {
+      "get": {
+        "operationId": "babyMemories",
+        "parameters": [
+          {
+            "name": "babyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BabyMemoriesDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "The memory book and every word your child knows",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
     "/api/messages/baby/{babyId}/outfit": {
       "put": {
         "operationId": "babyOutfit",
@@ -26788,6 +27873,55 @@
           "labels"
         ]
       },
+      "GameTurnDto": {
+        "type": "object",
+        "properties": {
+          "who": {
+            "type": "number",
+            "description": "Q&A: index of who asks. Truth or Dare: index of who picks and replies"
+          },
+          "pick": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "truth",
+              "dare"
+            ]
+          },
+          "question": {
+            "type": "string",
+            "nullable": true,
+            "description": "The question (Q&A) or the truth question / dare"
+          },
+          "clarify": {
+            "type": "string",
+            "nullable": true,
+            "description": "Q&A: \"what do you mean?\" from the answerer"
+          },
+          "clarification": {
+            "type": "string",
+            "nullable": true,
+            "description": "Q&A: what the asker meant"
+          },
+          "answer": {
+            "type": "string",
+            "nullable": true
+          },
+          "passed": {
+            "type": "boolean",
+            "description": "Truth or Dare: skipped with a pass"
+          }
+        },
+        "required": [
+          "who",
+          "pick",
+          "question",
+          "clarify",
+          "clarification",
+          "answer",
+          "passed"
+        ]
+      },
       "ChatGameDto": {
         "type": "object",
         "properties": {
@@ -26803,7 +27937,9 @@
               "rps",
               "memory",
               "thisorthat",
-              "gomoku"
+              "gomoku",
+              "qa",
+              "tod"
             ]
           },
           "players": {
@@ -26907,6 +28043,25 @@
             "type": "boolean",
             "description": "The other player already picked in the current round"
           },
+          "phase": {
+            "type": "string",
+            "nullable": true,
+            "description": "Q&A: ask | answer | explain. Truth or Dare: pick | prompt | reply"
+          },
+          "turns": {
+            "description": "Q&A and Truth or Dare turns so far (the last one is in progress)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GameTurnDto"
+            }
+          },
+          "chances": {
+            "description": "Q&A: \"what do you mean?\" left; Truth or Dare: passes left (per player)",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
           "updatedAt": {
             "type": "string",
             "format": "date-time"
@@ -26931,6 +28086,9 @@
           "totalRounds",
           "myChoice",
           "peerReady",
+          "phase",
+          "turns",
+          "chances",
           "updatedAt"
         ]
       },
@@ -27365,6 +28523,95 @@
           "hasMore"
         ]
       },
+      "BabyDecorStateDto": {
+        "type": "object",
+        "properties": {
+          "room": {
+            "type": "string",
+            "nullable": true,
+            "description": "Room theme item id; null is the default room"
+          },
+          "hang": {
+            "type": "string",
+            "nullable": true
+          },
+          "floor": {
+            "type": "string",
+            "nullable": true
+          },
+          "frame": {
+            "type": "string",
+            "nullable": true,
+            "description": "\"frame\" when the photo frame hangs on the wall"
+          }
+        },
+        "required": [
+          "room",
+          "hang",
+          "floor",
+          "frame"
+        ]
+      },
+      "BabyMomentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "born",
+              "stage",
+              "word",
+              "firsthug",
+              "healed",
+              "bought"
+            ]
+          },
+          "stage": {
+            "type": "number",
+            "nullable": true,
+            "description": "Stage at that moment (born, stage)"
+          },
+          "outfit": {
+            "type": "number",
+            "nullable": true,
+            "description": "Outfit at that moment (born, stage)"
+          },
+          "word": {
+            "type": "string",
+            "nullable": true,
+            "description": "The word (word)"
+          },
+          "item": {
+            "type": "string",
+            "nullable": true,
+            "description": "Shop item id (bought)"
+          },
+          "byId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "description": "Parent who made it happen, if one did"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "stage",
+          "outfit",
+          "word",
+          "item",
+          "byId",
+          "createdAt"
+        ]
+      },
       "BabyCareDto": {
         "type": "object",
         "properties": {
@@ -27379,13 +28626,21 @@
           },
           "games": {
             "type": "number"
+          },
+          "baths": {
+            "type": "number"
+          },
+          "sleeps": {
+            "type": "number"
           }
         },
         "required": [
           "feeds",
           "plays",
           "chats",
-          "games"
+          "games",
+          "baths",
+          "sleeps"
         ]
       },
       "BabyDto": {
@@ -27454,12 +28709,91 @@
             "type": "number",
             "description": "0-100, runs down over about 36 hours"
           },
+          "clean": {
+            "type": "number",
+            "description": "0-100, runs down over about 40 hours; a bath fills it"
+          },
+          "energy": {
+            "type": "number",
+            "description": "0-100: runs down while awake, fills up while asleep"
+          },
+          "asleep": {
+            "type": "boolean"
+          },
+          "sick": {
+            "type": "boolean",
+            "description": "Has a cold: grows at half speed until both parents give medicine"
+          },
+          "medicineMine": {
+            "type": "boolean",
+            "description": "You already gave medicine for this cold"
+          },
+          "medicineTheirs": {
+            "type": "boolean",
+            "description": "The other parent already gave medicine for this cold"
+          },
           "mood": {
             "type": "string",
             "enum": [
               "happy",
               "hungry",
-              "sad"
+              "sad",
+              "sick",
+              "sleepy",
+              "dirty"
+            ]
+          },
+          "coins": {
+            "type": "number",
+            "description": "Shared piggy bank"
+          },
+          "owned": {
+            "description": "Shop items bought",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "decor": {
+            "$ref": "#/components/schemas/BabyDecorStateDto"
+          },
+          "photoUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Photo in the frame on the wall"
+          },
+          "myHugAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "theirHugAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "familyHugToday": {
+            "type": "boolean",
+            "description": "You both hugged within a few minutes of each other today"
+          },
+          "familyHugs": {
+            "type": "number"
+          },
+          "words": {
+            "description": "Words the child can say, newest first (up to 40)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "latestMoment": {
+            "nullable": true,
+            "description": "Newest page of the memory book",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BabyMomentDto"
+              }
             ]
           },
           "outfit": {
@@ -27506,7 +28840,23 @@
           "nextStageXp",
           "fullness",
           "happiness",
+          "clean",
+          "energy",
+          "asleep",
+          "sick",
+          "medicineMine",
+          "medicineTheirs",
           "mood",
+          "coins",
+          "owned",
+          "decor",
+          "photoUrl",
+          "myHugAt",
+          "theirHugAt",
+          "familyHugToday",
+          "familyHugs",
+          "words",
+          "latestMoment",
           "outfit",
           "mine",
           "theirs",
@@ -27564,6 +28914,261 @@
           "item"
         ]
       },
+      "BabyBuyDto": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "string",
+            "enum": [
+              "toy-6",
+              "toy-7",
+              "toy-8",
+              "toy-9",
+              "toy-10",
+              "toy-11",
+              "frame",
+              "hang-bunting",
+              "hang-lights",
+              "hang-balloons",
+              "hang-mobile",
+              "floor-horse",
+              "floor-tent",
+              "floor-toybox",
+              "floor-bunny",
+              "room-ocean",
+              "room-space",
+              "room-garden"
+            ]
+          }
+        },
+        "required": [
+          "item"
+        ]
+      },
+      "BabyPlaceDto": {
+        "type": "object",
+        "properties": {
+          "slot": {
+            "type": "string",
+            "enum": [
+              "room",
+              "hang",
+              "floor",
+              "frame"
+            ]
+          },
+          "item": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "toy-6",
+              "toy-7",
+              "toy-8",
+              "toy-9",
+              "toy-10",
+              "toy-11",
+              "frame",
+              "hang-bunting",
+              "hang-lights",
+              "hang-balloons",
+              "hang-mobile",
+              "floor-horse",
+              "floor-tent",
+              "floor-toybox",
+              "floor-bunny",
+              "room-ocean",
+              "room-space",
+              "room-garden"
+            ],
+            "description": "An item you own for that slot; null clears it"
+          }
+        },
+        "required": [
+          "slot",
+          "item"
+        ]
+      },
+      "BabyPhotoDto": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "description": "A photo message from this chat; null removes the photo"
+          }
+        },
+        "required": [
+          "messageId"
+        ]
+      },
+      "BabyTeachDto": {
+        "type": "object",
+        "properties": {
+          "word": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20
+          }
+        },
+        "required": [
+          "word"
+        ]
+      },
+      "BabyHereDto": {
+        "type": "object",
+        "properties": {
+          "scene": {
+            "type": "string",
+            "enum": [
+              "nursery",
+              "kitchen",
+              "bathroom",
+              "garden",
+              "park"
+            ],
+            "description": "Where you are in the baby world"
+          },
+          "since": {
+            "type": "number",
+            "description": "Last signal id you already have; only newer ones come back"
+          }
+        },
+        "required": [
+          "scene"
+        ]
+      },
+      "BabySignalDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "heart",
+              "wave",
+              "kiss",
+              "star"
+            ]
+          },
+          "fromId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "fromId",
+          "createdAt"
+        ]
+      },
+      "BabyTogetherDto": {
+        "type": "object",
+        "properties": {
+          "partnerHere": {
+            "type": "boolean",
+            "description": "The other parent has the baby open right now"
+          },
+          "partnerScene": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "nursery",
+              "kitchen",
+              "bathroom",
+              "garden",
+              "park"
+            ],
+            "description": "Where the other parent is, while here"
+          },
+          "signals": {
+            "description": "Signals from the other parent newer than `since`",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BabySignalDto"
+            }
+          },
+          "cursor": {
+            "type": "number",
+            "description": "Pass this as `since` next time"
+          }
+        },
+        "required": [
+          "partnerHere",
+          "partnerScene",
+          "signals",
+          "cursor"
+        ]
+      },
+      "BabySendSignalDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "heart",
+              "wave",
+              "kiss",
+              "star"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "BabyWordDto": {
+        "type": "object",
+        "properties": {
+          "word": {
+            "type": "string"
+          },
+          "taughtBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "learnedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "word",
+          "taughtBy",
+          "learnedAt"
+        ]
+      },
+      "BabyMemoriesDto": {
+        "type": "object",
+        "properties": {
+          "moments": {
+            "description": "Newest first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BabyMomentDto"
+            }
+          },
+          "words": {
+            "description": "Newest first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BabyWordDto"
+            }
+          }
+        },
+        "required": [
+          "moments",
+          "words"
+        ]
+      },
       "BabyOutfitDto": {
         "type": "object",
         "properties": {
@@ -27591,9 +29196,30 @@
               "paper",
               "scissors",
               "a",
-              "b"
+              "b",
+              "truth",
+              "dare"
             ],
-            "description": "Rock-paper-scissors pick, or This or That answer"
+            "description": "Rock-paper-scissors pick, This or That answer, or truth/dare"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "ask",
+              "answer",
+              "clarify",
+              "explain",
+              "pick",
+              "prompt",
+              "reply",
+              "pass"
+            ],
+            "description": "Q&A and Truth or Dare moves"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "Written move: a question, answer, dare or explanation"
           }
         }
       },
@@ -27608,7 +29234,9 @@
               "rps",
               "memory",
               "thisorthat",
-              "gomoku"
+              "gomoku",
+              "qa",
+              "tod"
             ]
           }
         },

@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Languages, Monitor, Moon, Sun } from "lucide-react";
+import { setLang, useLang } from "@/lib/i18n";
 import { useTheme, type ThemePreference } from "@/lib/theme";
 import {
   useInfiniteQuery,
@@ -105,6 +106,21 @@ export function AppearanceSettings() {
             ? <span className="theme-preview-stack" aria-hidden="true"><span className="theme-preview"><span /><span /><span /></span><span className="theme-preview dark"><span /><span /><span /></span></span>
             : <span className={`theme-preview ${value}`} aria-hidden="true"><span /><span /><span /></span>}
           <span className="theme-option-label"><Icon size={15} /> {label}</span>
+        </button>
+      ))}
+    </div>
+  </section>;
+}
+/** English or Türkçe; each option is written in its own language. */
+export function LanguageSettings() {
+  const lang = useLang();
+  return <section className="card settings-card" aria-labelledby="language-title">
+    <div className="settings-title"><Languages size={20} /><div><h2 id="language-title">Language</h2><p>Choose the language Circle uses.</p></div></div>
+    <div className="language-options" role="radiogroup" aria-label="Language" translate="no">
+      {([["en", "English", "EN"], ["tr", "Türkçe", "TR"]] as const).map(([value, label, flag]) => (
+        <button type="button" role="radio" key={value} aria-checked={lang === value} className={`language-option ${lang === value ? "active" : ""}`}
+          onClick={() => { if (lang !== value) setLang(value); }}>
+          <span className="language-code" aria-hidden="true">{flag}</span> {label}
         </button>
       ))}
     </div>
@@ -380,6 +396,7 @@ export default function Settings() {
         }
       />
       <AppearanceSettings />
+      <LanguageSettings />
       <PrivacySettings key={user.id} user={user} />
       <VideoPlaybackSettings />
       <SecuritySettings />

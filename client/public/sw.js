@@ -10,6 +10,48 @@ const BADGE = "/badge-72.png";
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
+/* Notifications follow the app's language (the page tells us which, and we remember it). */
+let LANG = null;
+const TR = {
+  "Sent you a message": "Sana mesaj gönderdi",
+  "Sent a voice message": "Sesli mesaj gönderdi",
+  "Wants to play a game 🎮": "Oyun oynamak istiyor 🎮",
+  "Wants to have a baby with you 👶": "Seninle bebek sahibi olmak istiyor 👶",
+  "Sent a GIF": "GIF gönderdi",
+  "Sent a sticker": "Çıkartma gönderdi",
+  "Sent a view once photo": "Bir kez görüntülenen fotoğraf gönderdi",
+  "Sent a photo": "Fotoğraf gönderdi",
+  "Sent a video": "Video gönderdi",
+  "Shared a post": "Bir gönderi paylaştı",
+  "There's something new for you two 💗": "Size özel yeni bir şey var 💗",
+  "You have a new message": "Yeni bir mesajın var",
+  "Ended a video call": "Görüntülü arama bitti",
+  "Ended a voice call": "Sesli arama bitti",
+  "Missed video call": "Cevapsız görüntülü arama",
+  "Missed voice call": "Cevapsız sesli arama",
+  "Incoming video call": "Gelen görüntülü arama",
+  "Incoming voice call": "Gelen sesli arama",
+};
+async function language() {
+  if (LANG) return LANG;
+  try {
+    const stored = await (await caches.open("circle-meta")).match("/__lang");
+    LANG = stored ? await stored.text() : "en";
+  } catch {
+    LANG = "en";
+  }
+  return LANG;
+}
+function localize(lang, text) {
+  if (lang !== "tr" || !text) return text;
+  if (TR[text]) return TR[text];
+  let m = text.match(/^Replied to your (note|story): ([\s\S]*)$/);
+  if (m) return `${m[1] === "note" ? "Notuna" : "Hikâyene"} cevap verdi: ${m[2]}`;
+  m = text.match(/^Reacted (\S+) to your message(?:: ([\s\S]*))?$/);
+  if (m) return `Mesajına ${m[1]} bıraktı${m[2] ? `: ${m[2]}` : ""}`;
+  return text;
+}
+
 function preview(message) {
   if (!message) return "Sent you a message";
   if (message.noteReply) return `Replied to your note: ${message.content || ""}`;
@@ -44,12 +86,41 @@ async function latest() {
     }catch{}
     const conversation = data.items && data.items[0];
     if (!conversation) return null;
+    const last = conversation.lastMessage;
+    const url = `/messages?to=${encodeURIComponent(conversation.user.username)}`;
+    const icon = conversation.user.avatarUrl || ICON;
+    // Pushes also come for things that aren't new messages (your baby, a game move, a heart).
+    // Then the newest message may be your own: never show it back to you as if they sent it.
+    // They reacted to your message: say so (with your message as context).
+    const reaction = last && last.senderId !== conversation.user.id &&
+      (last.reactions || []).find((r) => r.userId === conversation.user.id);
+    if (reaction) {
+      const text = preview(last);
+      return {
+        title: conversation.user.displayName,
+        body: `Reacted ${reaction.emoji} to your message${text && text !== "Sent you a message" ? `: ${text}` : ""}`,
+        url,
+        tag: `react-${conversation.user.id}`,
+        icon,
+        activity: true,
+      };
+    }
+    if (!last || last.senderId !== conversation.user.id || !conversation.unreadCount) {
+      return {
+        title: conversation.user.displayName,
+        body: "There's something new for you two 💗",
+        url,
+        tag: `activity-${conversation.user.id}`,
+        icon,
+        activity: true,
+      };
+    }
     return {
       title: conversation.user.displayName,
-      body: preview(conversation.lastMessage),
-      url: `/messages?to=${encodeURIComponent(conversation.user.username)}`,
+      body: preview(last),
+      url,
       tag: `dm-${conversation.user.id}`,
-      icon: conversation.user.avatarUrl || ICON,
+      icon,
     };
   } catch {
     return null;
@@ -76,6 +147,9 @@ self.addEventListener("push", (event) => {
         tag: "dm",
         icon: ICON,
       };
+      const lang = await language();
+      message.body = localize(lang, message.body);
+      if (message.title === "Circle") message.body = localize(lang, message.body);
       // The call stopped ringing: drop its "Incoming call" notification.
       if (!message.call) {
         for (const shown of await self.registration.getNotifications())
@@ -84,7 +158,9 @@ self.addEventListener("push", (event) => {
       const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       const visible = windows.filter((w) => w.visibilityState === "visible");
       if (visible.length) {
-        for (const w of visible) w.postMessage({ type: message.call ? "circle:incoming-call" : "circle:new-message", ...message });
+        // The open app refreshes itself; only real messages and calls get the in-app banner and sound.
+        if (!message.activity)
+          for (const w of visible) w.postMessage({ type: message.call ? "circle:incoming-call" : "circle:new-message", ...message });
         return;
       }
       await self.registration.showNotification(message.title, {
@@ -138,6 +214,13 @@ self.addEventListener("pushsubscriptionchange", (event) => {
       }).catch(() => undefined);
     })(),
   );
+});
+
+// The page tells us the app's language.
+self.addEventListener("message", (event) => {
+  if (!event.data || event.data.type !== "circle:lang") return;
+  LANG = event.data.lang === "tr" ? "tr" : "en";
+  event.waitUntil(caches.open("circle-meta").then((c) => c.put("/__lang", new Response(LANG))).catch(() => undefined));
 });
 
 // The page asks to dismiss a ringing call notification once the call is answered, declined or over.

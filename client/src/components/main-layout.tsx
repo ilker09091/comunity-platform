@@ -26,8 +26,10 @@ import {
   UsersRound,
   Moon,
   Sun,
+  Languages,
 } from "lucide-react";
 import { useTheme } from "@/lib/theme";
+import { setLang, useLang } from "@/lib/i18n";
 import { api } from "@/lib/api/client";
 import { useFeatures } from "@/lib/platform-config";
 import { useSession } from "./providers";
@@ -42,6 +44,7 @@ export function Brand() {
   return (
     <Link href="/" className="brand" aria-label="Circle home">
       <Image className="brand-logo" src="/circle-logo.png" alt="Circle" width={706} height={728} sizes="(max-width: 767px) 34px, 40px" />
+      <span className="brand-wordmark" aria-hidden="true">Circle</span>
     </Link>
   );
 }
@@ -49,6 +52,16 @@ export function Brand() {
 function UnreadBadge({ count }: { count?: number }) {
   if (!count) return null;
   return <span className="nav-badge">{count > 99 ? "99+" : count}</span>;
+}
+
+/** English / Türkçe. */
+function LanguageMenuItem() {
+  const lang = useLang();
+  return (
+    <button type="button" className="theme-menu-item" translate="no" onClick={() => setLang(lang === "tr" ? "en" : "tr")}>
+      <Languages size={16} /> {lang === "tr" ? "English" : "Türkçe"}
+    </button>
+  );
 }
 
 /** Quick light/dark switch; "System" stays available in Settings → Appearance. */
@@ -175,6 +188,7 @@ export function AppHeader() {
                 <Settings size={16} /> Settings
               </Link>
               <ThemeMenuItem />
+              <LanguageMenuItem />
               <a href={APK_URL} download>
                 <Smartphone size={16} /> Get the Android app
               </a>
@@ -484,12 +498,72 @@ export function ReadOnlyBanner() {
   );
 }
 
-export default function MainLayout({ children }: { children: ReactNode }) {
+/**
+ * Messages on desktop: Instagram's narrow icon rail on the left instead of the top header,
+ * so the inbox can take the whole screen.
+ */
+export function SideRail() {
+  const pathname = usePathname();
+  const { user } = useSession();
+  const unreadTotal = useUnreadTotal();
+  const messageUnread = useMessageUnread().data?.count ?? 0;
+  const { on } = useFeatures();
+  const [creating, setCreating] = useState(false);
+  const items = [
+    { href: "/", label: "Home", icon: Home },
+    { href: "/explore", label: "Search", icon: Search },
+    { href: "/reels", label: "Reels", icon: Clapperboard },
+    { href: "/messages", label: "Messages", icon: MessageCircle, badge: messageUnread },
+    { href: "/notifications", label: "Notifications", icon: Heart, badge: unreadTotal },
+    { href: "/circles", label: "Circles", icon: UsersRound },
+  ].filter((item) => item.href !== "/reels" || on("reels"));
+  const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   return (
-    <>
+    <aside className="ig-side" aria-label="Main navigation">
+      <Link href="/" className="ig-side-brand" aria-label="Circle home">
+        <Image src="/circle-logo.png" alt="" width={706} height={728} sizes="30px" />
+      </Link>
+      <nav className="ig-side-nav">
+        {items.map(({ href, label, icon: Icon, badge }) => {
+          const active = isActive(href);
+          return (
+            <Link key={href} href={href} className={`ig-side-item ${active ? "active" : ""}`} aria-current={active ? "page" : undefined}
+              aria-label={badge ? `${label}, ${badge} unread` : label} title={label}>
+              <Icon size={25} strokeWidth={active ? 2.5 : 1.9} aria-hidden="true" />
+              <UnreadBadge count={badge} />
+            </Link>
+          );
+        })}
+        {user && (
+          <button type="button" className="ig-side-item" onClick={() => setCreating(true)} title="Create" aria-label="Create">
+            <PlusSquare size={25} strokeWidth={1.9} aria-hidden="true" />
+          </button>
+        )}
+      </nav>
+      {user && (
+        <Link href={`/profile/${user.username}`} className="ig-side-item" title="Profile" aria-label="Profile">
+          <Avatar user={user} size={28} />
+        </Link>
+      )}
+      {user && (
+        <Link href="/settings" className="ig-side-item" title="Settings" aria-label="Settings">
+          <Settings size={24} strokeWidth={1.9} aria-hidden="true" />
+        </Link>
+      )}
+      {creating && <PostComposer modalOpen mode="post" initialFiles={[]} onModalClose={() => setCreating(false)} />}
+    </aside>
+  );
+}
+
+export default function MainLayout({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const messages = pathname.startsWith("/messages");
+  return (
+    <div className={`ig-shell ${messages ? "dm-layout" : ""}`}>
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
+      {messages && <SideRail />}
       <AppHeader />
       <ReadOnlyBanner />
       <div className="app-container app-grid">
@@ -500,6 +574,6 @@ export default function MainLayout({ children }: { children: ReactNode }) {
         <RightSidebar />
       </div>
       <MobileNav />
-    </>
+    </div>
   );
 }

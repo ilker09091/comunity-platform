@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyMove, C4_COLS, GameRuleError, GOMOKU_SIZE, initialState, TOT_ROUNDS, type BoardState, type MemoryState, type RpsState, type TotState } from './games.js';
+import { applyMove, C4_COLS, GameRuleError, GOMOKU_SIZE, initialState, TOT_ROUNDS, type BoardState, type MemoryState, type RpsState, type TotState, type QaState, type TodState, QA_ROUNDS, QA_CLARIFY, TOD_ROUNDS, TOD_PASSES } from './games.js';
 
 describe('mini games', () => {
   it('XOX: a row wins and turns alternate', () => {
@@ -164,5 +164,74 @@ describe('mini games', () => {
     out = applyMove('gomoku', state, turn!, turn, { cell: 4 * n + 4 });
     expect(out.status).toBe('won');
     expect((out.state as BoardState).line).toEqual([0, n + 1, 2 * n + 2, 3 * n + 3, 4 * n + 4]);
+  });
+
+  it('Q&A: ask, ask back once, explain, answer; roles swap and it ends after all questions', () => {
+    let state = initialState('qa');
+    let out = applyMove('qa', state, 0, 0, { action: 'ask', text: '  En sevdiğin anımız?  ' });
+    expect(out.next).toBe(1);
+    expect((out.state as QaState).rounds[0].question).toBe('En sevdiğin anımız?');
+    expect(() => applyMove('qa', out.state, 1, 0, { action: 'answer', text: 'x' })).toThrow(GameRuleError);
+    out = applyMove('qa', out.state, 1, 1, { action: 'clarify', text: 'Ne demek istedin?' });
+    expect(out.next).toBe(0);
+    expect((out.state as QaState).phase).toBe('explain');
+    expect((out.state as QaState).chances[1]).toBe(QA_CLARIFY - 1);
+    expect(() => applyMove('qa', out.state, 0, 0, { action: 'answer', text: 'x' })).toThrow(GameRuleError);
+    out = applyMove('qa', out.state, 0, 0, { action: 'explain', text: 'Birlikte en mutlu olduğun an' });
+    expect(out.next).toBe(1);
+    expect(() => applyMove('qa', out.state, 1, 1, { action: 'clarify', text: 'Again?' })).toThrow('already asked');
+    expect(() => applyMove('qa', out.state, 1, 1, { action: 'answer', text: '   ' })).toThrow('Write something');
+    out = applyMove('qa', out.state, 1, 1, { action: 'answer', text: 'İlk tatilimiz' });
+    expect(out.next).toBe(1);
+    expect((out.state as QaState).rounds).toHaveLength(2);
+    expect((out.state as QaState).rounds[1].asker).toBe(1);
+    state = out.state;
+    let turn = 1;
+    for (let r = 1; r < QA_ROUNDS; r++) {
+      const asker = turn;
+      out = applyMove('qa', state, asker, asker, { action: 'ask', text: `Q${r}` });
+      out = applyMove('qa', out.state, 1 - asker, 1 - asker, { action: 'answer', text: `A${r}` });
+      state = out.state;
+      turn = out.next ?? -1;
+    }
+    expect(out.status).toBe('done');
+    expect((state as QaState).rounds).toHaveLength(QA_ROUNDS);
+  });
+
+  it('Q&A: "what do you mean?" runs out', () => {
+    let state = initialState('qa');
+    const s0 = state as QaState;
+    s0.chances = [0, 0];
+    state = applyMove('qa', state, 0, 0, { action: 'ask', text: 'Q' }).state;
+    expect(() => applyMove('qa', state, 1, 1, { action: 'clarify', text: '?' })).toThrow('left');
+  });
+
+  it('Truth or dare: pick, the other writes, reply or pass; passes run out; turns alternate', () => {
+    let out = applyMove('tod', initialState('tod'), 0, 0, { action: 'pick', choice: 'dare' });
+    expect(out.next).toBe(1);
+    expect(() => applyMove('tod', out.state, 0, 0, { action: 'pick', choice: 'truth' })).toThrow(GameRuleError);
+    out = applyMove('tod', out.state, 1, 1, { action: 'prompt', text: 'Bana bir şarkı söyle 🎤' });
+    expect(out.next).toBe(0);
+    out = applyMove('tod', out.state, 0, 0, { action: 'pass' });
+    expect((out.state as TodState).rounds[0].passed).toBe(true);
+    expect((out.state as TodState).chances[0]).toBe(TOD_PASSES - 1);
+    expect(out.next).toBe(1);
+    expect((out.state as TodState).rounds[1].player).toBe(1);
+    let state = out.state;
+    let turn = 1;
+    for (let r = 1; r < TOD_ROUNDS; r++) {
+      const p = turn;
+      out = applyMove('tod', state, p, p, { action: 'pick', choice: 'truth' });
+      out = applyMove('tod', out.state, 1 - p, 1 - p, { action: 'prompt', text: 'Soru?' });
+      out = applyMove('tod', out.state, p, p, { action: 'reply', text: 'Cevap' });
+      state = out.state;
+      turn = out.next ?? -1;
+    }
+    expect(out.status).toBe('done');
+    const spent = initialState('tod') as TodState;
+    spent.chances = [0, 0];
+    let s2 = applyMove('tod', spent, 0, 0, { action: 'pick', choice: 'truth' }).state;
+    s2 = applyMove('tod', s2, 1, 1, { action: 'prompt', text: 'Q' }).state;
+    expect(() => applyMove('tod', s2, 0, 0, { action: 'pass' })).toThrow('No passes');
   });
 });

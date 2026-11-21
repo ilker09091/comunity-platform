@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { ArrowUpRight, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api/client";
@@ -15,48 +16,44 @@ import { EmptyState, ErrorState, LoadingSkeleton, LoadMore, PageHeader, SignInPr
 export type FeedMode = "global" | "following" | "explore" | "saved";
 
 const SORTS = [
-  { value: "recent", label: "Recent", mode: "global" },
+  { value: "recent", label: "For you", mode: "global" },
   { value: "following", label: "Following", mode: "following" },
   { value: "popular", label: "Popular", mode: "explore" },
 ] as const;
 
-/** Compact divider with a "Sort by" control, as in the reference feed. */
+/** Feed tabs: For you, Following, Popular. */
 export function FeedToolbar({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return (
-    <div className="feed-toolbar">
-      <span className="feed-toolbar-line" aria-hidden="true" />
-      <label className="feed-sort">
-        Sort by:
-        <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Sort feed">
-          {SORTS.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-      </label>
+    <div className="feed-tabs" role="tablist" aria-label="Feed">
+      {SORTS.map((s) => (
+        <button key={s.value} type="button" role="tab" aria-selected={value === s.value} className={value === s.value ? "active" : ""} onClick={() => onChange(s.value)}>
+          {s.label}
+        </button>
+      ))}
     </div>
   );
 }
 
-/** Home: composer, sort toolbar and the selected feed. */
+/** Home: stories, the composer, feed tabs and the selected feed. */
 export function HomeFeed() {
   const params = useSearchParams();
   const pathname = usePathname();
-  const sort = SORTS.find((s) => s.value === params.get("sort")) ?? SORTS[0];
+  const [sortValue, setSortValue] = useState(() => params.get("sort") ?? "recent");
+  const sort = SORTS.find((s) => s.value === sortValue) ?? SORTS[0];
   return (
-    <>
+    <div className="ig-home">
       <h1 className="sr-only">Home</h1>
       <Stories />
       <PostComposer />
       <FeedToolbar
         value={sort.value}
-        onChange={(value) =>
-          window.history.replaceState(null, "", value === "recent" ? pathname : `${pathname}?sort=${value}`)
-        }
+        onChange={(value) => {
+          setSortValue(value);
+          window.history.replaceState(null, "", value === "recent" ? pathname : `${pathname}?sort=${value}`);
+        }}
       />
       <Feed mode={sort.mode} embedded />
-    </>
+    </div>
   );
 }
 

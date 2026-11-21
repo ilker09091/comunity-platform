@@ -14,6 +14,8 @@ import "./dark.css";
 import "./dark-generated.css";
 import "./messaging-upgrade.css";
 import "./messages-v2.css";
+import "./ig.css";
+import "./auth-ig.css";
 import Providers from "@/components/providers";
 import { Suspense } from "react";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme-boot";

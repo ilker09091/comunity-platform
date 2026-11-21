@@ -1,0 +1,21 @@
+Sounds for "Our baby". All are public domain or CC0 (no attribution required); listed here anyway.
+
+Interface sounds: tap, select, success, place, pop, pop2, sparkle, toggle, open, close, whoosh, back, hmm, nope, bong, scrub
+  Kenney "Interface Sounds" (www.kenney.nl), CC0 1.0. See LICENSE-kenney-interface-sounds.txt.
+
+Jingles: jingle-up, jingle-coin, jingle-win, jingle-love
+  Kenney "Music Jingles" (www.kenney.nl), CC0 1.0.
+
+Footsteps: step-1..4 (carpet), grass-1..3
+  Kenney "Impact Sounds" (www.kenney.nl), CC0 1.0.
+
+Baby voice: laugh-*  <- "Baby-giggle" (Internet Archive, archive.org/details/Baby-giggle), public domain
+            coo-*, babble-* <- "Rosalie Talks" (Internet Archive, archive.org/details/RosalieTalks), CC0 1.0
+            fuss-*, cry-1 <- "Toddler Crying D. D. Teoli Jr" (Internet Archive), Public Domain Mark 1.0
+Bath: splash-* <- "Bathtub water splashes.ogg" (Wikimedia Commons, public domain)
+Ducks: duck-1 <- "Ducks snatching.ogg" (Wikimedia Commons, CC0)
+Ambience: amb-garden <- "Birds singing in garden.ogg" (Wikimedia Commons, public domain)
+          amb-park <- "Gentle breeze and birds singing.ogg" (Wikimedia Commons, public domain)
+          amb-rain <- "Rain against the window.ogg" (Wikimedia Commons, public domain)
+
+Clips were cut, faded, level-matched and turned into seamless loops for the game.

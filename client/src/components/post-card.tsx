@@ -192,7 +192,7 @@ export function PostActions({
         disabled={mutation.isPending}
         onClick={() => press("like")}
       >
-        <Heart size={18} fill={post.isLiked ? "currentColor" : "none"} />
+        <Heart size={25} fill={post.isLiked ? "currentColor" : "none"} />
         <span>{post.likeCount}</span>
       </button>
       <button
@@ -202,7 +202,7 @@ export function PostActions({
         aria-expanded={commentsOpen}
         onClick={onComments}
       >
-        <MessageCircle size={18} />
+        <MessageCircle size={24} />
         <span>{post.commentCount}</span>
       </button>
       {on("reposts") && (
@@ -213,7 +213,7 @@ export function PostActions({
         summaryClassName={`action repost ${post.isReposted ? "active" : ""}`}
         summary={
           <>
-            <Repeat2 size={18} />
+            <Repeat2 size={25} />
             <span>{post.repostCount + post.quoteCount}</span>
           </>
         }
@@ -245,14 +245,14 @@ export function PostActions({
         disabled={mutation.isPending}
         onClick={() => press("bookmark")}
       >
-        <Bookmark size={18} fill={post.isBookmarked ? "currentColor" : "none"} />
+        <Bookmark size={24} fill={post.isBookmarked ? "currentColor" : "none"} />
       </button>
       <SendPostButton
         postId={post.id}
         story={post.media.some((m) => m.type === "VIDEO")}
       />
       <button type="button" className="action" aria-label="Share" onClick={() => void share()}>
-        <Share2 size={17} />
+        <Share2 size={23} />
       </button>
     </div>
   );
@@ -414,7 +414,7 @@ export default function PostCard({ post, detail = false }: { post: Post; detail?
       )}
       <header className="post-header">
         <Link href={`/profile/${visible.author.username}`} className="user-identity">
-          <Avatar user={visible.author} size={42} />
+          <Avatar user={visible.author} size={36} />
           <span className="post-author">
             <strong id={`post-${post.id}-author`}>{visible.author.displayName}{visible.author.isVerified && <VerifiedBadge />}</strong>
             <span className="post-meta">
@@ -450,7 +450,7 @@ export default function PostCard({ post, detail = false }: { post: Post; detail?
         <div className="quoted-post unavailable">This post is unavailable.</div>
       ) : (
         <>
-          {visible.content && (() => {
+          {visible.content && !visible.media.length && (() => {
             const parsed = parseInteractive(visible.content);
             return <>
               {parsed.before && <RichText text={parsed.before} />}
@@ -498,6 +498,29 @@ export default function PostCard({ post, detail = false }: { post: Post; detail?
           onComments={() => setComments(!comments)}
           onQuote={() => setQuote(true)}
         />
+      )}
+      {!(post.kind === "REPOST" && post.referencedPostUnavailable) && (
+        <div className="post-ig-meta">
+          {visible.likeCount > 0 && (
+            <p className="post-likes">{visible.likeCount.toLocaleString()} {visible.likeCount === 1 ? "like" : "likes"}</p>
+          )}
+          {visible.content && visible.media.length > 0 && (() => {
+            const parsed = parseInteractive(visible.content);
+            return (
+              <div className="post-caption">
+                <Link href={`/profile/${visible.author.username}`} className="post-caption-author">{visible.author.username}</Link>
+                {parsed.before && <RichText text={parsed.before} />}
+                {parsed.widget && <InteractiveWidget postId={visible.id} widget={parsed.widget} />}
+                {parsed.after && <RichText text={parsed.after} />}
+              </div>
+            );
+          })()}
+          {visible.commentCount > 0 && !comments && (
+            <button type="button" className="post-view-comments" onClick={() => setComments(true)}>
+              {visible.commentCount === 1 ? "View 1 comment" : `View all ${visible.commentCount.toLocaleString()} comments`}
+            </button>
+          )}
+        </div>
       )}
       {comments && (
         <CommentList postId={visible.id} postAuthorId={visible.author.id} showInput={detail} />

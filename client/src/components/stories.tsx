@@ -866,7 +866,7 @@ export default function Stories() {
               <Plus size={14} />
             </span>
           </span>
-          <span>Add story</span>
+          <span>Your story</span>
         </button>
         {orderedGroups.map((group) => {
           const first = group.find((s) => !s.isViewed) ?? group[0];
