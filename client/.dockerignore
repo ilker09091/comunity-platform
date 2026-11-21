@@ -13,3 +13,6 @@ AGENTS.md
 coverage
 .vscode
 scripts/test-*
+
+# Source sheets for the baby art; only the sliced images in public/baby are served.
+public/baby/raw

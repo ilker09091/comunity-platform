@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Keyboard, Loader2, Plus, Search, Sticker as StickerIcon, X } from "lucide-react";
+import { Keyboard, Loader2, Plus, Search, Smile, Sticker as StickerIcon, X } from "lucide-react";
 import { api, upload, type Models } from "@/lib/api/client";
 import { haptic } from "@/lib/haptics";
 import { useSession, useToast } from "./providers";
@@ -11,6 +11,25 @@ import { ConfirmDialog } from "./ui";
 
 type Sticker = Models["StickerDto"];
 export type Gif = Models["GifDto"];
+type Tab = "emoji" | "pack" | "mine" | "favorites" | "gifs";
+
+/** Emoji tab of the conversation tray (Telegram-style: emoji, stickers and GIFs in one place). */
+export const EMOJIS = [
+  "😀","😃","😄","😁","😆","😅","😂","🤣","🥲","🥹","😊","😇","🙂","🙃","😉","😌","😍","🥰","😘","😗",
+  "😙","😚","😋","😛","😝","😜","🤪","🤨","🧐","🤓","😎","🥸","🤩","🥳","😏","😒","😞","😔","😟","😕",
+  "🙁","☹️","😣","😖","😫","😩","🥺","😢","😭","😤","😠","😡","🤬","🤯","😳","🥵","🥶","😱","😨","😰",
+  "😥","😓","🤗","🤔","🫣","🤭","🫢","🫡","🤫","🫠","🤥","😶","😐","😑","😬","🙄","😯","😦","😧","😮",
+  "😲","🥱","😴","🤤","😪","😵","🤐","🥴","🤢","🤮","🤧","😷","🤒","🤕","🤑","🤠","😈","👿","👻","💀",
+  "👍","👎","👏","🙌","👐","🤲","🤝","🙏","✌️","🤞","🫶","🤟","🤘","👌","🤌","👈","👉","👆","👇","☝️",
+  "✋","🤚","🖐️","🖖","👋","🤙","💪","🫵","👀","🧠","❤️","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔",
+  "❤️‍🔥","💕","💞","💓","💗","💖","💘","💝","💯","🔥","✨","⭐","🌟","💫","🎉","🎊","🎈","🎁","🏆","⚽",
+  "🌹","🌸","🌈","☀️","🌙","⚡","❄️","🍕","🍔","🍟","🍿","☕","🍺","🎂","🍫","🍓","🐶","🐱","🦋","🙈",
+];
+/** The tray reopens on the tab used last (per browser session). */
+const TAB_KEY = "dm-tray-tab";
+function rememberedTab(): Tab {
+  try { return (sessionStorage.getItem(TAB_KEY) as Tab | null) ?? "emoji"; } catch { return "emoji"; }
+}
 
 /** A sent GIF: a looping silent video when GIPHY offers one (lighter), else the animated image. */
 export function GifView({ gif, className = "", maxWidth = 240 }: { gif: Gif; className?: string; maxWidth?: number }) {
@@ -25,16 +44,19 @@ export function GifView({ gif, className = "", maxWidth = 240 }: { gif: Gif; cla
 }
 
 /** GIPHY search (trending when empty), shown as a tab of the sticker tray. */
+const gifQuery = (term: string) => ({
+  queryKey: ["gifs", term],
+  queryFn: ({ pageParam, signal }: { pageParam: number; signal: AbortSignal }) =>
+    api("gifsList", { query: { q: term || undefined, offset: pageParam }, signal }),
+  initialPageParam: 0,
+  getNextPageParam: (page: Models["GifPageDto"]) => page.nextOffset ?? undefined,
+  staleTime: 5 * 60_000,
+});
+
 function GifPanel({ onPick, disabled }: { onPick: (gif: Gif) => void; disabled?: boolean }) {
   const [search, setSearch] = useState(""), [term, setTerm] = useState("");
   useEffect(() => { const timer = setTimeout(() => setTerm(search.trim()), 300); return () => clearTimeout(timer); }, [search]);
-  const gifs = useInfiniteQuery({
-    queryKey: ["gifs", term],
-    queryFn: ({ pageParam, signal }) => api("gifsList", { query: { q: term || undefined, offset: pageParam }, signal }),
-    initialPageParam: 0,
-    getNextPageParam: (page) => page.nextOffset ?? undefined,
-    staleTime: 5 * 60_000,
-  });
+  const gifs = useInfiniteQuery(gifQuery(term));
   const items = [...new Map((gifs.data?.pages.flatMap((page) => page.items) ?? []).map(gif=>[gif.id,gif])).values()];
   const enabled = gifs.data?.pages[0]?.enabled ?? true;
   // Loads more when the end comes into view, whichever element scrolls (tray or popover).
@@ -60,7 +82,7 @@ function GifPanel({ onPick, disabled }: { onPick: (gif: Gif) => void; disabled?:
             {items.map((gif) => (
               <button type="button" key={gif.id} className="gif-option" disabled={disabled} aria-label={`Send GIF: ${gif.title}`} onClick={() => onPick(gif)}
                 style={{ aspectRatio: `${gif.width}/${gif.height}` }}>
-                <img src={gif.previewUrl} alt="" loading="lazy" />
+                <img src={gif.previewUrl} alt="" loading="lazy" decoding="async" />
               </button>
             ))}
             <div ref={sentinel} className="gif-sentinel" aria-hidden="true" />
@@ -138,6 +160,7 @@ export function StickerButton({
   conversation = false,
   dock,
   onGif,
+  onEmoji,
 }: {
   disabled?: boolean;
   onPick: (sticker: Sticker) => void;
@@ -145,11 +168,20 @@ export function StickerButton({
   dock?:HTMLElement|null;
   /** Adds a GIFs tab (GIPHY search) that sends the chosen GIF. */
   onGif?: (gif: Gif) => void;
+  /** Adds an emoji tab (conversation tray); emoji go into the message field. */
+  onEmoji?: (emoji: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   /** Opens upwards when the composer sits near the bottom of the screen (e.g. Reels comments). */
   const [up, setUp] = useState(false);
-  const [tab, setTab] = useState<"pack" | "mine" | "favorites" | "gifs">("pack");
+  const [tab, setTabState] = useState<Tab>(() => {
+    const saved = typeof window === "undefined" ? "emoji" : rememberedTab();
+    return (saved === "emoji" && !onEmoji) || (saved === "gifs" && !onGif) || !["emoji", "pack", "gifs", "mine", "favorites"].includes(saved) ? "pack" : saved;
+  });
+  const setTab = (value: Tab) => {
+    try { sessionStorage.setItem(TAB_KEY, value); } catch { /* storage unavailable */ }
+    setTabState(value);
+  };
   const [progress, setProgress] = useState<number | null>(null);
   const [removing, setRemoving] = useState<Sticker | null>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -161,7 +193,12 @@ export function StickerButton({
   const [overlap,setOverlap]=useState(0);
   const client = useQueryClient();
   const toast = useToast();
-  const stickers = useStickers(open);
+  // The conversation tray loads its stickers ahead of time, so it opens filled.
+  const stickers = useStickers(open || conversation);
+  // Warm the GIF tab while the tray is open, before it is chosen.
+  useEffect(() => {
+    if (open && onGif) void client.prefetchInfiniteQuery(gifQuery(""));
+  }, [open, onGif, client]);
   const pack = stickers.data?.filter((s) => !!s.emoji) ?? [];
   const mine = stickers.data?.filter((s) => s.isOwn) ?? [];
   const favorites = stickers.data?.filter(s=>s.isFavorite)??[];
@@ -262,13 +299,16 @@ export function StickerButton({
     onPick(sticker);
   };
   const shown = tab === "pack" ? pack : tab==='mine'?mine:favorites;
+  const tabs: Tab[] = [...(onEmoji ? (["emoji"] as const) : []), "pack", ...(onGif ? (["gifs"] as const) : []), "mine", "favorites"];
   const content=<>
           <div className="sticker-tabs" role="tablist">
-            {(onGif?(['pack','gifs','mine','favorites'] as const):(['pack','mine','favorites'] as const)).map(value=><button key={value} type="button" role="tab" aria-selected={tab===value} onClick={()=>setTab(value)}>
-              {value==='pack'?'Stickers':value==='gifs'?'GIFs':value==='mine'?'Yours':'Favorites'}
+            {tabs.map(value=><button key={value} type="button" role="tab" aria-selected={tab===value} onClick={()=>setTab(value)}>
+              {value==='emoji'?'Emoji':value==='pack'?'Stickers':value==='gifs'?'GIFs':value==='mine'?'Yours':'Favorites'}
             </button>)}
           </div>
-          {tab==='gifs'&&onGif?<GifPanel disabled={disabled} onPick={gif=>{haptic("tap");if(!conversation)setOpen(false);onGif(gif);}}/>:<>
+          {tab==='emoji'&&onEmoji?<div className="emoji-grid" role="listbox" aria-label="Emoji">
+            {EMOJIS.map(emoji=><button key={emoji} type="button" role="option" aria-selected={false} disabled={disabled} onClick={()=>{haptic('tap');onEmoji(emoji);}}>{emoji}</button>)}
+          </div>:tab==='gifs'&&onGif?<GifPanel disabled={disabled} onPick={gif=>{haptic("tap");if(!conversation)setOpen(false);onGif(gif);}}/>:<>
           {stickers.isPending && <p className="sticker-hint">Loading stickers...</p>}
           {stickers.error && <p className="sticker-hint" role="alert">{stickers.error.message}</p>}
           <div className="sticker-grid">
@@ -304,7 +344,7 @@ export function StickerButton({
       <button
         type="button"
         className="comment-sticker-button"
-        aria-label={conversation&&open?"Show keyboard":"Send a sticker"}
+        aria-label={conversation&&open?"Show keyboard":onEmoji?"Emoji, stickers and GIFs":"Send a sticker"}
         aria-expanded={open}
         disabled={disabled}
         onPointerDown={event=>{
@@ -325,12 +365,14 @@ export function StickerButton({
           setOpen((o) => !o);
         }}
       >
-        {conversation&&open?<Keyboard size={21}/>:<StickerIcon size={20} strokeWidth={1.75} />}
+        {conversation&&open?<Keyboard size={21}/>:onEmoji?<Smile size={23} strokeWidth={1.75} />:<StickerIcon size={20} strokeWidth={1.75} />}
       </button>
       {open && conversation&&dock?createPortal(<div ref={panel} className="dm-sticker-tray" role="region" aria-label="Stickers"
         style={{height:Math.max(0,trayHeight-overlap)}}
-        onPointerDown={event=>{if(!(event.target instanceof HTMLInputElement))event.preventDefault();}}>
-        <div className="dm-sticker-tray-inner" style={{height:trayHeight}}>
+        // Only taps on buttons keep focus where it is; drags must stay free to scroll the tray.
+        onPointerDown={event=>{if(event.pointerType!=='touch'&&(event.target as Element).closest('button'))event.preventDefault();}}>
+        {/* Fills exactly the visible tray, so the last rows are always reachable by scrolling. */}
+        <div className="dm-sticker-tray-inner">
           <div className="dm-sticker-library">{content}</div>
         </div>
       </div>,dock):open && !conversation && (

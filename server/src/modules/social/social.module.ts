@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Post,
   Patch,
+  Put,
   Query,
   UploadedFile,
   UseInterceptors,
@@ -41,6 +42,9 @@ import { UploadsMulterModule } from '../media/multer.options.js';
 import { PostsModule } from '../posts/posts.module.js';
 import { UsersModule } from '../users/users.module.js';
 import {
+  ChatThemeDto,
+  ReactDto,
+  TogetherDto,
   ConversationDto,
   ConversationQueryDto,
   CreateNoteDto,
@@ -62,11 +66,11 @@ import {
   PushTestDto,
   PushUnsubscribeDto,
   SendMessageDto,
+  SharedMediaQueryDto,
   StickerDto,
   StoryDto,
   StoryReplyDto,
-  StoryViewerDto,
-} from './social.dto.js';
+  StoryViewerDto, ChatGameDto, GameMoveDto, StartGameDto, ChatPrefsDto, ChatPrefsResultDto, BabyDto, BabyStateDto, StartBabyDto, BabyItemDto, BabyOutfitDto } from './social.dto.js';
 import { MessagesService } from './messages.service.js';
 import { MessageAudioService } from './message-audio.service.js';
 import { CallsController, StreaksController } from './calls.controller.js';
@@ -78,13 +82,14 @@ import { StickersService } from './stickers.service.js';
 import { StoriesService } from './stories.service.js';
 import { GroupsService } from './groups.service.js';
 import { GroupsController } from './groups.controller.js';
+import { BabiesService } from './babies.service.js';
 
 @ApiTags('Messages')
 @ApiAuth()
 @ApiErrors(400, 401, 403, 404)
 @Controller('messages')
 export class MessagesController {
-  constructor(private readonly messages: MessagesService,private readonly audio:MessageAudioService) {}
+  constructor(private readonly messages: MessagesService,private readonly audio:MessageAudioService,private readonly babies:BabiesService) {}
   @Patch(':id')
   @ApiOperation({operationId:'messagesEdit',summary:'Edit the text of your own message'})
   @ApiOkResponse({type:DirectMessageDto})
@@ -132,6 +137,69 @@ export class MessagesController {
   unread(@CurrentUser() u: AuthUser) {
     return this.messages.unread(u.id);
   }
+  @Get(':id/baby')
+  @ApiOperation({operationId:'messagesBaby',summary:'The baby you raise with this user, or the open request'}) @ApiOkResponse({type:BabyStateDto})
+  baby(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string){return this.messages.baby(u.id,id);}
+  @Post(':id/baby')
+  @ApiOperation({operationId:'messagesStartBaby',summary:'Ask this user to have a baby together; it arrives as a message'}) @ApiCreatedResponse({type:DirectMessageDto})
+  startBaby(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string,@Body() dto:StartBabyDto){return this.messages.startBaby(u.id,id,dto.name,dto.gender);}
+  @Post('baby/:babyId/accept') @HttpCode(200)
+  @ApiOperation({operationId:'babyAccept',summary:'Accept the request: the baby is born'}) @ApiOkResponse({type:BabyDto})
+  babyAccept(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string){return this.babies.accept(u.id,id);}
+  @Post('baby/:babyId/decline') @HttpCode(204)
+  @ApiOperation({operationId:'babyDecline',summary:'Decline or withdraw an open baby request'}) @ApiNoContentResponse()
+  async babyDecline(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string){await this.babies.decline(u.id,id);}
+  @Post('baby/:babyId/feed') @HttpCode(200)
+  @ApiOperation({operationId:'babyFeed',summary:'Feed your baby (three times a day per parent)'}) @ApiOkResponse({type:BabyDto})
+  babyFeed(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string,@Body() _dto:BabyItemDto){return this.babies.feed(u.id,id);}
+  @Post('baby/:babyId/play') @HttpCode(200)
+  @ApiOperation({operationId:'babyPlay',summary:'Play with your baby (three times a day per parent)'}) @ApiOkResponse({type:BabyDto})
+  babyPlay(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string,@Body() _dto:BabyItemDto){return this.babies.play(u.id,id);}
+  @Put('baby/:babyId/outfit')
+  @ApiOperation({operationId:'babyOutfit',summary:'Dress your baby (both parents see it)'}) @ApiOkResponse({type:BabyDto})
+  babyOutfit(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string,@Body() dto:BabyOutfitDto){return this.babies.setOutfit(u.id,id,dto.outfit);}
+  @Delete('baby/:babyId') @HttpCode(204)
+  @ApiOperation({operationId:'babyEnd',summary:'Say goodbye to your baby, for both parents'}) @ApiNoContentResponse()
+  async babyEnd(@CurrentUser() u:AuthUser,@Param('babyId',ParseUUIDPipe) id:string){await this.babies.end(u.id,id);}
+  @Get('games/:gameId')
+  @ApiOperation({operationId:'messagesGame',summary:'Current state of a mini game you play in'}) @ApiOkResponse({type:ChatGameDto})
+  game(@CurrentUser() u:AuthUser,@Param('gameId',ParseUUIDPipe) id:string){return this.messages.game(u.id,id);}
+  @Post('games/:gameId/move') @HttpCode(200)
+  @ApiOperation({operationId:'messagesGameMove',summary:'Play a move: a cell (XOX), a column (Connect Four) or a pick (rock-paper-scissors)'})
+  @ApiOkResponse({type:ChatGameDto})
+  gameMove(@CurrentUser() u:AuthUser,@Param('gameId',ParseUUIDPipe) id:string,@Body() dto:GameMoveDto){return this.messages.move(u.id,id,dto);}
+  @Post(':id/games')
+  @ApiOperation({operationId:'messagesStartGame',summary:'Invite a user to a mini game; it arrives as a message'}) @ApiCreatedResponse({type:DirectMessageDto})
+  startGame(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string,@Body() dto:StartGameDto){return this.messages.startGame(u.id,id,dto.kind);}
+  @Put(':id/prefs')
+  @ApiOperation({operationId:'messagesSetPrefs',summary:'Your private nickname and wallpaper for this conversation'}) @ApiOkResponse({type:ChatPrefsResultDto})
+  setPrefs(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string,@Body() dto:ChatPrefsDto){return this.messages.setPrefs(u.id,id,dto);}
+  @Put(':id/reaction') @HttpCode(204)
+  @ApiOperation({operationId:'messagesReact',summary:'React to a message with an emoji (replaces your previous reaction)'}) @ApiNoContentResponse()
+  async react(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string,@Body() dto:ReactDto){await this.messages.react(u.id,id,dto.emoji);}
+  @Delete(':id/reaction') @HttpCode(204)
+  @ApiOperation({operationId:'messagesUnreact',summary:'Remove your reaction'}) @ApiNoContentResponse()
+  async unreact(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string){await this.messages.unreact(u.id,id);}
+  @Get(':id/together')
+  @ApiOperation({operationId:'messagesTogether',summary:'Shared stats for the conversation with a user'}) @ApiOkResponse({type:TogetherDto})
+  together(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string){return this.messages.together(u.id,id);}
+  @Put(':id/theme') @HttpCode(204)
+  @ApiOperation({operationId:'messagesSetTheme',summary:'Set the chat theme for both people in this conversation'}) @ApiNoContentResponse()
+  async setTheme(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string,@Body() dto:ChatThemeDto){await this.messages.setTheme(u.id,id,dto.theme);}
+  @Post(':id/favorite') @HttpCode(204)
+  @ApiOperation({operationId:'messagesFavorite',summary:'Star a message (only you see your stars)'}) @ApiNoContentResponse()
+  async favorite(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string){await this.messages.favorite(u.id,id);}
+  @Delete(':id/favorite') @HttpCode(204)
+  @ApiOperation({operationId:'messagesUnfavorite',summary:'Remove the star from a message'}) @ApiNoContentResponse()
+  async unfavorite(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string){await this.messages.unfavorite(u.id,id);}
+  @Get(':id/favorites')
+  @ApiOperation({operationId:'messagesFavorites',summary:'Your starred messages with a user, most recently starred first'})
+  @ApiOkResponse({type:Paginated(DirectMessageDto)})
+  favorites(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string,@Query() q:CursorQueryDto){return this.messages.favorites(u.id,id,q.cursor,q.limit??30);}
+  @Get(':id/media')
+  @ApiOperation({operationId:'messagesSharedMedia',summary:'Photos, videos and GIFs (or links) shared with a user, newest first'})
+  @ApiOkResponse({type:Paginated(DirectMessageDto)})
+  sharedMedia(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string,@Query() q:SharedMediaQueryDto){return this.messages.sharedMedia(u.id,id,q.kind??'media',q.cursor,q.limit??30);}
   @Get(':id')
   @ApiOperation({
     operationId: 'messagesList',
@@ -512,6 +580,6 @@ export class PushController {
 @Module({
   imports: [MediaModule, UsersModule, PostsModule, UploadsMulterModule, GifsModule],
   controllers: [MessagesController, GroupsController, StoriesController, StickersController, NotesController, PushController, CallsController, StreaksController],
-  providers: [MessagesService, GroupsService, MessageAudioService, StoriesService, StickersService, NotesService, PushService, CallsService, StreaksService],
+  providers: [MessagesService, BabiesService, GroupsService, MessageAudioService, StoriesService, StickersService, NotesService, PushService, CallsService, StreaksService],
 })
 export class SocialModule {}

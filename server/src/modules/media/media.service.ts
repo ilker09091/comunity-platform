@@ -224,7 +224,8 @@ export class MediaService implements OnModuleInit {
           OR EXISTS (SELECT 1 FROM chat_groups cg WHERE cg.avatar_media_id = m.id)
                OR EXISTS (SELECT 1 FROM stories st WHERE st.media_id = m.id)
                OR EXISTS (SELECT 1 FROM stickers sk WHERE sk.media_id = m.id)
-               OR EXISTS (SELECT 1 FROM circle_posts cp WHERE cp.media_id = m.id)) AS in_use
+               OR EXISTS (SELECT 1 FROM circle_posts cp WHERE cp.media_id = m.id)
+               OR EXISTS (SELECT 1 FROM conversation_prefs cpr WHERE cpr.wallpaper_media_id = m.id)) AS in_use
          FROM media m
         WHERE m.id = ANY($1::uuid[]) AND m.owner_id = $2
         ORDER BY m.id
@@ -351,6 +352,7 @@ export class MediaService implements OnModuleInit {
               AND NOT EXISTS (SELECT 1 FROM stories st WHERE st.media_id = m.id)
               AND NOT EXISTS (SELECT 1 FROM stickers sk WHERE sk.media_id = m.id)
               AND NOT EXISTS (SELECT 1 FROM circle_posts cp WHERE cp.media_id = m.id)
+              AND NOT EXISTS (SELECT 1 FROM conversation_prefs cpr WHERE cpr.wallpaper_media_id = m.id)
             ORDER BY m.created_at
             LIMIT 200
             FOR UPDATE SKIP LOCKED)

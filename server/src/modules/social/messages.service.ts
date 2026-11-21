@@ -7,10 +7,14 @@ import { decodeCursor, iso, toPage } from '../../common/utils/cursor.js';
 import { notBlockedSql, sqlOne, sqlRows } from '../../common/utils/sql.js';
 import { ContentDeletionService } from '../media/content-deletion.service.js';
 import { PushService } from './push.service.js';
+import { BabiesService } from './babies.service.js';
 import { MediaService } from '../media/media.service.js';
 import { MediaUrlService } from '../media/media-url.service.js';
 import { StickersService } from './stickers.service.js';
 import { GifsService } from '../gifs/gifs.js';
+import type { ChatTheme } from '../../database/migrations/1760192700000-StrictStreaksAndChatThemes.js';
+import type { GameKind } from '../../database/migrations/1760193000000-MoreChatGames.js';
+import { applyMove, GameRuleError, initialState, THIS_OR_THAT, type BoardState, type GameState, type MemoryState, type RpsState, type TotState } from './games.js';
 import { PostsQueryService } from '../posts/posts-query.service.js';
 import {
   USER_AVATAR_JOIN,
@@ -19,6 +23,8 @@ import {
   type UserSummaryRow,
 } from '../users/users.service.js';
 import {
+  ChatGameDto,
+  ChatPrefsDto,
   DirectMessageDto,
   MessageReplyRefDto,
   MessageStatusDto,
@@ -55,6 +61,7 @@ export class MessagesService {
     private readonly stickers: StickersService,
     private readonly urls: MediaUrlService,
     private readonly gifs: GifsService,
+    private readonly babies: BabiesService,
   ) {}
 
   /** Whether `owner` still treats `peer` as a message request, and whether `peer` already wrote. */
@@ -188,7 +195,7 @@ export class MessagesService {
     const parents = replyIds.length
       ? await sqlRows(
           this.db,
-          `SELECT d.id, d.sender_id, d.content, d.post_id, d.story_reply, d.view_once, d.has_sticker, d.audio_key, d.call_id, d.gif,
+          `SELECT d.id, d.sender_id, d.content, d.post_id, d.story_reply, d.view_once, d.has_sticker, d.audio_key, d.call_id, d.gif, d.game_id, d.baby_id,
               d.audio_duration_ms, m.type AS media_type, m.storage_key AS media_key, sk.emoji AS sticker_emoji, skm.storage_key AS sticker_key
           FROM direct_messages d LEFT JOIN media m ON m.id = d.media_id
           LEFT JOIN stickers sk ON sk.id = d.sticker_id LEFT JOIN media skm ON skm.id = sk.media_id
@@ -206,7 +213,7 @@ export class MessagesService {
             ? 'VIEW_ONCE'
             : m.content
               ? 'TEXT'
-              : m.has_sticker ? 'STICKER' : m.audio_key ? 'AUDIO' : m.call_id ? 'CALL' : m.gif ? 'GIF' : m.media_type === 'IMAGE'
+              : m.game_id ? 'GAME' : m.baby_id ? 'BABY' : m.has_sticker ? 'STICKER' : m.audio_key ? 'AUDIO' : m.call_id ? 'CALL' : m.gif ? 'GIF' : m.media_type === 'IMAGE'
                 ? 'PHOTO'
                 : m.media_type === 'VIDEO'
                   ? 'VIDEO'
@@ -224,7 +231,22 @@ export class MessagesService {
       ]),
     );
     const stickers=await this.stickers.hydrate([...new Set(rows.map(r=>r.sticker_id).filter(Boolean))],viewerId);
+    const ids=rows.map(r=>r.id).filter(Boolean);
+    const starred=new Set(ids.length?(await sqlRows<{message_id:string}>(this.db,
+      'SELECT message_id FROM message_favorites WHERE user_id=$1 AND message_id=ANY($2::uuid[])',[viewerId,ids])).map(r=>r.message_id):[]);
+    const reactions=new Map<string,{userId:string;emoji:string}[]>();
+    if(ids.length)for(const r of await sqlRows<{message_id:string;user_id:string;emoji:string}>(this.db,
+      'SELECT message_id,user_id,emoji FROM message_reactions WHERE message_id=ANY($1::uuid[]) ORDER BY created_at',[ids]))
+      reactions.set(r.message_id,[...(reactions.get(r.message_id)??[]),{userId:r.user_id,emoji:r.emoji}]);
+    const gameIds=[...new Set(rows.map(r=>r.game_id).filter(Boolean))];
+    const games=new Map(gameIds.length?(await sqlRows(this.db,'SELECT * FROM chat_games WHERE id=ANY($1::uuid[])',[gameIds]))
+      .map(g=>[g.id,this.gameDto(g,viewerId)]):[]);
+    const babies=await this.babies.invites([...new Set(rows.map(r=>r.baby_id).filter(Boolean))]);
     return rows.map((r) => ({
+      game: r.game_id ? (games.get(r.game_id) ?? null) : null,
+      baby: r.baby_id ? (babies.get(r.baby_id) ?? null) : null,
+      isFavorite: starred.has(r.id),
+      reactions: reactions.get(r.id) ?? [],
       gif: r.gif ?? null,
       editedAt: iso(r.edited_at),
       call: r.call_id
@@ -355,6 +377,8 @@ export class MessagesService {
     });
     // Wake the recipient's phones/browsers (the service worker fetches and shows the message).
     this.push.notifyUser(recipientId);
+    // Talking to each other is part of raising your baby together.
+    void this.babies.onMessage(senderId, recipientId);
     return (await this.hydrate([row], senderId))[0];
   }
 
@@ -383,6 +407,80 @@ export class MessagesService {
     return { ...page, items: await this.hydrate(page.items, viewerId) };
   }
 
+  /** Stars a message of one of your conversations; only you see your stars. */
+  async favorite(viewerId:string,messageId:string) {
+    const row=await sqlOne<{sender_id:string;recipient_id:string}>(this.db,
+      'SELECT sender_id,recipient_id FROM direct_messages WHERE id=$1 AND (sender_id=$2 OR recipient_id=$2)',[messageId,viewerId]);
+    if(!row)throw AppException.notFound(ErrorCode.NOT_FOUND,'Message not found');
+    await this.historyPeer(viewerId,row.sender_id===viewerId?row.recipient_id:row.sender_id);
+    await sqlRows(this.db,'INSERT INTO message_favorites(user_id,message_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',[viewerId,messageId]);
+  }
+
+  /** One reaction per person per message (sending another emoji replaces it). */
+  async react(viewerId:string,messageId:string,emoji:string) {
+    const row=await sqlOne<{sender_id:string;recipient_id:string}>(this.db,
+      'SELECT sender_id,recipient_id FROM direct_messages WHERE id=$1 AND (sender_id=$2 OR recipient_id=$2)',[messageId,viewerId]);
+    if(!row)throw AppException.notFound(ErrorCode.NOT_FOUND,'Message not found');
+    await this.assertPeer(viewerId,row.sender_id===viewerId?row.recipient_id:row.sender_id);
+    await sqlRows(this.db,`INSERT INTO message_reactions(message_id,user_id,emoji) VALUES ($1,$2,$3)
+      ON CONFLICT (message_id,user_id) DO UPDATE SET emoji=EXCLUDED.emoji,created_at=now()`,[messageId,viewerId,emoji]);
+    this.push.notifyUser(row.sender_id===viewerId?row.recipient_id:row.sender_id);
+  }
+
+  async unreact(viewerId:string,messageId:string) {
+    await sqlRows(this.db,'DELETE FROM message_reactions WHERE message_id=$1 AND user_id=$2',[messageId,viewerId]);
+  }
+
+  /** "Together" stats for the conversation with `peerId`. */
+  async together(viewerId:string,peerId:string) {
+    await this.historyPeer(viewerId,peerId);
+    const row=await sqlOne<{since:Date|null;messages:number;photos:number;voice:number;call_s:number;days:number}>(this.db,`
+      WITH pair AS (SELECT * FROM direct_messages d
+        WHERE least(d.sender_id,d.recipient_id)=least($1::uuid,$2::uuid) AND greatest(d.sender_id,d.recipient_id)=greatest($1::uuid,$2::uuid))
+      SELECT min(created_at) AS since,
+        count(*) FILTER (WHERE call_id IS NULL)::int AS messages,
+        count(*) FILTER (WHERE media_id IS NOT NULL AND NOT view_once)::int AS photos,
+        count(*) FILTER (WHERE audio_key IS NOT NULL)::int AS voice,
+        coalesce(sum(call_duration_s) FILTER (WHERE call_status='completed'),0)::int AS call_s,
+        (SELECT count(*)::int FROM (SELECT (created_at AT TIME ZONE 'UTC')::date FROM pair WHERE call_id IS NULL
+          GROUP BY 1 HAVING count(DISTINCT sender_id)=2) both_days) AS days
+      FROM pair`,[viewerId,peerId]);
+    return {since:iso(row?.since??null),messages:row?.messages??0,photos:row?.photos??0,voiceNotes:row?.voice??0,
+      callMinutes:Math.round((row?.call_s??0)/60),daysTogether:row?.days??0};
+  }
+
+  async unfavorite(viewerId:string,messageId:string) {
+    await sqlRows(this.db,'DELETE FROM message_favorites WHERE user_id=$1 AND message_id=$2',[viewerId,messageId]);
+  }
+
+  /** Your starred messages in the conversation with `peerId`, most recently starred first. */
+  async favorites(viewerId:string,peerId:string,cursorStr:string|undefined,limit:number) {
+    await this.historyPeer(viewerId,peerId);
+    const cursor=decodeCursor(cursorStr,['date','uuid']);
+    const rows=await sqlRows(this.db,`SELECT d.*, f.created_at AS starred_at FROM message_favorites f
+      JOIN direct_messages d ON d.id=f.message_id
+      WHERE f.user_id=$1 AND ((d.sender_id=$1 AND d.recipient_id=$2) OR (d.sender_id=$2 AND d.recipient_id=$1))
+      ${cursor?'AND (f.created_at, d.id) < ($4::timestamptz, $5::uuid)':''}
+      ORDER BY f.created_at DESC, d.id DESC LIMIT $3`,[viewerId,peerId,limit+1,...(cursor??[])]);
+    const page=toPage(rows,limit,(r)=>r,(r)=>[iso(r.starred_at)!,r.id]);
+    return {...page,items:await this.hydrate(page.items,viewerId)};
+  }
+
+  /** WhatsApp-style "Media, links": photos, videos and GIFs, or messages with links. */
+  async sharedMedia(viewerId:string,peerId:string,kind:'media'|'links',cursorStr:string|undefined,limit:number) {
+    await this.historyPeer(viewerId,peerId);
+    const cursor=decodeCursor(cursorStr,['date','uuid']);
+    const filter=kind==='links'?`d.content ~* '(https?://|www[.])'`
+      :`((d.media_id IS NOT NULL AND NOT d.view_once) OR d.gif IS NOT NULL)`;
+    const rows=await sqlRows(this.db,`SELECT d.* FROM direct_messages d
+      WHERE least(d.sender_id,d.recipient_id)=least($1::uuid,$2::uuid) AND greatest(d.sender_id,d.recipient_id)=greatest($1::uuid,$2::uuid)
+      AND ${filter}
+      ${cursor?'AND (d.created_at, d.id) < ($4::timestamptz, $5::uuid)':''}
+      ORDER BY d.created_at DESC, d.id DESC LIMIT $3`,[viewerId,peerId,limit+1,...(cursor??[])]);
+    const page=toPage(rows,limit,(r)=>r,(r)=>[iso(r.created_at)!,r.id]);
+    return {...page,items:await this.hydrate(page.items,viewerId)};
+  }
+
   async conversations(
     viewerId: string,
     cursorStr: string | undefined,
@@ -403,9 +501,12 @@ export class MessagesService {
       (SELECT count(*)::int FROM direct_messages d WHERE d.recipient_id = $1 AND d.sender_id = u.id AND d.read_at IS NULL) AS unread,
       ${isRequest} AS is_request,
       u.last_active_at, (u.last_active_at > now() - ${ONLINE_WINDOW_SQL}) AS online,
-      CASE WHEN streak.days>=3 AND streak.last_completed_day>=(now() AT TIME ZONE 'UTC')::date-2 THEN streak.days ELSE 0 END AS streak_days,
-      streak.last_completed_day=(now() AT TIME ZONE 'UTC')::date-2 AS streak_fading
+      CASE WHEN streak.days>=3 AND streak.last_completed_day>=(now() AT TIME ZONE 'UTC')::date-1 THEN streak.days ELSE 0 END AS streak_days,
+      (streak.last_completed_day=(now() AT TIME ZONE 'UTC')::date-1
+        AND (now() AT TIME ZONE 'UTC')>=(now() AT TIME ZONE 'UTC')::date+interval '16 hours') AS streak_fading
+      , cpref.nickname AS pref_nickname
       FROM latest l JOIN users u ON u.id = l.peer_id ${USER_AVATAR_JOIN}
+      LEFT JOIN conversation_prefs cpref ON cpref.user_id = $1 AND cpref.peer_id = u.id
       LEFT JOIN message_streaks streak ON streak.low_id=least($1::uuid,u.id) AND streak.high_id=greatest($1::uuid,u.id)
       WHERE u.status = 'ACTIVE'
       ${folder ? `AND ${folder === 'requests' ? '' : 'NOT '}${isRequest}` : ''}
@@ -435,14 +536,17 @@ export class MessagesService {
         lastActiveAt: r.contact_unavailable?null:iso(r.last_active_at),
         streakDays: r.contact_unavailable?0:r.streak_days ?? 0,
         streakFading: !!r.streak_fading,
+        nickname: r.contact_unavailable ? null : (r.pref_nickname ?? null),
       })),
     };
   }
 
   async status(viewerId: string, peerId: string): Promise<MessageStatusDto> {
     const rel=await this.historyPeer(viewerId,peerId);
+    const theme=(await sqlOne<{theme:string}>(this.db,'SELECT theme FROM conversation_themes WHERE low_id=least($1::uuid,$2::uuid) AND high_id=greatest($1::uuid,$2::uuid)',[viewerId,peerId]))?.theme??null;
+    const prefs=await this.prefs(viewerId,peerId);
     if(rel.isBlocking||rel.isBlockedBy)return {isUnavailable:true,isBlocking:rel.isBlocking,isRequest:false,awaitingAcceptance:false,
-      canSend:false,peerTyping:false,peerOnline:false,peerLastActiveAt:null};
+      canSend:false,peerTyping:false,peerOnline:false,peerLastActiveAt:null,theme,...prefs};
     const mine = await this.requestState(this.db, viewerId, peerId);
     const theirs = await this.requestState(this.db, peerId, viewerId);
     const awaitingAcceptance = theirs.request && theirs.sent;
@@ -471,7 +575,142 @@ export class MessagesService {
       peerTyping: !!presence?.typing,
       peerOnline: !!presence?.online,
       peerLastActiveAt: iso(presence?.last_active_at ?? null),
+      theme,
+      ...prefs,
     };
+  }
+
+  /** Instagram-style chat theme, shared by both people in the conversation. */
+  async setTheme(viewerId:string,peerId:string,theme:ChatTheme) {
+    await this.assertPeer(viewerId,peerId);
+    if(theme==='default'){
+      await sqlRows(this.db,'DELETE FROM conversation_themes WHERE low_id=least($1::uuid,$2::uuid) AND high_id=greatest($1::uuid,$2::uuid)',[viewerId,peerId]);
+      return;
+    }
+    await sqlRows(this.db,`INSERT INTO conversation_themes(low_id,high_id,theme,updated_by) VALUES (least($1::uuid,$2::uuid),greatest($1::uuid,$2::uuid),$3,$1)
+      ON CONFLICT (low_id,high_id) DO UPDATE SET theme=EXCLUDED.theme,updated_by=EXCLUDED.updated_by,updated_at=now()`,[viewerId,peerId,theme]);
+  }
+
+  /** Your private nickname and wallpaper for a conversation. */
+  private async prefs(viewerId:string,peerId:string) {
+    const row=await sqlOne<{nickname:string|null;media:Record<string,any>|null}>(this.db,`SELECT p.nickname, row_to_json(md) AS media
+      FROM conversation_prefs p LEFT JOIN media md ON md.id=p.wallpaper_media_id WHERE p.user_id=$1 AND p.peer_id=$2`,[viewerId,peerId]);
+    return {nickname:row?.nickname??null,wallpaperUrl:row?.media?this.media.toDto(row.media as any).url:null};
+  }
+
+  /** Only the fields present in `dto` change; the wallpaper is an uploaded image you own. */
+  async setPrefs(viewerId:string,peerId:string,dto:ChatPrefsDto) {
+    await this.historyPeer(viewerId,peerId);
+    const files=await this.db.transaction(async m=>{
+      const current=await sqlOne<{nickname:string|null;wallpaper_media_id:string|null}>(m,
+        'SELECT nickname,wallpaper_media_id FROM conversation_prefs WHERE user_id=$1 AND peer_id=$2 FOR UPDATE',[viewerId,peerId]);
+      const nickname=dto.nickname!==undefined?(dto.nickname?.trim()||null):current?.nickname??null;
+      const wallpaper=dto.wallpaperMediaId!==undefined?dto.wallpaperMediaId:current?.wallpaper_media_id??null;
+      const replaced=current?.wallpaper_media_id&&current.wallpaper_media_id!==wallpaper?current.wallpaper_media_id:null;
+      if(wallpaper&&wallpaper!==current?.wallpaper_media_id)await this.media.lockAttachable(m,viewerId,[wallpaper],{imagesOnly:true});
+      if(!nickname&&!wallpaper)await sqlRows(m,'DELETE FROM conversation_prefs WHERE user_id=$1 AND peer_id=$2',[viewerId,peerId]);
+      else await sqlRows(m,`INSERT INTO conversation_prefs(user_id,peer_id,nickname,wallpaper_media_id) VALUES ($1,$2,$3,$4)
+        ON CONFLICT (user_id,peer_id) DO UPDATE SET nickname=EXCLUDED.nickname,wallpaper_media_id=EXCLUDED.wallpaper_media_id,updated_at=now()`,
+        [viewerId,peerId,nickname,wallpaper]);
+      return replaced?this.deletion.deleteMedia(m,[replaced]):null;
+    });
+    if(files)await this.deletion.removeFiles(files);
+    return this.prefs(viewerId,peerId);
+  }
+
+  private gameDto(g:Record<string,any>,viewerId:string):ChatGameDto {
+    const state=g.state as GameState, me=(g.players as string[]).indexOf(viewerId), kind=g.kind as GameKind;
+    const rps=kind==='rps'?state as RpsState:null;
+    const memory=kind==='memory'?state as MemoryState:null;
+    const tot=kind==='thisorthat'?state as TotState:null;
+    const board=!rps&&!memory&&!tot?state as BoardState:null;
+    const picks=rps?.picks??tot?.picks??null;
+    const label=(q:number)=>[...(THIS_OR_THAT[q]??['',''])];
+    return {
+      id:g.id,kind,players:g.players,
+      board:board?.board??[],line:board?.line??[],
+      turnId:g.turn_id??null,status:g.status,winnerId:g.winner_id??null,
+      scores:rps?.scores??memory?.scores??[],
+      rounds:rps?rps.rounds.map(r=>({choices:r.choices,winner:r.winner,labels:[]}))
+        :tot?tot.rounds.map(r=>({choices:r.answers,winner:null,labels:label(r.q)})):[],
+      // Memory faces stay secret until a card is turned up; so do the other player's picks.
+      cards:memory?memory.cards.map((c,i)=>memory.owners[i]||memory.flipped.includes(i)||memory.shown.includes(i)?c:''):[],
+      owners:memory?.owners??[],
+      flipped:memory?[...memory.flipped,...memory.shown]:[],
+      prompt:tot&&tot.round<tot.order.length?label(tot.order[tot.round]):[],
+      round:tot?.round??0,totalRounds:tot?.order.length??0,
+      myChoice:picks&&me>=0?picks[me]??null:null,
+      peerReady:!!(picks&&me>=0&&picks[1-me]),
+      updatedAt:iso(g.updated_at)!,
+    };
+  }
+
+  /** Starts a mini game: it arrives as a message, and you move first. */
+  async startGame(viewerId:string,peerId:string,kind:GameKind) {
+    await this.assertPeer(viewerId,peerId,true);
+    const row=await this.db.transaction(async m=>{
+      await sqlRows(m,'SELECT pg_advisory_xact_lock(hashtext(least($1::text, $2::text) || greatest($1::text, $2::text)))',[viewerId,peerId]);
+      if(await sqlOne(m,`SELECT 1 FROM blocks WHERE (blocker_id=$1 AND blocked_id=$2) OR (blocker_id=$2 AND blocked_id=$1)`,[viewerId,peerId]))
+        throw AppException.notFound(ErrorCode.USER_NOT_FOUND,'User not found');
+      if((await this.requestState(m,peerId,viewerId)).request)
+        throw AppException.forbidden(ErrorCode.INVALID_STATE,'Games are available after your message request is accepted');
+      const game=(await sqlOne<{id:string}>(m,`INSERT INTO chat_games(low_id,high_id,kind,players,state,turn_id,created_by)
+        VALUES (least($1::uuid,$2::uuid),greatest($1::uuid,$2::uuid),$3,ARRAY[$1::uuid,$2::uuid],$4,$5,$1) RETURNING id`,
+        [viewerId,peerId,kind,JSON.stringify(initialState(kind)),kind==='rps'||kind==='thisorthat'?null:viewerId]))!;
+      return (await sqlOne(m,'INSERT INTO direct_messages(sender_id,recipient_id,game_id) VALUES ($1,$2,$3) RETURNING *',[viewerId,peerId,game.id]))!;
+    });
+    this.push.notifyUser(peerId);
+    return (await this.hydrate([row],viewerId))[0];
+  }
+
+  /** Asks the other person to have a baby together; the request arrives as a message. */
+  async startBaby(viewerId:string,peerId:string,name:string,gender:'girl'|'boy') {
+    await this.assertPeer(viewerId,peerId,true);
+    const row=await this.db.transaction(async m=>{
+      await sqlRows(m,'SELECT pg_advisory_xact_lock(hashtext(least($1::text, $2::text) || greatest($1::text, $2::text)))',[viewerId,peerId]);
+      if(await sqlOne(m,`SELECT 1 FROM blocks WHERE (blocker_id=$1 AND blocked_id=$2) OR (blocker_id=$2 AND blocked_id=$1)`,[viewerId,peerId]))
+        throw AppException.notFound(ErrorCode.USER_NOT_FOUND,'User not found');
+      if((await this.requestState(m,peerId,viewerId)).request)
+        throw AppException.forbidden(ErrorCode.INVALID_STATE,'This is available after your message request is accepted');
+      await this.babies.assertNone(m,viewerId,peerId);
+      const baby=await this.babies.create(m,viewerId,peerId,name,gender);
+      return (await sqlOne(m,'INSERT INTO direct_messages(sender_id,recipient_id,baby_id) VALUES ($1,$2,$3) RETURNING *',[viewerId,peerId,baby.id]))!;
+    });
+    this.push.notifyUser(peerId);
+    return (await this.hydrate([row],viewerId))[0];
+  }
+
+  async baby(viewerId:string,peerId:string) {
+    await this.historyPeer(viewerId,peerId);
+    return this.babies.current(viewerId,peerId);
+  }
+
+  private async gameRow(m:DataSource|EntityManager,viewerId:string,gameId:string,lock=false) {
+    const g=await sqlOne(m,`SELECT * FROM chat_games WHERE id=$1 AND $2::uuid=ANY(players)${lock?' FOR UPDATE':''}`,[gameId,viewerId]);
+    if(!g)throw AppException.notFound(ErrorCode.NOT_FOUND,'Game not found');
+    return g;
+  }
+
+  async game(viewerId:string,gameId:string) {
+    const g=await this.gameRow(this.db,viewerId,gameId);
+    await this.historyPeer(viewerId,(g.players as string[]).find(id=>id!==viewerId)!);
+    return this.gameDto(g,viewerId);
+  }
+
+  async move(viewerId:string,gameId:string,move:{cell?:number;choice?:string}) {
+    const g=await this.db.transaction(async m=>{
+      const g=await this.gameRow(m,viewerId,gameId,true);
+      const players=g.players as string[], me=players.indexOf(viewerId);
+      await this.assertPeer(viewerId,players[1-me]);
+      if(g.status!=='active')throw AppException.badRequest(ErrorCode.INVALID_STATE,'This game is over');
+      let out;
+      try{out=applyMove(g.kind,g.state,me,g.turn_id?players.indexOf(g.turn_id):null,move);}
+      catch(e){if(e instanceof GameRuleError)throw AppException.badRequest(ErrorCode.INVALID_STATE,e.message);throw e;}
+      return (await sqlOne(m,'UPDATE chat_games SET state=$2,turn_id=$3,status=$4,winner_id=$5,updated_at=now() WHERE id=$1 RETURNING *',
+        [gameId,JSON.stringify(out.state),out.next===null?null:players[out.next],out.status,out.winner===null?null:players[out.winner]]))!;
+    });
+    if(g.status!=='active')void this.babies.onGameFinished(g.players as string[]);
+    return this.gameDto(g,viewerId);
   }
 
   /** Records that the viewer's app is open (throttled to one write per 20 s). */

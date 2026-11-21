@@ -135,7 +135,9 @@ export function VoiceMessage({id,src,durationMs,own=false,author,peaks:given,com
  * WhatsApp-style recorder: the composer turns into a recording strip (red dot, timer, live
  * level bars). Stop to review the note with its waveform, or send straight away.
  */
-export function VoiceRecorder({disabled,onSend,onActiveChange}:{disabled:boolean;onSend:(id:string)=>Promise<unknown>;onActiveChange:(active:boolean)=>void}) {
+export function VoiceRecorder({disabled,onSend,onActiveChange,buttonClassName='dm-icon',hidden=false}:{disabled:boolean;onSend:(id:string)=>Promise<unknown>;onActiveChange:(active:boolean)=>void;buttonClassName?:string;
+  /** Keeps the recorder mounted while its button is out of view (e.g. the send button is showing). */
+  hidden?:boolean}) {
   const toast=useToast();
   const [phase,setPhase]=useState<'idle'|'acquiring'|'recording'|'preview'|'sending'>('idle');
   const [duration,setDuration]=useState(0),[preview,setPreview]=useState<string|null>(null);
@@ -221,7 +223,7 @@ export function VoiceRecorder({disabled,onSend,onActiveChange}:{disabled:boolean
   };
   const loudest=Math.max(.02,...levels);
   return <>
-    <button type="button" className="dm-icon" aria-label="Record voice message" title="Voice message" disabled={disabled||phase!=='idle'} onClick={()=>void start()}>
+    <button type="button" className={buttonClassName} aria-label="Record voice message" title="Voice message" aria-hidden={hidden||undefined} tabIndex={hidden?-1:undefined} disabled={disabled||phase!=='idle'} onClick={()=>void start()}>
       <svg width="21" height="21" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
         <rect x="9" y="2" width="6" height="12" rx="3" fill="currentColor"/>
         <path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>

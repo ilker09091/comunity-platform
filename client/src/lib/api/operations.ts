@@ -525,6 +525,106 @@ export const endpoints = {
     "method": "GET",
     "authenticated": true
   },
+  "messagesBaby": {
+    "path": "/api/messages/{id}/baby",
+    "method": "GET",
+    "authenticated": true
+  },
+  "messagesStartBaby": {
+    "path": "/api/messages/{id}/baby",
+    "method": "POST",
+    "authenticated": true
+  },
+  "babyAccept": {
+    "path": "/api/messages/baby/{babyId}/accept",
+    "method": "POST",
+    "authenticated": true
+  },
+  "babyDecline": {
+    "path": "/api/messages/baby/{babyId}/decline",
+    "method": "POST",
+    "authenticated": true
+  },
+  "babyFeed": {
+    "path": "/api/messages/baby/{babyId}/feed",
+    "method": "POST",
+    "authenticated": true
+  },
+  "babyPlay": {
+    "path": "/api/messages/baby/{babyId}/play",
+    "method": "POST",
+    "authenticated": true
+  },
+  "babyOutfit": {
+    "path": "/api/messages/baby/{babyId}/outfit",
+    "method": "PUT",
+    "authenticated": true
+  },
+  "babyEnd": {
+    "path": "/api/messages/baby/{babyId}",
+    "method": "DELETE",
+    "authenticated": true
+  },
+  "messagesGame": {
+    "path": "/api/messages/games/{gameId}",
+    "method": "GET",
+    "authenticated": true
+  },
+  "messagesGameMove": {
+    "path": "/api/messages/games/{gameId}/move",
+    "method": "POST",
+    "authenticated": true
+  },
+  "messagesStartGame": {
+    "path": "/api/messages/{id}/games",
+    "method": "POST",
+    "authenticated": true
+  },
+  "messagesSetPrefs": {
+    "path": "/api/messages/{id}/prefs",
+    "method": "PUT",
+    "authenticated": true
+  },
+  "messagesReact": {
+    "path": "/api/messages/{id}/reaction",
+    "method": "PUT",
+    "authenticated": true
+  },
+  "messagesUnreact": {
+    "path": "/api/messages/{id}/reaction",
+    "method": "DELETE",
+    "authenticated": true
+  },
+  "messagesTogether": {
+    "path": "/api/messages/{id}/together",
+    "method": "GET",
+    "authenticated": true
+  },
+  "messagesSetTheme": {
+    "path": "/api/messages/{id}/theme",
+    "method": "PUT",
+    "authenticated": true
+  },
+  "messagesFavorite": {
+    "path": "/api/messages/{id}/favorite",
+    "method": "POST",
+    "authenticated": true
+  },
+  "messagesUnfavorite": {
+    "path": "/api/messages/{id}/favorite",
+    "method": "DELETE",
+    "authenticated": true
+  },
+  "messagesFavorites": {
+    "path": "/api/messages/{id}/favorites",
+    "method": "GET",
+    "authenticated": true
+  },
+  "messagesSharedMedia": {
+    "path": "/api/messages/{id}/media",
+    "method": "GET",
+    "authenticated": true
+  },
   "messagesStatus": {
     "path": "/api/messages/{id}/status",
     "method": "GET",

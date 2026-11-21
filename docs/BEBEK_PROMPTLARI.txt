@@ -1,0 +1,391 @@
+=====================================================================
+  BEBEĞİMİZ — CHATGPT GÖRSEL PROMPTLARI (toplam 17 görsel)
+=====================================================================
+
+NASIL KULLANILIR
+----------------
+1) ChatGPT'de YENİ bir sohbet aç. Bütün promptları SIRAYLA ve HEP AYNI
+   SOHBETTE gönder. Aynı sohbette kalınca ChatGPT karakteri hatırlar ve
+   bütün görsellerde AYNI çocuk çıkar. Sohbeti değiştirirsen karakter
+   değişir.
+
+2) Her prompt "----- KOPYALA BAŞLANGIÇ -----" ile
+   "----- KOPYALA BİTİŞ -----" arasında. Sadece aradaki İngilizce metni
+   kopyala.
+
+3) Gelen görseli indir ve başlıkta yazan isimle kaydet. Hepsini şu klasöre koy:
+       client/public/baby/raw/
+   (klasör yoksa oluştur)
+
+4) Izgaralı (grid) görselleri ben otomatik parçalara ayıracağım.
+   Hücrelerin milimetrik hizalı olması gerekmiyor, sadece karakterler
+   birbirine DEĞMESİN.
+
+(İSTEĞE BAĞLI) ÇOCUK İKİNİZE BENZESİN
+--------------------------------------
+1. prompttan ÖNCE ikinizin birer net yüz fotoğrafını ChatGPT'ye yükle ve
+1. promptun en başına şu cümleyi ekle:
+   "Give the child a cartoon mix of these two people's features: hair
+   color, hair texture, eye color and skin tone. Keep it fully cartoon,
+   not realistic."
+Bu durumda 1. ve 2. promptlardaki saç/göz/ten renklerini ChatGPT
+fotoğraflara göre ayarlar; o kısımlara dokunma, kendisi uyarlar.
+
+SORUN ÇIKARSA ŞUNLARI YAZ
+-------------------------
+- Arka plan şeffaf değilse:
+    Make the background fully transparent (PNG with alpha). Keep everything else exactly the same.
+- Şeffaflık hiç olmuyorsa (ben silerim):
+    Use a solid pure magenta (#FF00FF) background instead, and make sure nothing in the drawing uses magenta.
+- Karakter değiştiyse / farklı biri çıktıysa:
+    Keep the exact same child as in the reference sheet (same face, hair, eyes, skin tone). Only change the outfit.
+- Yazı, numara, logo veya filigran çıktıysa:
+    Remove all text, numbers, labels and watermarks. Keep everything else the same.
+- Karakterler birbirine değiyorsa / kesik çıktıysa:
+    Make every figure smaller so each one fits fully inside its own cell with clear empty space around it.
+- Gölge veya renk geçişi (gradient) olduysa:
+    Use flat solid colors only: no gradients, no soft shading, no shadows.
+
+ORTAK STİL (her promptun sonunda zaten var, SİLME)
+-------------------------------------------------
+Cute flat 2D vector illustration, kawaii chibi proportions, flat solid
+colors, no gradients, transparent background. Bu blok tutarlılığı sağlıyor.
+
+
+=====================================================================
+  1 / 17   →   ref-girl.png   (KIZ — REFERANS SAYFASI)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+Create a character reference sheet of ONE little girl shown at four different ages, standing side by side in a single horizontal row, from left to right:
+
+1) Baby, about 8 months old, sitting on the floor with legs forward, chubby cheeks, very little hair with a tiny curl on top.
+2) Toddler, about 2 years old, standing, round face, short hair with two tiny pigtails.
+3) Child, about 6 years old, standing, shoulder-length wavy hair with a small yellow star hair clip.
+4) Child, about 10 years old, standing, longer wavy hair just past the shoulders with the same yellow star hair clip.
+
+It must clearly be the SAME person growing up: same face shape, same warm chestnut-brown hair (#7A4A2A), same big dark brown eyes, same light-warm skin tone, same little rosy cheeks, same friendly smile. Each age wears the same simple plain white outfit (white top and white bottoms, white socks).
+
+Layout: four equal columns with generous empty space between figures; every figure fully visible from head to toe, centered in its own column, all facing the viewer. The ages should grow in height naturally from left to right (the baby is smallest), but use a consistent scale.
+
+Landscape image, 1536 x 1024.
+
+Style: cute flat 2D vector illustration, kawaii chibi proportions (big head, small body), soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no ground shadows, no background objects, no text, no labels, no numbers, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel). Nothing touching anything else.
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  2 / 17   →   ref-boy.png   (ERKEK — REFERANS SAYFASI)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+Now create the same kind of character reference sheet for ONE little boy, who looks like the brother of the girl above (same art style, same family features: warm chestnut-brown hair #7A4A2A, big dark brown eyes, same light-warm skin tone, rosy cheeks, friendly smile). Show him at four different ages, standing side by side in a single horizontal row, from left to right:
+
+1) Baby, about 8 months old, sitting on the floor with legs forward, chubby cheeks, very little hair with a tiny curl on top.
+2) Toddler, about 2 years old, standing, round face, short fluffy hair.
+3) Child, about 6 years old, standing, short tousled hair with a small cowlick on top.
+4) Child, about 10 years old, standing, slightly longer tousled hair, same cowlick.
+
+It must clearly be the SAME boy growing up. Each age wears the same simple plain white outfit (white top and white bottoms, white socks).
+
+Layout: four equal columns with generous empty space between figures; every figure fully visible from head to toe, centered in its own column, all facing the viewer. Heights grow naturally from left to right with a consistent scale.
+
+Landscape image, 1536 x 1024.
+
+Style: cute flat 2D vector illustration, kawaii chibi proportions (big head, small body), soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no ground shadows, no background objects, no text, no labels, no numbers, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel). Nothing touching anything else.
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  KIYAFET SAYFALARI (3–10)
+  Her biri 3 sütun x 2 satır = 6 kıyafet. SIRA ÖNEMLİ: soldan sağa,
+  önce üst satır. 1. kıyafet varsayılan kıyafettir.
+=====================================================================
+
+
+=====================================================================
+  3 / 17   →   girl-stage1.png   (KIZ — BEBEK, 8 AYLIK)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+Using the exact same girl from the reference sheet, at age 1 (baby, about 8 months old, sitting on the floor with legs forward), draw her 6 times in a grid of 3 columns and 2 rows. Same sitting pose, same size and same position inside every cell; same face, hair and smile. Only the outfit changes. Outfits in this exact order (left to right, top row first):
+
+1. Plain white onesie with short sleeves and white socks.
+2. Soft pink hooded onesie with long bunny ears on the hood.
+3. Bright yellow duckling romper with a little orange beak on the hood and tiny wing shapes on the sides.
+4. Knitted cream sweater with a matching cream beanie with a pom-pom, and light grey leggings.
+5. Light brown teddy bear costume with a hood that has round bear ears, and a lighter brown belly patch.
+6. Little white-and-navy sailor dress with a navy collar, a small red bow and white socks.
+
+Leave clear empty space around every figure. Landscape image, 1536 x 1024.
+
+Style: cute flat 2D vector illustration, kawaii chibi proportions (big head, small body), soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no ground shadows, no text, no labels, no numbers, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel). Every figure fully visible and centered in its own cell, nothing touching.
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  4 / 17   →   boy-stage1.png   (ERKEK — BEBEK, 8 AYLIK)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+Using the exact same boy from the reference sheet, at age 1 (baby, about 8 months old, sitting on the floor with legs forward), draw him 6 times in a grid of 3 columns and 2 rows. Same sitting pose, same size and same position inside every cell; same face, hair and smile. Only the outfit changes. Outfits in this exact order (left to right, top row first):
+
+1. Plain white onesie with short sleeves and white socks.
+2. Light blue hooded onesie with long bunny ears on the hood.
+3. Bright yellow duckling romper with a little orange beak on the hood and tiny wing shapes on the sides.
+4. Knitted cream sweater with a matching cream beanie with a pom-pom, and light grey leggings.
+5. Light brown teddy bear costume with a hood that has round bear ears, and a lighter brown belly patch.
+6. Little white-and-navy sailor suit with a navy collar, navy shorts and white socks.
+
+Leave clear empty space around every figure. Landscape image, 1536 x 1024.
+
+Style: cute flat 2D vector illustration, kawaii chibi proportions (big head, small body), soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no ground shadows, no text, no labels, no numbers, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel). Every figure fully visible and centered in its own cell, nothing touching.
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  5 / 17   →   girl-stage2.png   (KIZ — 2 YAŞ)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+Using the exact same girl from the reference sheet, at age 2 (toddler, about 2 years old, standing, two tiny pigtails), draw her 6 times in a grid of 3 columns and 2 rows. Same standing pose with arms slightly out, same size and same position inside every cell; same face, hair and smile. Only the outfit changes. Outfits in this exact order (left to right, top row first):
+
+1. White-and-light-blue striped t-shirt with blue denim overalls and white sneakers.
+2. Green dinosaur costume with a hood that has small soft spikes, a light green belly and a little tail.
+3. Bright yellow raincoat with the hood down, and shiny red rain boots.
+4. Navy blue pajamas covered with small yellow stars, with matching navy slippers.
+5. Red dress with small white dots that looks like a strawberry, a little green leaf collar, and red shoes.
+6. Puffy coral winter coat, a white pom-pom beanie, white mittens and brown boots.
+
+Leave clear empty space around every figure. Landscape image, 1536 x 1024.
+
+Style: cute flat 2D vector illustration, kawaii chibi proportions (big head, small body), soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no ground shadows, no text, no labels, no numbers, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel). Every figure fully visible and centered in its own cell, nothing touching.
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  6 / 17   →   boy-stage2.png   (ERKEK — 2 YAŞ)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+Using the exact same boy from the reference sheet, at age 2 (toddler, about 2 years old, standing, short fluffy hair), draw him 6 times in a grid of 3 columns and 2 rows. Same standing pose with arms slightly out, same size and same position inside every cell; same face, hair and smile. Only the outfit changes. Outfits in this exact order (left to right, top row first):
+
+1. White-and-light-blue striped t-shirt with blue denim overalls and white sneakers.
+2. Green dinosaur costume with a hood that has small soft spikes, a light green belly and a little tail.
+3. Bright yellow raincoat with the hood down, and shiny red rain boots.
+4. Navy blue pajamas covered with small yellow stars, with matching navy slippers.
+5. White shirt with red suspenders, a small red bow tie, beige shorts and brown shoes.
+6. Puffy teal winter coat, a white pom-pom beanie, white mittens and brown boots.
+
+Leave clear empty space around every figure. Landscape image, 1536 x 1024.
+
+Style: cute flat 2D vector illustration, kawaii chibi proportions (big head, small body), soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no ground shadows, no text, no labels, no numbers, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel). Every figure fully visible and centered in its own cell, nothing touching.
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  7 / 17   →   girl-stage3.png   (KIZ — 6 YAŞ)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+Using the exact same girl from the reference sheet, at age 3 (child, about 6 years old, standing, shoulder-length wavy hair with the yellow star clip), draw her 6 times in a grid of 3 columns and 2 rows. Same relaxed standing pose, same size and same position inside every cell; same face, hair and smile. Only the outfit changes. Outfits in this exact order (left to right, top row first):
+
+1. Lilac t-shirt with a small heart on it, blue jeans and white sneakers.
+2. School uniform: white shirt, navy pinafore dress, navy cardigan, white knee socks, black shoes and a small red backpack.
+3. Superhero costume: purple suit, a flowing pink cape, a small pink eye mask and a yellow star on the chest.
+4. Football kit: red jersey, white shorts, red socks and football boots, holding a football under one arm.
+5. Party dress: pale pink layered dress with a big pink hair bow and shiny white shoes.
+6. Cozy light blue pajamas with clouds, fluffy slippers, hugging a small white pillow.
+
+Leave clear empty space around every figure. Landscape image, 1536 x 1024.
+
+Style: cute flat 2D vector illustration, kawaii chibi proportions (big head, small body), soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no ground shadows, no text, no labels, no numbers, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel). Every figure fully visible and centered in its own cell, nothing touching.
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  8 / 17   →   boy-stage3.png   (ERKEK — 6 YAŞ)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+Using the exact same boy from the reference sheet, at age 3 (child, about 6 years old, standing, short tousled hair with a cowlick), draw him 6 times in a grid of 3 columns and 2 rows. Same relaxed standing pose, same size and same position inside every cell; same face, hair and smile. Only the outfit changes. Outfits in this exact order (left to right, top row first):
+
+1. Mint green t-shirt with a small rocket on it, blue jeans and white sneakers.
+2. School uniform: white shirt, navy sweater vest, grey shorts, white socks, black shoes and a small red backpack.
+3. Superhero costume: blue suit, a flowing red cape, a small red eye mask and a yellow lightning bolt on the chest.
+4. Football kit: red jersey, white shorts, red socks and football boots, holding a football under one arm.
+5. Smart outfit: small navy blazer, white shirt, red bow tie, grey trousers and brown shoes.
+6. Cozy light blue pajamas with clouds, fluffy slippers, hugging a small white pillow.
+
+Leave clear empty space around every figure. Landscape image, 1536 x 1024.
+
+Style: cute flat 2D vector illustration, kawaii chibi proportions (big head, small body), soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no ground shadows, no text, no labels, no numbers, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel). Every figure fully visible and centered in its own cell, nothing touching.
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  9 / 17   →   girl-stage4.png   (KIZ — 10 YAŞ)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+Using the exact same girl from the reference sheet, at age 4 (child, about 10 years old, standing, wavy hair past the shoulders with the yellow star clip), draw her 6 times in a grid of 3 columns and 2 rows. Same relaxed standing pose, same size and same position inside every cell; same face, hair and smile. Only the outfit changes. Outfits in this exact order (left to right, top row first):
+
+1. Soft pink hoodie, grey joggers and white sneakers.
+2. School uniform: white shirt, navy blazer, navy pleated skirt, white knee socks, black shoes and a backpack on one shoulder.
+3. Summer beach outfit: light yellow sundress, a wide straw sun hat, sandals, holding a small beach bag.
+4. Elegant dress for a special day: long lavender dress with a ribbon belt and silver shoes.
+5. Chunky cream knit winter sweater, a red scarf, dark jeans and brown boots.
+6. Tennis outfit: white polo shirt, white pleated tennis skirt, white sneakers, holding a tennis racket.
+
+Leave clear empty space around every figure. Landscape image, 1536 x 1024.
+
+Style: cute flat 2D vector illustration, kawaii chibi proportions (big head, small body), soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no ground shadows, no text, no labels, no numbers, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel). Every figure fully visible and centered in its own cell, nothing touching.
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  10 / 17   →   boy-stage4.png   (ERKEK — 10 YAŞ)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+Using the exact same boy from the reference sheet, at age 4 (child, about 10 years old, standing, slightly longer tousled hair with the cowlick), draw him 6 times in a grid of 3 columns and 2 rows. Same relaxed standing pose, same size and same position inside every cell; same face, hair and smile. Only the outfit changes. Outfits in this exact order (left to right, top row first):
+
+1. Navy blue hoodie, grey joggers and white sneakers.
+2. School uniform: white shirt, navy blazer, grey trousers, black shoes and a backpack on one shoulder.
+3. Summer beach outfit: turquoise short-sleeve shirt with palm leaves, beige shorts, a straw sun hat and sandals.
+4. Smart outfit for a special day: light blue shirt, navy waistcoat, navy trousers and brown shoes.
+5. Chunky cream knit winter sweater, a red scarf, dark jeans and brown boots.
+6. Tennis outfit: white polo shirt, white shorts, white sneakers, holding a tennis racket.
+
+Leave clear empty space around every figure. Landscape image, 1536 x 1024.
+
+Style: cute flat 2D vector illustration, kawaii chibi proportions (big head, small body), soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no ground shadows, no text, no labels, no numbers, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel). Every figure fully visible and centered in its own cell, nothing touching.
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  11 / 17   →   girl-moods.png   (KIZ — RUH HALLERİ)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+Using the exact same girl from the reference sheet, make a grid of 4 columns and 3 rows (12 figures). The 4 columns are her four ages from the reference sheet, in the same order: baby sitting (8 months), toddler (2 years), child (6 years), child (10 years). The 3 rows are moods; in every cell she wears the plain white outfit:
+
+Row 1 (top): sleeping peacefully, eyes closed as gentle curves, head slightly tilted, relaxed smile. Do NOT draw any "Z" letters.
+Row 2 (middle): eating happily, holding a small spoon, cheeks a little puffed, eyes squinting with joy.
+Row 3 (bottom): a little sad, pouting lips, eyebrows tilted up, one small tear on the cheek.
+
+Same scale and same position in every cell, clear empty space around every figure, nothing touching. Landscape image, 1536 x 1024.
+
+Style: cute flat 2D vector illustration, kawaii chibi proportions (big head, small body), soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no ground shadows, no text, no labels, no numbers, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel).
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  12 / 17   →   boy-moods.png   (ERKEK — RUH HALLERİ)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+Using the exact same boy from the reference sheet, make a grid of 4 columns and 3 rows (12 figures). The 4 columns are his four ages from the reference sheet, in the same order: baby sitting (8 months), toddler (2 years), child (6 years), child (10 years). The 3 rows are moods; in every cell he wears the plain white outfit:
+
+Row 1 (top): sleeping peacefully, eyes closed as gentle curves, head slightly tilted, relaxed smile. Do NOT draw any "Z" letters.
+Row 2 (middle): eating happily, holding a small spoon, cheeks a little puffed, eyes squinting with joy.
+Row 3 (bottom): a little sad, pouting lips, eyebrows tilted up, one small tear on the cheek.
+
+Same scale and same position in every cell, clear empty space around every figure, nothing touching. Landscape image, 1536 x 1024.
+
+Style: cute flat 2D vector illustration, kawaii chibi proportions (big head, small body), soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no ground shadows, no text, no labels, no numbers, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel).
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  13 / 17   →   food.png   (YİYECEKLER — 12 ADET)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+A grid of 4 columns and 3 rows with 12 separate food items, one item per cell, all the same size, centered in their cells, with clear empty space around each one and nothing touching. In this exact order (left to right, top row first):
+
+1. baby milk bottle with a light blue cap
+2. small baby food jar (orange puree) with a little spoon
+3. shiny red apple with a green leaf
+4. yellow banana
+5. chocolate chip cookie
+6. slice of pizza with melted cheese and pepperoni
+7. slice of strawberry cake with cream and a strawberry on top
+8. orange carrot with green leaves
+9. bowl of warm soup with a spoon
+10. glass of orange juice with a straw
+11. ice cream cone with a pink scoop
+12. sandwich with lettuce, cheese and tomato
+
+Each food has a tiny cute happy face (two dot eyes and a small smile). Landscape image, 1536 x 1024.
+
+Style: cute flat 2D vector illustration, kawaii style, soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no shadows, no text, no labels, no numbers, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel).
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  14 / 17   →   toys.png   (OYUNCAKLAR — 6 ADET)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+A grid of 3 columns and 2 rows with 6 separate toys, one toy per cell, all the same size, centered in their cells, with clear empty space around each one and nothing touching. In this exact order (left to right, top row first):
+
+1. light brown teddy bear with a red bow tie
+2. yellow rubber duck
+3. stack of colorful wooden toy blocks (red, blue, yellow, green)
+4. red ball with a white star
+5. diamond-shaped kite (pink and blue) with a wavy tail
+6. open picture book with simple colorful shapes on the pages (no readable text)
+
+Landscape image, 1536 x 1024.
+
+Style: cute flat 2D vector illustration, soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no shadows, no text, no labels, no numbers, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel).
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  15 / 17   →   room-day.png   (ODA — GÜNDÜZ)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+A cozy child's bedroom interior seen straight from the front, with NO people or characters in it. Soft peach walls, light wooden floor. A big window at the top center with a sunny blue sky and two fluffy white clouds. A small bed with a light blue blanket on the left side. White shelves with a few toys and colorful books on the right side. A green potted plant in a corner. A round soft pink rug on the floor in the lower middle.
+
+VERY IMPORTANT: keep the center of the image (the rug area and the space above it, from about 35% to 85% of the image height) empty and uncluttered, because a child character will be placed standing on the rug later.
+
+Portrait image, 1024 x 1536.
+
+Style: flat 2D vector illustration matching the characters, soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no text, no labels, no watermark. Warm pastel palette. Full opaque background (this image is NOT transparent).
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  16 / 17   →   room-night.png   (ODA — GECE)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+The exact same bedroom as the previous image, with every object in exactly the same place, but at night: the window shows a dark navy sky with small stars and a crescent moon, the walls are a darker muted peach as if lit softly, and a warm bedside lamp next to the bed is switched on with a small circle of warm yellow light. Calm and cozy. Still NO people or characters, and the center of the rug area is still empty.
+
+Portrait image, 1024 x 1536.
+
+Style: flat 2D vector illustration matching the characters, soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only (the lamp light is a flat solid circle, not a gradient). No gradients, no soft shading, no textures, no text, no labels, no watermark. Full opaque background (this image is NOT transparent).
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  17 / 17   →   stork.png   (DOĞUM ANI — LEYLEK)
+=====================================================================
+----- KOPYALA BAŞLANGIÇ -----
+A friendly white stork flying to the right with its wings fully spread, with a long orange beak and orange legs tucked back. It carries a small soft cloth bundle (light pink and light blue stripes) hanging from its beak. A tiny red heart floats just above the bundle. No baby is visible, only the closed bundle.
+
+Square image, 1024 x 1024, the stork centered with empty space around it.
+
+Style: cute flat 2D vector illustration, soft rounded shapes, clean thin dark-brown outlines (#3B2A20) of even width, flat solid colors only. No gradients, no soft shading, no textures, no shadows, no text, no labels, no watermark. Warm pastel palette. Transparent background (PNG with alpha channel).
+----- KOPYALA BİTİŞ -----
+
+
+=====================================================================
+  KONTROL LİSTESİ — client/public/baby/raw/ içinde olması gerekenler
+=====================================================================
+[ ] ref-girl.png
+[ ] ref-boy.png
+[ ] girl-stage1.png
+[ ] girl-stage2.png
+[ ] girl-stage3.png
+[ ] girl-stage4.png
+[ ] boy-stage1.png
+[ ] boy-stage2.png
+[ ] boy-stage3.png
+[ ] boy-stage4.png
+[ ] girl-moods.png
+[ ] boy-moods.png
+[ ] food.png
+[ ] toys.png
+[ ] room-day.png
+[ ] room-night.png
+[ ] stork.png
+
+Hepsi hazır olunca bana "görseller hazır" yaz, parçalayıp yerleştiririm.

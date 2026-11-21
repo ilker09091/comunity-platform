@@ -1,4 +1,7 @@
 import { GroupAvatars1760192500000 } from './1760192500000-GroupAvatars.js';
+import { MessageFavorites1760192600000 } from './1760192600000-MessageFavorites.js';
+import { StrictStreaksAndChatThemes1760192700000 } from './1760192700000-StrictStreaksAndChatThemes.js';
+import { MessageReactions1760192800000 } from './1760192800000-MessageReactions.js';
 import { MessagesAndStories1760191200000 } from './1760191200000-MessagesAndStories.js';
 import { StoryPostShares1760191300000 } from './1760191300000-StoryPostShares.js';
 import { StoryEngagementRequestsStickers1760191400000 } from './1760191400000-StoryEngagementRequestsStickers.js';
@@ -31,6 +34,9 @@ import { CallMessages1760192000000 } from './1760192000000-CallMessages.js';
 import { Circles1760192100000 } from './1760192100000-Circles.js';
 import { AdminUserNotes1760192200000 } from './1760192200000-AdminUserNotes.js';
 import { GifAttachments1760192300000 } from './1760192300000-GifAttachments.js';
+import { OurBaby1760193100000 } from './1760193100000-OurBaby.js';
+import { MoreChatGames1760193000000 } from './1760193000000-MoreChatGames.js';
+import { ChatPrefsAndGames1760192900000 } from './1760192900000-ChatPrefsAndGames.js';
 import { GroupMessaging1760192400000 } from './1760192400000-GroupMessaging.js';
 export const migrations = [
   CreateUsersAndAuth1760180000000,
@@ -65,4 +71,10 @@ export const migrations = [
   GifAttachments1760192300000,
   GroupMessaging1760192400000,
   GroupAvatars1760192500000,
+  MessageFavorites1760192600000,
+  StrictStreaksAndChatThemes1760192700000,
+  MessageReactions1760192800000,
+  ChatPrefsAndGames1760192900000,
+  MoreChatGames1760193000000,
+  OurBaby1760193100000,
 ];

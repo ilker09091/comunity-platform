@@ -1,5 +1,5 @@
 "use client";
-import { Fragment, useEffect, useEffectEvent, useRef, useState } from "react";
+import { Fragment, memo, useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -8,15 +8,32 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  type InfiniteData,
 } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Check,
   CheckCheck,
+  ChevronDown,
+  ChevronRight,
+  CircleAlert,
+  Clock,
+  Images,
+  MessageCircle,
+  CalendarHeart,
+  Flame,
+  Heart,
+  Link2,
+  Palette,
+  Paperclip,
+  Play,
+  Plus,
+  Smile,
+  RotateCcw,
+  SendHorizontal,
   Image as ImageIcon,
   Mic,
   Camera,
-  ImagePlus,
   Eye,
   Sticker as StickerIcon,
   Music2,
@@ -30,7 +47,6 @@ import {
   ContactRound as Info,
   Search,
   Send,
-  FaceSlightlySmilingPlus as Smile,
   MessageSquarePlus as SquarePen,
   Pencil,
   UsersRound as Users,
@@ -41,12 +57,17 @@ import {
   PhoneOutgoing,
   Ban,
   ShieldOff,
-  Flame,
   Star,
+  Sparkles,
+  Gamepad2,
+  Baby,
+  WandSparkles,
+  WifiOff,
   X,
 } from "lucide-react";
-import { api, type Models } from "@/lib/api/client";
+import { api, ApiError, upload, type Models, type Result } from "@/lib/api/client";
 import { useMediaAttachment } from "@/lib/use-media-attachment";
+import { compressImage } from "@/lib/compress-image";
 import { haptic } from "@/lib/haptics";
 import { useSession, useToast } from "./providers";
 import {
@@ -64,12 +85,16 @@ import { MediaVideo } from "./media-video";
 import { NotesTray } from "./notes";
 import { messageSoundsOn, setMessageSounds } from "./app-bridge";
 import { useCalls } from "./calls";
-import MessageStreak from "./message-streak";
+import StreakChip, { FlameIcon, useStreak } from "./message-streak";
 import { ImageViewer } from "./image-viewer";
+import { PhotoViewer } from "./photo-gallery";
 import { GifView, StickerButton, StickerView } from './sticker-picker';
 import { VoiceMessage, VoiceRecorder } from './voice-message';
 import { MessageText } from './message-text';
 import { CreateGroup, GroupAvatar, GroupThread, useGroups } from './group-chat';
+import { ChatCustomize, GameCard, gameName, TogetherSheet, type GameKind } from './chat-extras';
+import { BabyBubble, BabyCard, BabyInviteCard, BabySheet } from './baby';
+import { CHAT_THEMES, ThemeStage, ThemeTray, themeAttributes, themeMeta, themePhoto, type ChatThemeId } from './chat-themes';
 
 type Message = Models["DirectMessageDto"];
 type Conversation = Models["ConversationDto"];
@@ -79,11 +104,6 @@ type Folder = "primary" | "requests";
 const GROUP_MS = 5 * 60_000;
 /** A gap this long (or a new day) gets a centered date/time separator. */
 const SEPARATOR_MS = 60 * 60_000;
-const EMOJIS = [
-  "😀", "😂", "🥹", "😍", "🥰", "😘", "😎", "🤩", "🤔", "😅",
-  "😭", "😡", "👍", "👎", "👏", "🙏", "💪", "🔥", "✨", "🎉",
-  "❤️", "💙", "💔", "💯", "👀", "🙌", "🤝", "😴", "🤯", "🥳",
-];
 
 /** Instagram-style compact age: "now", "5m", "3h", "2d", "4w". */
 function shortTime(value: string) {
@@ -237,6 +257,8 @@ function CallBubble({ message, own, onCall }: { message: Message; own: boolean; 
 }
 
 function attachmentLabel(message: Message) {
+  if (message.game) return `🎮 ${gameName(message.game.kind)}`;
+  if (message.baby) return `👶 Baby request · ${message.baby.name}`;
   if(message.call){const summary=callSummary(message.call,false);return summary.missed?summary.title:`${summary.title}${message.call.status==='completed'&&message.call.durationSeconds!=null?` · ${callDuration(message.call.durationSeconds)}`:''}`;}
   if(message.audioUrl)return 'Voice message';
   if(message.gif)return 'GIF';
@@ -266,23 +288,29 @@ function presence(online: boolean, lastActiveAt: string | null | undefined) {
   return age === "now" ? "Active just now" : `Active ${age} ago`;
 }
 
-/** WhatsApp-style receipt: one grey tick sent, two grey delivered, two blue read. */
-function Ticks({ message }: { message: Message }) {
-  const state = message.readAt ? "read" : message.deliveredAt ? "delivered" : "sent";
-  const label = state === "read" ? "Read" : state === "delivered" ? "Delivered" : "Sent";
+/** A local message on its way to the server, or one that could not be sent. */
+/** "waiting": no connection; it goes out by itself once the phone is back online. */
+type Delivery = "sending" | "waiting" | "failed";
+
+/** WhatsApp-style receipt: a clock while sending, one grey tick sent, two grey delivered, two blue read. */
+function Ticks({ message, delivery }: { message: Message; delivery?: Delivery }) {
+  const state = delivery ?? (message.readAt ? "read" : message.deliveredAt ? "delivered" : "sent");
+  const label = { sending: "Sending", waiting: "Waiting for connection", failed: "Not sent", read: "Read", delivered: "Delivered", sent: "Sent" }[state];
   return (
     <span className={`dm-ticks ${state}`} role="img" aria-label={label} title={label}>
-      {state === "sent" ? <Check size={15} strokeWidth={2.4} /> : <CheckCheck size={15} strokeWidth={2.4} />}
+      {state === "sending" || state === "waiting" ? <Clock size={13} strokeWidth={2.4} /> : state === "failed" ? <CircleAlert size={14} strokeWidth={2.4} />
+        : state === "sent" ? <Check size={15} strokeWidth={2.4} /> : <CheckCheck size={15} strokeWidth={2.4} />}
     </span>
   );
 }
 
-function Stamp({ message, own }: { message: Message; own: boolean }) {
+function Stamp({ message, own, delivery }: { message: Message; own: boolean; delivery?: Delivery }) {
   return (
     <span className="dm-stamp">
+      {message.isFavorite && <Star className="dm-stamp-star" size={11} fill="currentColor" aria-label="Favorite" />}
       {message.editedAt&&<span className="dm-edited">Edited</span>}
       <time dateTime={message.createdAt}>{clock(message.createdAt)}</time>
-      {own && <Ticks message={message} />}
+      {own && <Ticks message={message} delivery={delivery} />}
     </span>
   );
 }
@@ -298,6 +326,8 @@ const REPLY_KIND: Record<Models["MessageReplyRefDto"]["kind"], string> = {
   AUDIO: "Voice message",
   CALL: "Call",
   GIF: "GIF",
+  GAME: "Game",
+  BABY: "Baby request",
   UNAVAILABLE: "Message unavailable",
 };
 
@@ -306,7 +336,7 @@ const voiceLength = (ms: number | null | undefined) =>
 /** Icon and words for what a quoted message holds, like WhatsApp ("🎤 Voice message 0:12"). */
 function QuoteSummary({ kind, text, durationMs }: { kind: Models["MessageReplyRefDto"]["kind"]; text: string | null; durationMs?: number | null }) {
   const Icon = kind === "AUDIO" ? Mic : kind === "PHOTO" ? Camera : kind === "VIDEO" ? Video : kind === "STICKER" ? StickerIcon
-    : kind === "GIF" ? ImageIcon : kind === "VIEW_ONCE" ? Eye : kind === "CALL" ? Phone : null;
+    : kind === "GIF" ? ImageIcon : kind === "VIEW_ONCE" ? Eye : kind === "CALL" ? Phone : kind === "GAME" ? Gamepad2 : kind === "BABY" ? Baby : null;
   return (
     <span className="dm-quote-summary">
       {Icon && <Icon size={14} aria-hidden="true" />}
@@ -501,7 +531,138 @@ function MessageSticker({sticker}:{sticker:Models['StickerDto']}) {
   </div>;
 }
 
-export function MessageItem({
+/** Instagram-style quick reactions (long-press menu); double-tap sends the first one. */
+const REACTIONS = ["❤️", "😂", "😮", "😢", "😡", "👍"];
+
+function Reactions({ reactions, userId, onToggle }: { reactions: Models["MessageReactionDto"][]; userId?: string; onToggle?: (emoji: string) => void }) {
+  const groups = new Map<string, { count: number; mine: boolean }>();
+  for (const reaction of reactions) {
+    const group = groups.get(reaction.emoji) ?? { count: 0, mine: false };
+    group.count += 1;
+    group.mine ||= reaction.userId === userId;
+    groups.set(reaction.emoji, group);
+  }
+  return (
+    <div className="dm-reactions">
+      {[...groups].map(([emoji, group]) => (
+        <button
+          key={emoji}
+          type="button"
+          className={group.mine ? "mine" : ""}
+          aria-label={`${emoji} ${group.count}${group.mine ? ", your reaction. Tap to remove" : ""}`}
+          disabled={!onToggle}
+          onClick={() => onToggle?.(emoji)}
+        >
+          <span>{emoji}</span>
+          {group.count > 1 && <small>{group.count}</small>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** WhatsApp-style album: photos and videos sent together, as one grid. */
+function AlbumGrid({ items }: { items: Message[] }) {
+  const [photoIndex, setPhotoIndex] = useState<number | null>(null);
+  const [video, setVideo] = useState<Message | null>(null);
+  const shown = items.slice(0, 4);
+  const extra = items.length - shown.length;
+  const photos = items.filter((m) => m.media?.type === "IMAGE").map((m) => m.media!);
+  return (
+    <>
+      <div className={`dm-album count-${shown.length}`}>
+        {shown.map((m, i) => (
+          <button
+            key={m.id}
+            id={i === items.length - 1 ? undefined : `msg-${m.id}`}
+            type="button"
+            className="dm-album-tile"
+            aria-label={m.media?.type === "VIDEO" ? "Play video" : "Open photo"}
+            onClick={() => (m.media?.type === "VIDEO" ? setVideo(m) : setPhotoIndex(Math.max(0, photos.findIndex((p) => p.id === m.media?.id))))}
+          >
+            {m.media?.type === "VIDEO" ? (
+              <>
+                <video src={`${m.media.url}#t=0.1`} muted playsInline preload="metadata" />
+                <span className="dm-media-badge"><Play size={14} fill="currentColor" /></span>
+              </>
+            ) : m.media ? (
+              <img src={m.media.url} alt="Photo" loading="lazy" decoding="async" />
+            ) : null}
+            {i === shown.length - 1 && extra > 0 && <span className="dm-album-more">+{extra}</span>}
+          </button>
+        ))}
+        {/* Jump targets for the photos hidden behind "+N". */}
+        {items.slice(4, -1).map((m) => <span key={m.id} id={`msg-${m.id}`} className="dm-anchor" />)}
+      </div>
+      {photoIndex !== null && photos.length > 0 && (
+        <PhotoViewer photos={photos} initial={photoIndex} title="Photos" alt="Photo in conversation" onClose={() => setPhotoIndex(null)} />
+      )}
+      {video && <SharedMediaViewer message={video} onClose={() => setVideo(null)} />}
+    </>
+  );
+}
+
+type EffectKind = "hearts" | "kisses" | "confetti" | "hugs" | "roses";
+type Effect = { kind: EffectKind; key: string };
+const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}|\p{Emoji_Component}|\u200d|\ufe0f|\s)+$/u;
+/** Messenger-style screen effects for emoji-only messages: hearts, kisses, confetti. */
+function effectFor(text: string | null | undefined): EffectKind | null {
+  const value = (text ?? "").trim();
+  if (!value || value.length > 24 || !/\p{Extended_Pictographic}/u.test(value) || !EMOJI_ONLY.test(value)) return null;
+  if (/[😘💋]/u.test(value)) return "kisses";
+  if (/[🤗🫂]/u.test(value)) return "hugs";
+  if (/[🌹🌷💐🌸]/u.test(value)) return "roses";
+  if (/[🎉🥳🎊🎂🍾]/u.test(value)) return "confetti";
+  if (/[❤💕💖💗💓💞💘💝😍🥰💜💙💚💛🧡🤍🖤🫶😻🥺]/u.test(value)) return "hearts";
+  return null;
+}
+const EFFECT_GLYPHS: Record<EffectKind, string[]> = {
+  hearts: ["❤️", "💕", "💖", "💗", "🥰", "💞"],
+  kisses: ["😘", "💋", "❤️", "💕"],
+  confetti: ["🎉", "🎊", "✨", "🥳", "💫", "⭐"],
+  hugs: ["🤗", "🫂", "💞", "💗", "✨"],
+  roses: ["🌹", "🌷", "🌸", "💐", "❤️"],
+};
+function ScreenEffect({ effect, onDone }: { effect: Effect; onDone: () => void }) {
+  const [particles] = useState(() =>
+    Array.from({ length: 28 }, (_, i) => ({
+      glyph: EFFECT_GLYPHS[effect.kind][i % EFFECT_GLYPHS[effect.kind].length],
+      left: Math.random() * 100,
+      delay: Math.random() * 0.9,
+      duration: 2.3 + Math.random() * 1.4,
+      size: 22 + Math.random() * 24,
+      drift: (Math.random() - 0.5) * 90,
+      spin: (Math.random() - 0.5) * 70,
+    })),
+  );
+  const done = useEffectEvent(onDone);
+  useEffect(() => {
+    const timer = window.setTimeout(() => done(), 3800);
+    return () => window.clearTimeout(timer);
+  }, []);
+  return (
+    <div className={`dm-effect ${effect.kind}`} aria-hidden="true">
+      {(effect.kind === "hugs" || effect.kind === "kisses") && <b className="dm-effect-center">{effect.kind === "hugs" ? "🫂" : "😘"}</b>}
+      {particles.map((p, i) => (
+        <span
+          key={i}
+          style={{
+            left: `${p.left}%`,
+            fontSize: p.size,
+            animationDelay: `${p.delay}s`,
+            animationDuration: `${p.duration}s`,
+            "--drift": `${p.drift}px`,
+            "--spin": `${p.spin}deg`,
+          } as CSSProperties}
+        >
+          {p.glyph}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+export const MessageItem = memo(function MessageItem({
   message,
   own,
   peer,
@@ -512,7 +673,16 @@ export function MessageItem({
   onUnsend,
   onCall,
   onEdit,
+  onFavorite,
+  onReact,
+  album,
   replyAuthor,
+  enter = false,
+  delivery,
+  onRetry,
+  onDiscard,
+  onRematch,
+  onBaby,
 }: {
   message: Message;
   own: boolean;
@@ -521,11 +691,27 @@ export function MessageItem({
   last: boolean;
   onReply: (message: Message) => void;
   onJump: (id: string) => void;
-  onUnsend: (message: Message) => void;
+  /** `album` is set when unsending a group of photos sent together. */
+  onUnsend: (message: Message, album?: Message[]) => void;
   /** Calls the peer again from a call history entry; absent while calling is unavailable. */
   onCall?: (kind: "audio" | "video") => void;
   onEdit?: (message: Message) => void;
+  /** Stars or unstars the message (direct messages only). */
+  onFavorite?: (message: Message) => void;
+  /** Sets (or with null, removes) your reaction (direct messages only). */
+  onReact?: (message: Message, emoji: string | null) => void;
+  /** Photos and videos sent together; `message` is the last one (caption, time, receipts). */
+  album?: Message[];
   replyAuthor?: string;
+  /** Arrived or was sent while the chat is open: slides in. */
+  enter?: boolean;
+  delivery?: Delivery;
+  onRetry?: (id: string) => void;
+  onDiscard?: (id: string) => void;
+  /** Starts a new round of a finished mini game. */
+  onRematch?: (kind: GameKind) => void;
+  /** Opens the baby screen (from a baby request in the chat). */
+  onBaby?: () => void;
 }) {
   const toast = useToast();
   /**
@@ -539,7 +725,7 @@ export function MessageItem({
   const openPopover = () => {
     const rect = bodyRef.current?.getBoundingClientRect();
     if (!rect) return setMenu({ mode: "sheet" });
-    const height = own ? 150 : 108;
+    const height = (own ? 150 : 108) + (onFavorite ? 42 : 0) + (onReact ? 56 : 0);
     const top = window.innerHeight - rect.bottom > height + 16 ? rect.bottom + 6 : Math.max(8, rect.top - height - 6);
     setMenu(
       own
@@ -568,14 +754,26 @@ export function MessageItem({
     };
   }, [menu]);
   useEffect(() => () => window.clearTimeout(press.current), []);
-  const media = message.viewOnce ? null : message.media;
+  const media = album || message.viewOnce ? null : message.media;
+  const replyTo = (album?.[0] ?? message).replyTo;
   const missing =
-    !message.content && !media && !message.post && !message.storyReply && !message.viewOnce && !message.hasSticker && !message.audioUrl && !message.call && !message.gif;
+    !album && !message.content && !media && !message.post && !message.storyReply && !message.viewOnce && !message.hasSticker && !message.audioUrl && !message.call && !message.gif && !message.game && !message.baby;
   const swipe = useRef<{ x: number; y: number; id: number } | null>(null);
   const [drag, setDrag] = useState(0);
   const { user } = useSession();
-  const quoteAuthor = message.replyTo
-    ? message.replyTo.senderId === user?.id
+  const reactions = message.reactions ?? [];
+  const myReaction = reactions.find((reaction) => reaction.userId === user?.id)?.emoji ?? null;
+  const lastTap = useRef(0);
+  const [burst, setBurst] = useState(0);
+  /** Instagram: double-tap a message to heart it (it never un-hearts). */
+  const heart = () => {
+    if (!onReact || delivery) return;
+    haptic("tap");
+    setBurst((b) => b + 1);
+    if (myReaction !== "❤️") onReact(message, "❤️");
+  };
+  const quoteAuthor = replyTo
+    ? replyTo.senderId === user?.id
       ? "You"
       : replyAuthor ?? peer.displayName
     : "";
@@ -583,12 +781,12 @@ export function MessageItem({
   return (
     <li
       id={`msg-${message.id}`}
-      className={`dm-message ${own ? "own" : ""} ${first ? "first" : ""} ${last ? "last" : ""}`}
+      className={`dm-message ${own ? "own" : ""} ${first ? "first" : ""} ${last ? "last" : ""} ${enter ? "enter" : ""} ${delivery ?? ""}`}
       onClickCapture={event=>{if(openingPress.current){event.preventDefault();event.stopPropagation();openingPress.current=false;}}}
       style={drag ? { transform: `translateX(${drag}px)` } : undefined}
       // Touch: swipe a message to the right to reply, like WhatsApp.
       onPointerDown={(e) => {
-        if (e.pointerType !== "touch") return;
+        if (e.pointerType !== "touch" || delivery) return;
         // Scrubbing a voice note or using a player must not start a swipe-to-reply or the menu.
         if(menu)return;
         const interactive=(e.target as Element).closest("button, a, .wa-voice-wave, video, audio, input");
@@ -621,14 +819,25 @@ export function MessageItem({
         }
         setDrag(Math.max(0, Math.min(72, dx)));
       }}
-      onPointerUp={() => {
+      onPointerUp={(e) => {
         window.clearTimeout(press.current);
         if (drag >= 56) {
           haptic("tap");
           onReply(message);
+        } else if (e.pointerType === "touch" && swipe.current && drag < 6 && !(e.target as Element).closest("button, a, video, audio, input, .wa-voice-wave")) {
+          const now = e.timeStamp;
+          if (now - lastTap.current < 320) {
+            lastTap.current = 0;
+            heart();
+          } else lastTap.current = now;
         }
         swipe.current = null;
         setDrag(0);
+      }}
+      onDoubleClick={(e) => {
+        if ((e.target as Element).closest("button, a, video, audio, input")) return;
+        window.getSelection()?.removeAllRanges();
+        heart();
       }}
       onPointerCancel={() => {
         window.clearTimeout(press.current);
@@ -642,10 +851,11 @@ export function MessageItem({
         </span>
       )}
       <div className="dm-message-body" ref={bodyRef} title={separatorLabel(message.createdAt)}>
+        {burst > 0 && <span key={burst} className="dm-heart-burst" aria-hidden="true">❤️</span>}
         {/* WhatsApp: a reply without text (voice note, sticker, GIF, photo) carries its quote on top. */}
-        {message.replyTo && !hasText && !message.viewOnce && (
+        {replyTo && !hasText && !message.viewOnce && (
           <div className="dm-reply-head">
-            <Quote reply={message.replyTo} author={quoteAuthor} onJump={() => onJump(message.replyTo!.id)} />
+            <Quote reply={replyTo} author={quoteAuthor} onJump={() => onJump(replyTo.id)} />
           </div>
         )}
         {message.storyReply && <StoryReplyPreview reply={message.storyReply} own={own} />}
@@ -655,6 +865,8 @@ export function MessageItem({
         {message.audioUrl&&<VoiceMessage id={message.id} src={message.audioUrl} durationMs={message.audioDurationMs} own={own} author={own?user:peer}/>}
         {message.sticker?<MessageSticker sticker={message.sticker}/>:message.hasSticker?<p className="dm-bubble muted">Sticker unavailable</p>:null}
         {message.gif && <GifView gif={message.gif} className="dm-gif" />}
+        {message.game && <GameCard game={message.game} peer={peer} own={own} onRematch={onRematch} />}
+        {message.baby && <BabyInviteCard invite={message.baby} own={own} peer={peer} onOpen={onBaby} />}
         {media &&
           (media.type === "VIDEO" ? (
             <MediaVideo
@@ -679,30 +891,46 @@ export function MessageItem({
               />
             </button>
           ))}
+        {album && <AlbumGrid items={album} />}
         {photoOpen&&media&&<ImageViewer src={media.url} alt="Photo in conversation" onClose={()=>setPhotoOpen(false)}/>}
         {message.post && <SharedPost post={message.post} />}
         {missing && <p className="dm-bubble muted">This attachment is no longer available.</p>}
         {hasText && !message.viewOnce && (
           <div className="dm-bubble">
-            {message.replyTo && (
+            {replyTo && (
               <Quote
-                reply={message.replyTo}
+                reply={replyTo}
                 author={quoteAuthor}
-                onJump={() => onJump(message.replyTo!.id)}
+                onJump={() => onJump(replyTo.id)}
               />
             )}
             <MessageText text={message.content!}/>
-            <Stamp message={message} own={own} />
+            <Stamp message={message} own={own} delivery={delivery} />
           </div>
         )}
         {!hasText && !message.viewOnce && (
           <span className="dm-stamp standalone">
+            {message.isFavorite && <Star className="dm-stamp-star" size={11} fill="currentColor" aria-label="Favorite" />}
             <time dateTime={message.createdAt}>{clock(message.createdAt)}</time>
-            {own && !message.call && <Ticks message={message} />}
+            {own && !message.call && <Ticks message={message} delivery={delivery} />}
+          </span>
+        )}
+        {reactions.length > 0 && (
+          <Reactions
+            reactions={reactions}
+            userId={user?.id}
+            onToggle={onReact && !delivery ? (emoji) => onReact(message, myReaction === emoji ? null : emoji) : undefined}
+          />
+        )}
+        {delivery === "failed" && (
+          <span className="dm-failed" role="alert">
+            Not sent
+            <button type="button" onClick={() => onRetry?.(message.id)}><RotateCcw size={13} /> Retry</button>
+            <button type="button" onClick={() => onDiscard?.(message.id)}>Delete</button>
           </span>
         )}
       </div>
-      <div className="dm-hover-actions">
+      {!delivery && <div className="dm-hover-actions">
         <button type="button" className="dm-reply-action" aria-label="Reply" onClick={() => onReply(message)}>
           <Reply size={16} />
         </button>
@@ -715,7 +943,7 @@ export function MessageItem({
         >
           <MoreHorizontal size={16} />
         </button>
-      </div>
+      </div>}
       {menu &&
         createPortal(
           <div className={`dm-menu-layer ${menu.mode}`}
@@ -728,6 +956,26 @@ export function MessageItem({
               style={menu.mode === "popover" ? { top: menu.top, left: menu.left, right: menu.right } : undefined}
             >
               {menu.mode === "sheet" && message.content && <p className="dm-menu-preview">{message.content}</p>}
+              {onReact && (
+                <div className="dm-react-bar" role="group" aria-label="React">
+                  {REACTIONS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      aria-label={`React with ${emoji}`}
+                      aria-pressed={myReaction === emoji}
+                      className={myReaction === emoji ? "selected" : ""}
+                      onClick={() => {
+                        setMenu(null);
+                        haptic("tap");
+                        onReact(message, myReaction === emoji ? null : emoji);
+                      }}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
               <button
                 type="button"
                 role="menuitem"
@@ -738,6 +986,19 @@ export function MessageItem({
               >
                 <Reply size={18} /> Reply
               </button>
+              {onFavorite && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenu(null);
+                    onFavorite(message);
+                  }}
+                >
+                  <Star size={18} fill={message.isFavorite ? "currentColor" : "none"} />{" "}
+                  {message.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                </button>
+              )}
               {message.content && (
                 <button
                   type="button"
@@ -761,10 +1022,10 @@ export function MessageItem({
                   className="danger"
                   onClick={() => {
                     setMenu(null);
-                    onUnsend(message);
+                    onUnsend(message, album);
                   }}
                 >
-                  <Trash2 size={18} /> Unsend
+                  <Trash2 size={18} /> {album ? `Unsend ${album.length} items` : "Unsend"}
                 </button>
               )}
               {menu.mode === "sheet" && (
@@ -783,64 +1044,922 @@ export function MessageItem({
       )}
     </li>
   );
+});
+
+type Draft = { content?: string; mediaId?: string; stickerId?:string;audioId?:string;gifId?:string;viewOnce?: boolean; replyToId?: string };
+type ThreadPage = Result<"messagesList">;
+type ThreadData = InfiniteData<ThreadPage, string | undefined>;
+type Outgoing = { message: Message; draft: Draft; status: Delivery };
+type InfoTab = "media" | "links" | "favorites";
+type AlbumDraft = { key: string; file: File; preview: string; type: "IMAGE" | "VIDEO"; progress: number; media: Models["MediaDto"] | null; error: string | null };
+const MAX_ALBUM = 10;
+/** Photos and videos from one person within this window form an album. */
+const ALBUM_MS = 2 * 60_000;
+const albumable = (m: Message) => !!m.media && !m.viewOnce && !m.post && !m.storyReply && !m.noteReply && !m.call;
+
+/** Local (not yet confirmed) messages carry this id prefix. */
+const LOCAL_PREFIX = "local-";
+let localCount = 0;
+const nextLocalId = () => `${LOCAL_PREFIX}${Date.now().toString(36)}-${localCount++}`;
+/** How often an open chat checks for new messages. Only the newest page is fetched. */
+const HEAD_POLL_MS = 2500;
+/** Grow the composer with CSS where supported, so typing never measures layout. */
+const CSS_AUTOSIZE = typeof CSS !== "undefined" && CSS.supports?.("field-sizing", "content");
+
+function blankMessage(id: string, senderId: string, recipientId: string): Message {
+  return {
+    id, senderId, recipientId, createdAt: new Date().toISOString(), content: null, media: null, post: null, replyTo: null,
+    viewOnce: false, viewOnceType: null, openedAt: null, deliveredAt: null, readAt: null, storyReply: null, noteReply: null,
+    editedAt: null, gif: null, call: null, sticker: null, hasSticker: false, audioUrl: null, audioDurationMs: null, isFavorite: false, reactions: [], game: null, baby: null,
+  };
+}
+function replyKind(m: Message): Models["MessageReplyRefDto"]["kind"] {
+  return m.viewOnce ? "VIEW_ONCE" : m.game ? "GAME" : m.baby ? "BABY" : m.content ? "TEXT" : m.audioUrl ? "AUDIO" : m.gif ? "GIF" : m.hasSticker ? "STICKER"
+    : m.call ? "CALL" : m.media?.type === "VIDEO" ? "VIDEO" : m.media ? "PHOTO" : m.post ? "POST" : m.storyReply ? "STORY" : "TEXT";
+}
+function replyThumb(m: Message) {
+  return m.viewOnce ? null : (m.gif?.previewUrl ?? (m.media?.type === "IMAGE" ? m.media.url : m.sticker?.url)) ?? null;
+}
+function replyRef(m: Message): Models["MessageReplyRefDto"] {
+  return {
+    id: m.id, senderId: m.senderId, kind: replyKind(m),
+    preview: m.viewOnce ? null : (m.content?.slice(0, 140) ?? m.sticker?.emoji ?? null),
+    audioDurationMs: m.audioUrl ? m.audioDurationMs : null, thumbnailUrl: replyThumb(m),
+  };
 }
 
-function EmojiButton({
-  disabled,
-  onPick,
-}: {
-  disabled: boolean;
-  onPick: (emoji: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: PointerEvent) => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const escape = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("pointerdown", close);
-    document.addEventListener("keydown", escape);
-    return () => {
-      document.removeEventListener("pointerdown", close);
-      document.removeEventListener("keydown", escape);
-    };
-  }, [open]);
+const updatePages = (data: ThreadData | undefined, fn: (items: Message[], page: number) => Message[]) =>
+  data && { ...data, pages: data.pages.map((p, i) => ({ ...p, items: fn(p.items, i) })) };
+function insertMessage(data: ThreadData | undefined, message: Message) {
+  if (!data?.pages.length || data.pages.some((p) => p.items.some((m) => m.id === message.id))) return data;
+  return updatePages(data, (items, page) => (page === 0 ? [message, ...items] : items));
+}
+const patchMessage = (data: ThreadData | undefined, id: string, patch: Partial<Message>) =>
+  updatePages(data, (items) => items.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+const dropMessage = (data: ThreadData | undefined, id: string) =>
+  updatePages(data, (items) => items.filter((m) => m.id !== id));
+const olderThan = (a: Message, b: Message) => a.createdAt < b.createdAt || (a.createdAt === b.createdAt && a.id < b.id);
+/**
+ * Folds a fresh newest page into the cached thread, so polling never refetches every loaded page.
+ * Returns null when the fresh page no longer overlaps the cache (a full refetch is needed).
+ */
+function mergeHead(data: ThreadData | undefined, head: ThreadPage): ThreadData | null {
+  if (!data?.pages.length) return null;
+  if (!head.hasMore) return { pages: [head], pageParams: [data.pageParams[0]] };
+  const [first, ...rest] = data.pages;
+  const oldest = head.items.at(-1);
+  if (oldest && first.items[0] && olderThan(first.items[0], oldest)) return null;
+  const fresh = new Set(head.items.map((m) => m.id));
+  // Cached messages inside the fresh window but missing from it were unsent; older ones stay.
+  const keep = oldest ? first.items.filter((m) => !fresh.has(m.id) && olderThan(m, oldest)) : first.items;
+  return { ...data, pages: [{ ...first, items: [...head.items, ...keep] }, ...rest] };
+}
+
+/** WhatsApp-style month headings for shared media and links. */
+function byMonth(items: Message[]) {
+  const groups: { label: string; items: Message[] }[] = [];
+  const thisYear = new Date().getFullYear();
+  for (const item of items) {
+    const date = new Date(item.createdAt);
+    const label = date.toLocaleDateString(undefined, { month: "long", ...(date.getFullYear() === thisYear ? {} : { year: "numeric" }) });
+    const last = groups.at(-1);
+    if (last?.label === label) last.items.push(item);
+    else groups.push({ label, items: [item] });
+  }
+  return groups;
+}
+const LINK = /((?:https?:\/\/|www\.)[^\s<>]+)/gi;
+function linksOf(text: string | null) {
+  return [...(text ?? "").matchAll(LINK)].map((match) => {
+    const raw = match[1].replace(/[.,!?;:)\]}]+$/, "");
+    try {
+      const url = new URL(/^www\./i.test(raw) ? `https://${raw}` : raw);
+      return ["http:", "https:"].includes(url.protocol) ? url : null;
+    } catch {
+      return null;
+    }
+  }).filter((url): url is URL => !!url);
+}
+
+function SharedMediaViewer({ message, onClose }: { message: Message; onClose: () => void }) {
+  if (message.media?.type === "IMAGE") return <ImageViewer src={message.media.url} alt="Shared photo" onClose={onClose} />;
   return (
-    <div className="dm-emoji" ref={box}>
-      <button
-        type="button"
-        className="dm-icon"
-        aria-label="Choose an emoji"
-        aria-expanded={open}
-        disabled={disabled}
-        onPointerDown={(e) => e.preventDefault()}
-        onClick={() => setOpen((o) => !o)}
-      >
-        <Smile size={24} />
-      </button>
-      {open && (
-        <div className="dm-emoji-panel" role="listbox" aria-label="Emoji">
-          {EMOJIS.map((emoji) => (
-            <button
-              type="button"
-              key={emoji}
-              role="option"
-              aria-selected={false}
-              onPointerDown={(e) => e.preventDefault()}
-              onClick={() => onPick(emoji)}
-            >
-              {emoji}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <Modal title={message.gif ? "GIF" : "Video"} className="dm-media-viewer" onClose={onClose}>
+      <div className="dm-media-viewer-stage">
+        {message.gif ? (
+          <GifView gif={message.gif} maxWidth={720} />
+        ) : message.media ? (
+          <MediaVideo src={message.media.url} autoPlay controls playsInline />
+        ) : null}
+      </div>
+    </Modal>
   );
 }
 
-type Draft = { content?: string; mediaId?: string; stickerId?:string;audioId?:string;gifId?:string;viewOnce?: boolean; replyToId?: string };
+/** "You & them" card in chat info: how long and how much you have been talking. */
+/** 1,234 → "1,234"; 12,400 → "12.4K", so big numbers never break the layout. */
+const compact = (value: number) =>
+  value < 10_000 ? value.toLocaleString() : new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(value);
+
+function TogetherCard({ peer }: { peer: Models["MessagePeerDto"] }) {
+  const { user } = useSession();
+  const stats = useQuery({
+    queryKey: ["messages", user?.id, "together", peer.id],
+    queryFn: ({ signal }) => api("messagesTogether", { params: { id: peer.id }, signal }),
+    staleTime: 60_000,
+  });
+  const streak = useStreak(peer.id, !peer.isUnavailable);
+  const [now] = useState(() => Date.now());
+  const data = stats.data;
+  if (!data?.since) return null;
+  const since = new Date(data.since);
+  const days = Math.max(1, Math.ceil((now - since.getTime()) / 86_400_000));
+  const streakDays = streak.data && streak.data.state !== "expired" ? streak.data.days : 0;
+  const tiles = [
+    { icon: MessageCircle, tone: "#228be6", value: data.messages, label: "Messages" },
+    { icon: Images, tone: "#12b886", value: data.photos, label: "Media" },
+    { icon: Mic, tone: "#7950f2", value: data.voiceNotes, label: "Voice notes" },
+    { icon: Phone, tone: "#15aabf", value: data.callMinutes, label: "Call min" },
+    { icon: CalendarHeart, tone: "#e64980", value: data.daysTogether, label: "Active days" },
+    { icon: Flame, tone: "#f76707", value: streakDays, label: "Streak" },
+  ];
+  return (
+    <section className="dm-us" aria-label={`You and ${peer.displayName}`}>
+      <div className="dm-us-head">
+        <span className="dm-us-avatars" aria-hidden="true">
+          <Avatar user={user} size={38} />
+          <Avatar user={peer} size={38} />
+          <span className="dm-us-heart"><Heart size={11} fill="currentColor" strokeWidth={0} /></span>
+        </span>
+        <span className="dm-us-title">
+          <strong><span>You</span><span className="dm-us-amp">&amp;</span><span className="dm-us-peer">{peer.displayName}</span></strong>
+          <small>Since {since.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</small>
+        </span>
+        <span className="dm-us-days">
+          <b>{compact(days)}</b>
+          <small>{days === 1 ? "day" : "days"}</small>
+        </span>
+      </div>
+      <div className="dm-us-grid">
+        {tiles.map(({ icon: Icon, tone, value, label }) => (
+          <div key={label} className="dm-us-stat" title={`${label}: ${value.toLocaleString()}`}>
+            <span className="dm-us-icon" style={{ color: tone, background: `color-mix(in srgb, ${tone} 14%, transparent)` }}>
+              <Icon size={15} strokeWidth={2.2} />
+            </span>
+            <span className="dm-us-copy">
+              <b>{compact(value)}</b>
+              <small>{label}</small>
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ChatInfo({
+  peer,
+  initialTab,
+  presenceText,
+  canCall,
+  sounds,
+  onToggleSounds,
+  themeId,
+  themeName,
+  onTheme,
+  onCustomize,
+  onTogether,
+  onBaby,
+  onBlock,
+  onDelete,
+  onCall,
+  onJump,
+  onClose,
+}: {
+  peer: Models["MessagePeerDto"];
+  initialTab: InfoTab;
+  presenceText: string | null;
+  canCall: boolean;
+  sounds: boolean;
+  onToggleSounds: () => void;
+  themeId: string;
+  themeName: string;
+  onTheme?: () => void;
+  onCustomize?: () => void;
+  onTogether?: () => void;
+  onBaby?: () => void;
+  onBlock?: () => void;
+  onDelete?: () => void;
+  onCall: (kind: "audio" | "video") => void;
+  onJump: (id: string) => void;
+  onClose: () => void;
+}) {
+  const { user } = useSession();
+  const [tab, setTab] = useState<InfoTab>(initialTab);
+  const [viewing, setViewing] = useState<Message | null>(null);
+  const list = useInfiniteQuery({
+    queryKey: tab === "favorites" ? ["messages", user?.id, "favorites", peer.id] : ["messages", user?.id, "shared", peer.id, tab],
+    queryFn: ({ pageParam, signal }) =>
+      tab === "favorites"
+        ? api("messagesFavorites", { params: { id: peer.id }, query: { cursor: pageParam, limit: 30 }, signal })
+        : api("messagesSharedMedia", { params: { id: peer.id }, query: { cursor: pageParam, limit: 30, kind: tab }, signal }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (p) => (p.hasMore ? (p.nextCursor ?? undefined) : undefined),
+    staleTime: 15_000,
+  });
+  const items = list.data?.pages.flatMap((p) => p.items) ?? [];
+  const tabs: { id: InfoTab; label: string }[] = [
+    { id: "media", label: "Media" },
+    { id: "links", label: "Links" },
+    { id: "favorites", label: "Favorites" },
+  ];
+  const empty = {
+    media: { title: "No media yet", text: "Photos, videos and GIFs you share in this chat appear here." },
+    links: { title: "No links yet", text: "Links you send each other are collected here." },
+    favorites: { title: "No favorites yet", text: "Long-press or open the menu on a message and choose “Add to favorites”." },
+  }[tab];
+  const photo = peer.isUnavailable ? null : themePhoto(themeId);
+  const accent = themeMeta(themeId).accent ?? "var(--primary)";
+  return (
+    <>
+    <Modal title="Chat info" className="dm-info-sheet" onClose={onClose}>
+      <div className="dm-info" style={{ "--info-accent": accent } as CSSProperties}>
+        {/* Telegram-style cover: the chat theme's photo behind a big avatar. */}
+        <div className={`dm-info-cover ${photo ? "has-photo" : ""}`} style={photo ? { backgroundImage: `url("${photo}")` } : undefined}>
+          <Avatar user={peer} size={96} />
+          <strong>
+            {peer.displayName}
+            {peer.isVerified && <VerifiedBadge />}
+          </strong>
+          <span>{presenceText ?? `@${peer.username}`}</span>
+        </div>
+
+        <div className="dm-info-quick">
+          <button type="button" disabled={!canCall} onClick={() => onCall("audio")}>
+            <Phone size={21} />
+            <span>Call</span>
+          </button>
+          <button type="button" disabled={!canCall} onClick={() => onCall("video")}>
+            <Video size={21} />
+            <span>Video</span>
+          </button>
+          <button type="button" onClick={onToggleSounds} aria-pressed={!sounds}>
+            {sounds ? <Bell size={21} /> : <BellOff size={21} />}
+            <span>{sounds ? "Mute" : "Unmute"}</span>
+          </button>
+          {!peer.isUnavailable ? (
+            <Link href={`/profile/${peer.username}`}>
+              <Info size={21} />
+              <span>Profile</span>
+            </Link>
+          ) : (
+            <button type="button" disabled>
+              <Info size={21} />
+              <span>Profile</span>
+            </button>
+          )}
+        </div>
+
+        {!peer.isUnavailable && <TogetherCard peer={peer} />}
+        {onBaby && (
+          <div className="dm-set-group dm-info-baby">
+            <BabyCard peer={peer} onOpen={onBaby} />
+          </div>
+        )}
+
+        {(onTheme || onCustomize || onTogether) && (
+          <>
+            <h3 className="dm-set-label">This chat</h3>
+            <div className="dm-set-group">
+              {onTheme && (
+                <button type="button" className="dm-set-item" onClick={onTheme}>
+                  <span className="dm-set-icon" style={{ background: accent }}><Palette size={17} /></span>
+                  <span className="dm-set-text"><strong>Chat theme</strong></span>
+                  <span className="dm-set-value">{themeName}</span>
+                  <ChevronRight size={18} className="dm-set-chevron" aria-hidden="true" />
+                </button>
+              )}
+              {onCustomize && (
+                <button type="button" className="dm-set-item" onClick={onCustomize}>
+                  <span className="dm-set-icon" style={{ background: "#7950f2" }}><WandSparkles size={17} /></span>
+                  <span className="dm-set-text"><strong>Nickname, wallpaper & sound</strong></span>
+                  <ChevronRight size={18} className="dm-set-chevron" aria-hidden="true" />
+                </button>
+              )}
+              {onTogether && (
+                <button type="button" className="dm-set-item" onClick={onTogether}>
+                  <span className="dm-set-icon" style={{ background: "#12b886" }}><Gamepad2 size={17} /></span>
+                  <span className="dm-set-text"><strong>Gestures & games</strong></span>
+                  <ChevronRight size={18} className="dm-set-chevron" aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          </>
+        )}
+
+        {(onBlock || onDelete) && (
+          <div className="dm-set-group dm-info-danger">
+            {onBlock && (
+              <button type="button" className="dm-set-item danger" onClick={onBlock}>
+                <span className="dm-set-icon" style={{ background: "#fa5252" }}>{peer.isBlocking ? <ShieldOff size={17} /> : <Ban size={17} />}</span>
+                <span className="dm-set-text"><strong>{peer.isBlocking ? "Unblock account" : "Block account"}</strong></span>
+              </button>
+            )}
+            {onDelete && (
+              <button type="button" className="dm-set-item danger" onClick={onDelete}>
+                <span className="dm-set-icon" style={{ background: "#fa5252" }}><Trash2 size={17} /></span>
+                <span className="dm-set-text"><strong>Delete chat</strong></span>
+              </button>
+            )}
+          </div>
+        )}
+
+        <h3 className="dm-set-label">Shared</h3>
+        <div className="dm-info-segment" role="tablist" aria-label="Shared in this chat">
+          {tabs.map(({ id, label }) => (
+            <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="dm-info-panel" role="tabpanel">
+          {list.isPending && (
+            <div className={tab === "media" ? "dm-media-grid" : "dm-info-skeleton"} aria-busy="true" aria-label="Loading">
+              {Array.from({ length: tab === "media" ? 9 : 4 }, (_, i) => <span key={i} className="dm-skeleton" />)}
+            </div>
+          )}
+          {list.error && <ErrorState error={list.error} retry={() => void list.refetch()} />}
+          {!list.isPending && !list.error && !items.length && (
+            <div className="dm-info-empty">
+              {tab === "media" ? <Images size={30} strokeWidth={1.5} /> : tab === "links" ? <Link2 size={30} strokeWidth={1.5} /> : <Star size={30} strokeWidth={1.5} />}
+              <strong>{empty.title}</strong>
+              <p>{empty.text}</p>
+            </div>
+          )}
+          {tab === "media" &&
+            byMonth(items).map((group) => (
+              <section key={group.label} className="dm-info-group">
+                <h3>{group.label}</h3>
+                <div className="dm-media-grid">
+                  {group.items.map((m) => (
+                    <button key={m.id} type="button" className="dm-media-tile" aria-label={`Open ${m.gif ? "GIF" : m.media?.type === "VIDEO" ? "video" : "photo"}`} onClick={() => setViewing(m)}>
+                      {m.gif ? (
+                        <img src={m.gif.previewUrl} alt="" loading="lazy" decoding="async" />
+                      ) : m.media?.type === "VIDEO" ? (
+                        <>
+                          <video src={`${m.media.url}#t=0.1`} muted playsInline preload="metadata" />
+                          <span className="dm-media-badge"><Play size={14} fill="currentColor" /></span>
+                        </>
+                      ) : m.media ? (
+                        <img src={m.media.url} alt="" loading="lazy" decoding="async" />
+                      ) : null}
+                      {m.gif && <span className="dm-media-badge text">GIF</span>}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
+          {tab === "links" &&
+            byMonth(items).map((group) => (
+              <section key={group.label} className="dm-info-group">
+                <h3>{group.label}</h3>
+                <ul className="dm-link-list">
+                  {group.items.flatMap((m) =>
+                    linksOf(m.content).map((url, i) => (
+                      <li key={`${m.id}-${i}`}>
+                        <a href={url.href} target="_blank" rel="noopener noreferrer nofollow">
+                          <span className="dm-link-icon"><Link2 size={18} /></span>
+                          <span className="dm-link-copy">
+                            <strong>{url.hostname.replace(/^www\./, "")}</strong>
+                            <small>{url.href}</small>
+                          </span>
+                        </a>
+                        <button type="button" className="dm-icon" aria-label="Show in chat" onClick={() => onJump(m.id)}>
+                          <ChevronRight size={18} />
+                        </button>
+                      </li>
+                    )),
+                  )}
+                </ul>
+              </section>
+            ))}
+          {tab === "favorites" && !!items.length && (
+            <ul className="dm-starred-list">
+              {items.map((m) => {
+                const own = m.senderId === user?.id;
+                const thumb = replyThumb(m);
+                return (
+                  <li key={m.id}>
+                    <button type="button" className="dm-starred-row" onClick={() => onJump(m.id)}>
+                      <Avatar user={own ? user : peer} size={36} />
+                      <span className="dm-starred-copy">
+                        <span className="dm-starred-meta">
+                          <strong>{own ? "You" : peer.displayName}</strong>
+                          <time dateTime={m.createdAt}>{separatorLabel(m.createdAt)}</time>
+                        </span>
+                        <span className={`dm-starred-bubble ${own ? "own" : ""}`}>
+                          {thumb && <img src={thumb} alt="" loading="lazy" />}
+                          <QuoteSummary kind={replyKind(m)} text={m.content || m.sticker?.emoji || attachmentLabel(m)} durationMs={m.audioDurationMs} />
+                        </span>
+                      </span>
+                      <Star className="dm-starred-star" size={15} fill="currentColor" aria-label="Favorite" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <LoadMore hasMore={list.hasNextPage} pending={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()} />
+        </div>
+      </div>
+    </Modal>
+    {viewing && <SharedMediaViewer message={viewing} onClose={() => setViewing(null)} />}
+    </>
+  );
+}
+
+/**
+ * Telegram-style composer: one rounded field (emoji/sticker tray, text, attach) and a round
+ * button that morphs between microphone and send. It owns the draft text, so typing re-renders
+ * only the composer and never the message list.
+ */
+function Composer({
+  peer,
+  canMessage,
+  awaiting,
+  callsBusy,
+  fieldRef,
+  stickerDock,
+  voiceActive,
+  onVoiceActiveChange,
+  replyTo,
+  editing,
+  onCancelReply,
+  onCancelEdit,
+  onJumpTo,
+  onSaveEdit,
+  onSend,
+  onSendAudio,
+  onTogether,
+}: {
+  peer: Models["MessagePeerDto"];
+  canMessage: boolean;
+  awaiting: boolean;
+  callsBusy: boolean;
+  fieldRef: RefObject<HTMLTextAreaElement | null>;
+  stickerDock: HTMLDivElement | null;
+  voiceActive: boolean;
+  onVoiceActiveChange: (active: boolean) => void;
+  replyTo: Message | null;
+  editing: Message | null;
+  onCancelReply: () => void;
+  onCancelEdit: () => void;
+  onJumpTo: (id: string) => void;
+  onSaveEdit: (message: Message, content: string) => void;
+  onSend: (draft: Draft, preview: Partial<Message>, options?: { noReply?: boolean }) => void;
+  onSendAudio: (audioId: string) => Promise<unknown>;
+  /** Opens gestures and mini games. */
+  onTogether?: () => void;
+}) {
+  const { user } = useSession();
+  const toast = useToast();
+  const [text, setText] = useState("");
+  const [viewOnce, setViewOnce] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const attachment = useMediaAttachment();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const typingSent = useRef(0);
+  // Editing a message puts its text in the field; finishing or cancelling empties it.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  if ((editing?.id ?? null) !== editingId) {
+    setEditingId(editing?.id ?? null);
+    setText(editing?.content ?? "");
+  }
+  useLayoutEffect(() => {
+    const el = fieldRef.current;
+    if (!el || CSS_AUTOSIZE) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [text, fieldRef]);
+  // Stop showing "typing..." to them when leaving the conversation.
+  useEffect(
+    () => () => {
+      if (typingSent.current) void api("messagesStopTyping", { params: { id: peer.id } }).catch(() => {});
+    },
+    [peer.id],
+  );
+  const signalTyping = (value: string) => {
+    const now = Date.now();
+    if (value.trim() && now - typingSent.current > 3000) {
+      typingSent.current = now;
+      void api("messagesTyping", { params: { id: peer.id } }).catch(() => {});
+    } else if (!value.trim() && typingSent.current) {
+      typingSent.current = 0;
+      void api("messagesStopTyping", { params: { id: peer.id } }).catch(() => {});
+    }
+  };
+  /** Several photos/videos picked at once upload in parallel and are sent as one album. */
+  const [album, setAlbum] = useState<AlbumDraft[]>([]);
+  const albumRef = useRef<AlbumDraft[]>([]);
+  const removedKeys = useRef(new Set<string>());
+  useEffect(() => {
+    albumRef.current = album;
+  }, [album]);
+  useEffect(
+    () => () => {
+      for (const item of albumRef.current) {
+        URL.revokeObjectURL(item.preview);
+        if (item.media) void api("mediaRemove", { params: { id: item.media.id } }).catch(() => {});
+      }
+    },
+    [],
+  );
+  const patchAlbum = (key: string, patch: Partial<AlbumDraft>) =>
+    setAlbum((list) => list.map((item) => (item.key === key ? { ...item, ...patch } : item)));
+  const uploadAlbumItem = async (item: AlbumDraft) => {
+    try {
+      const file = await compressImage(item.file);
+      if (removedKeys.current.has(item.key)) return;
+      let uploaded = (await upload(file, (progress) => patchAlbum(item.key, { progress }))) as Models["MediaDto"];
+      if (removedKeys.current.has(item.key)) {
+        void api("mediaRemove", { params: { id: uploaded.id } }).catch(() => {});
+        return;
+      }
+      patchAlbum(item.key, { media: uploaded, progress: 100 });
+      while (uploaded.status === "PROCESSING") {
+        await new Promise((resolve) => window.setTimeout(resolve, 1500));
+        if (removedKeys.current.has(item.key)) return;
+        uploaded = await api("mediaGet", { params: { id: uploaded.id } });
+        patchAlbum(item.key, { media: uploaded });
+      }
+      if (uploaded.status === "FAILED") patchAlbum(item.key, { error: "Processing failed" });
+    } catch (e) {
+      patchAlbum(item.key, { error: e instanceof Error ? e.message : "Upload failed" });
+    }
+  };
+  const addToAlbum = (files: File[]) => {
+    const room = MAX_ALBUM - album.length;
+    if (files.length > room) toast(`You can send up to ${MAX_ALBUM} photos and videos at once.`, true);
+    const items: AlbumDraft[] = files.slice(0, Math.max(0, room)).map((file) => ({
+      key: nextLocalId(),
+      file,
+      preview: URL.createObjectURL(file),
+      type: file.type.startsWith("video/") ? "VIDEO" : "IMAGE",
+      progress: 0,
+      media: null,
+      error: null,
+    }));
+    if (!items.length) return;
+    setAlbum((list) => [...list, ...items]);
+    void (async () => {
+      for (let i = 0; i < items.length; i += 2) await Promise.all(items.slice(i, i + 2).map(uploadAlbumItem));
+    })();
+  };
+  const removeFromAlbum = (key: string) => {
+    const item = album.find((x) => x.key === key);
+    removedKeys.current.add(key);
+    if (item) URL.revokeObjectURL(item.preview);
+    if (item?.media) void api("mediaRemove", { params: { id: item.media.id } }).catch(() => {});
+    setAlbum((list) => list.filter((x) => x.key !== key));
+  };
+  const albumReady = album.length > 0 && album.every((item) => item.media?.status === "READY" && !item.error);
+  const media = editing ? null : attachment.media;
+  const hasText = !!text.trim();
+  const canSend = canMessage && !voiceActive && !attachment.busy && !attachment.error && (album.length ? albumReady : hasText || !!media);
+  const showSend = hasText || !!media || !!editing || callsBusy || album.length > 0;
+  const submit = () => {
+    if (editing) {
+      const value = text.trim();
+      if (value && value !== editing.content) onSaveEdit(editing, value);
+      else if (!value) return;
+      else onCancelEdit();
+      return;
+    }
+    if (!canSend) return;
+    if (album.length) {
+      const caption = text.trim() || undefined;
+      album.forEach((item, i) => {
+        const last = i === album.length - 1;
+        onSend(
+          { mediaId: item.media!.id, content: last ? caption : undefined },
+          { media: item.media!, content: last ? (caption ?? null) : null },
+          { noReply: i > 0 },
+        );
+        URL.revokeObjectURL(item.preview);
+      });
+      setAlbum([]);
+      setText("");
+      typingSent.current = 0;
+      fieldRef.current?.focus({ preventScroll: true });
+      return;
+    }
+    const content = text.trim() || undefined;
+    onSend(
+      { content, mediaId: media?.id, viewOnce: media ? viewOnce : undefined },
+      {
+        content: content ?? null,
+        ...(media ? (viewOnce ? { viewOnce: true, viewOnceType: media.type } : { media }) : {}),
+      },
+    );
+    // Clear at once (like Telegram) and keep the keyboard open for the next message.
+    setText("");
+    typingSent.current = 0;
+    if (media) {
+      attachment.attached();
+      setViewOnce(false);
+      setPreviewOpen(false);
+    }
+    fieldRef.current?.focus({ preventScroll: true });
+  };
+  const insertEmoji = (emoji: string) => {
+    const el = fieldRef.current;
+    const start = el?.selectionStart ?? text.length;
+    const end = el?.selectionEnd ?? text.length;
+    const next = (text.slice(0, start) + emoji + text.slice(end)).slice(0, 2000);
+    setText(next);
+    signalTyping(next);
+    requestAnimationFrame(() => el?.setSelectionRange(start + emoji.length, start + emoji.length));
+  };
+  const previewSrc = attachment.previewUrl ?? media?.url;
+  const embedMessage = editing ?? replyTo;
+  const embed = embedMessage && {
+    kind: editing ? ("edit" as const) : ("reply" as const),
+    key: `${editing ? "edit" : "reply"}-${embedMessage.id}`,
+    message: embedMessage,
+    title: editing ? "Edit message" : `Reply to ${embedMessage.senderId === user?.id ? "yourself" : peer.displayName}`,
+    quoteKind: editing ? ("TEXT" as const) : replyKind(embedMessage),
+    text: editing
+      ? embedMessage.content
+      : embedMessage.viewOnce ? null : embedMessage.content || embedMessage.sticker?.emoji || attachmentLabel(embedMessage),
+    thumb: editing ? null : replyThumb(embedMessage),
+  };
+  return (
+    <form
+      className="dm-composer tg-composer"
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+    >
+      {awaiting && <p className="dm-notice">Message request sent. You can send more once {peer.displayName} accepts.</p>}
+      {!canMessage && !awaiting && (
+        <p className="dm-notice">
+          {peer.isBlocking ? "You blocked this account. Unblock it to send messages." : "Follow this private account before sending a message."}
+        </p>
+      )}
+      {!editing && previewSrc && (
+        <div className="dm-attachment dm-attachment-preview">
+          <div className="dm-draft-media">
+            {(media?.type ?? attachment.previewType) === "IMAGE" ? (
+              <button type="button" aria-label="Enlarge photo preview" onClick={() => setPreviewOpen(true)}>
+                <img src={previewSrc} alt="Photo preview before sending" />
+              </button>
+            ) : (
+              <video src={previewSrc} controls playsInline preload="metadata" aria-label="Video preview before sending" />
+            )}
+          </div>
+          {previewOpen && <ImageViewer src={previewSrc} alt="Photo preview" onClose={() => setPreviewOpen(false)} />}
+          <div className="dm-draft-details">
+            <span>
+              {attachment.uploading
+                ? `Uploading… ${attachment.progress}%`
+                : media?.status === "READY"
+                  ? `${media.type === "IMAGE" ? "Photo" : "Video"} ready to send`
+                  : "Processing video..."}
+            </span>
+            <button
+              type="button"
+              className={`dm-once-toggle ${viewOnce ? "on" : ""}`}
+              aria-pressed={viewOnce}
+              aria-label="View once"
+              disabled={!media}
+              title={viewOnce ? "View once: on" : "View once: off"}
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={() => {
+                haptic("tap");
+                setViewOnce((v) => !v);
+              }}
+            >
+              1
+            </button>
+            <button
+              type="button"
+              className="dm-icon"
+              aria-label="Remove attachment"
+              onClick={() => {
+                attachment.clear();
+                setViewOnce(false);
+                setPreviewOpen(false);
+              }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+          {attachment.uploading && (
+            <span className="dm-upload-bar" role="progressbar" aria-valuenow={attachment.progress} aria-valuemin={0} aria-valuemax={100}>
+              <span style={{ transform: `scaleX(${(attachment.progress ?? 0) / 100})` }} />
+            </span>
+          )}
+        </div>
+      )}
+      {!editing && album.length > 0 && (
+        <div className="dm-album-draft">
+          <div className="dm-album-draft-strip">
+            {album.map((item) => {
+              const pending = !item.error && item.media?.status !== "READY";
+              return (
+                <div key={item.key} className={`dm-album-draft-item ${item.error ? "error" : ""} ${pending ? "pending" : ""}`}>
+                  {item.type === "VIDEO" ? <video src={item.preview} muted playsInline preload="metadata" /> : <img src={item.preview} alt="" />}
+                  {pending && (
+                    <span className="dm-album-progress" style={{ "--p": `${item.media ? 100 : item.progress}%` } as CSSProperties} aria-label={`Uploading ${item.progress}%`} />
+                  )}
+                  {item.error && <span className="dm-album-error" title={item.error}><CircleAlert size={18} /></span>}
+                  {item.type === "VIDEO" && <span className="dm-album-kind"><Video size={12} /></span>}
+                  <button type="button" className="dm-album-remove" aria-label="Remove" onPointerDown={(e) => e.preventDefault()} onClick={() => removeFromAlbum(item.key)}>
+                    <X size={12} strokeWidth={3} />
+                  </button>
+                </div>
+              );
+            })}
+            {album.length < MAX_ALBUM && (
+              <button type="button" className="dm-album-add" aria-label="Add more photos or videos" onPointerDown={(e) => e.preventDefault()} onClick={() => fileRef.current?.click()}>
+                <Plus size={22} />
+              </button>
+            )}
+          </div>
+          <small>
+            {album.length} {album.length === 1 ? "item" : "items"} ·{" "}
+            {album.some((item) => item.error) ? "Remove the failed item to send" : albumReady ? "Add a caption or send" : "Uploading…"}
+          </small>
+        </div>
+      )}
+      {viewOnce && media && <p className="dm-notice">They can open it once. It disappears after it&apos;s viewed.</p>}
+      {attachment.error && (
+        <p className="dm-notice error" role="alert">
+          {attachment.error}
+        </p>
+      )}
+      <div className="dm-compose-row tg-row">
+        <div className={`tg-field ${embed ? "has-embed" : ""}`}>
+          {embed && (
+            <div className={`tg-embed ${embed.kind}`} key={embed.key}>
+              <span className="tg-embed-icon" aria-hidden="true">
+                {embed.kind === "edit" ? <Pencil size={18} /> : <Reply size={20} />}
+              </span>
+              <button
+                type="button"
+                className="tg-embed-body"
+                title="Show message"
+                onPointerDown={(e) => e.preventDefault()}
+                onClick={() => onJumpTo(embed.message.id)}
+              >
+                {embed.thumb && <img className="tg-embed-thumb" src={embed.thumb} alt="" />}
+                <span className="tg-embed-text">
+                  <strong>{embed.title}</strong>
+                  <span className="tg-embed-preview">
+                    <QuoteSummary kind={embed.quoteKind} text={embed.text} durationMs={embed.message.audioDurationMs} />
+                  </span>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="tg-embed-close"
+                aria-label={embed.kind === "edit" ? "Cancel edit" : "Cancel reply"}
+                onPointerDown={(e) => e.preventDefault()}
+                onClick={embed.kind === "edit" ? onCancelEdit : onCancelReply}
+              >
+                <X size={18} />
+              </button>
+            </div>
+          )}
+          <div className="tg-field-row">
+          <StickerButton
+            conversation
+            dock={stickerDock}
+            disabled={!canMessage || voiceActive}
+            onEmoji={insertEmoji}
+            onPick={(sticker) => onSend({ stickerId: sticker.id }, { sticker, hasSticker: true })}
+            onGif={(gif) => onSend({ gifId: gif.id }, { gif })}
+          />
+          <textarea
+            ref={fieldRef}
+            aria-label="Message"
+            placeholder="Message"
+            maxLength={2000}
+            value={text}
+            // Never disabled while sending: disabling would blur it and close the phone keyboard.
+            disabled={!canMessage}
+            onChange={(e) => {
+              setText(e.target.value);
+              signalTyping(e.target.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                onCancelReply();
+                if (editing) onCancelEdit();
+              }
+              // Enter sends on devices with a keyboard; Shift+Enter keeps a new line.
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && window.matchMedia("(hover: hover)").matches) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            rows={1}
+          />
+          {!editing && onTogether && !hasText && !album.length && !media && (
+            <button
+              type="button"
+              className="dm-icon tg-together"
+              aria-label="Gestures and games"
+              title="Gestures and games"
+              disabled={!canMessage || voiceActive}
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={onTogether}
+            >
+              <Sparkles size={21} />
+            </button>
+          )}
+          {!editing && (
+            <button
+              type="button"
+              className="dm-icon tg-attach"
+              aria-label="Attach photo or video"
+              title="Photo or video"
+              disabled={!canMessage || attachment.busy || voiceActive || !!media || album.length >= MAX_ALBUM}
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={() => fileRef.current?.click()}
+            >
+              <Paperclip size={22} />
+            </button>
+          )}
+          </div>
+        </div>
+        <div className={`tg-action ${showSend ? "is-send" : "is-mic"}`}>
+          <button
+            type="submit"
+            className={`tg-send ${editing ? "is-edit" : ""}`}
+            aria-label={editing ? "Save edit" : "Send message"}
+            aria-hidden={!showSend || undefined}
+            tabIndex={showSend ? undefined : -1}
+            disabled={editing ? !text.trim() : !canSend}
+            // Keep focus in the textarea so the phone keyboard stays open after sending.
+            onPointerDown={(e) => e.preventDefault()}
+          >
+            {editing ? <Check size={22} strokeWidth={2.6} /> : <SendHorizontal size={21} strokeWidth={2.2} />}
+          </button>
+          {!callsBusy && (
+            <VoiceRecorder
+              buttonClassName="tg-mic"
+              hidden={showSend}
+              disabled={!canMessage || attachment.busy || !!media || showSend || album.length > 0}
+              onActiveChange={onVoiceActiveChange}
+              onSend={onSendAudio}
+            />
+          )}
+        </div>
+        <input
+          ref={fileRef}
+          hidden
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif,video/*"
+          multiple
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            e.target.value = "";
+            if (!files.length) return;
+            if (album.length || files.length > 1) addToAlbum(files);
+            else void attachment.select(files[0]);
+          }}
+        />
+      </div>
+    </form>
+  );
+}
+
+/** Messages written without a connection survive a reload and go out once you are back online. */
+const outboxKey = (userId: string, peerId: string) => `circle-outbox:${userId}:${peerId}`;
+function savedOutbox(userId: string | undefined, peerId: string): Outgoing[] {
+  if (!userId || typeof window === "undefined") return [];
+  try {
+    const saved = JSON.parse(localStorage.getItem(outboxKey(userId, peerId)) ?? "[]") as Outgoing[];
+    return Array.isArray(saved) ? saved.map((o) => ({ ...o, status: "waiting" as const })) : [];
+  } catch {
+    return [];
+  }
+}
+function saveOutbox(userId: string | undefined, peerId: string, items: Outgoing[]) {
+  if (!userId) return;
+  try {
+    const waiting = items.filter((o) => o.status === "waiting");
+    if (waiting.length) localStorage.setItem(outboxKey(userId, peerId), JSON.stringify(waiting));
+    else localStorage.removeItem(outboxKey(userId, peerId));
+  } catch {
+    /* storage unavailable */
+  }
+}
+/** No answer at all (offline, or the server is restarting): worth sending again later. */
+const unreachable = (e: unknown) => !(e instanceof ApiError) || e.status === 0 || e.status >= 502;
+const isOnline = () => typeof navigator === "undefined" || navigator.onLine;
 
 function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
   const calls = useCalls();
@@ -852,49 +1971,182 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
     refetchInterval: 2000,
   });
   const unavailable=status.data?.isUnavailable??initialPeer.isUnavailable;
+  const nickname = unavailable ? null : (status.data?.nickname ?? null);
+  const wallpaperUrl = unavailable ? null : (status.data?.wallpaperUrl ?? null);
   const peer={...initialPeer,isUnavailable:unavailable,isBlocking:status.data?.isBlocking??initialPeer.isBlocking,
-    ...(unavailable?{displayName:"Circle user",avatarUrl:null,isVerified:false}: {})};
+    ...(unavailable?{displayName:"Circle user",avatarUrl:null,isVerified:false}: {}),
+    ...(nickname?{displayName:nickname}:{})};
 
   const router = useRouter();
   const toast = useToast();
   const client = useQueryClient();
-  const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editing, setEditing] = useState<Message|null>(null);
-  const [viewOnce, setViewOnce] = useState(false);
-  const [voiceActive,setVoiceActive]=useState(false);
-  const [previewOpen,setPreviewOpen]=useState(false);
+  const [outbox, setOutbox] = useState<Outgoing[]>(() => savedOutbox(user?.id, initialPeer.id));
+  const [online, setOnline] = useState(isOnline);
+  const [info, setInfo] = useState<InfoTab | null>(null);
+  const [together, setTogether] = useState(false);
+  const [babyOpen, setBabyOpen] = useState(false);
+  const [customize, setCustomize] = useState(false);
   const [stickerDock,setStickerDock]=useState<HTMLDivElement|null>(null);
-  const attachment = useMediaAttachment();
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [showJump, setShowJump] = useState(false);
+  const [effect, setEffect] = useState<Effect | null>(null);
+  const [voiceActive, setVoiceActive] = useState(false);
+  const [mountedAt] = useState(() => Date.now());
   const textRef = useRef<HTMLTextAreaElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const messageList = useRef<HTMLOListElement>(null);
   const pinned = useRef(true);
-  const typingSent = useRef(0);
+  const sendQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const sending = useRef(0);
+  /** Confirmed messages keep the React key of their local copy, so they do not re-animate. */
+  const [keyAlias, setKeyAlias] = useState<ReadonlyMap<string, string>>(() => new Map());
+  const userId = user?.id;
+  const peerId = peer.id;
+  const threadKey = ["messages", userId, "thread", peerId];
   const thread = useInfiniteQuery({
-    queryKey: ["messages", user?.id, "thread", peer.id],
+    queryKey: threadKey,
     queryFn: ({ pageParam, signal }) =>
       api("messagesList", {
-        params: { id: peer.id },
+        params: { id: peerId },
         query: { cursor: pageParam, limit: 30 },
         signal,
       }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (p) => (p.hasMore ? (p.nextCursor ?? undefined) : undefined),
-    refetchInterval: 3000,
   });
-  const messages = Array.from(
+  /**
+   * Older messages load one page at a time as you scroll up. The distance from the bottom is
+   * kept across the insert, so the view stays on the same message instead of jumping to the
+   * top (which used to trigger the next load, and the next, all the way to the first message).
+   */
+  const topSentinel = useRef<HTMLDivElement>(null);
+  const restore = useRef<number | null>(null);
+  const loadOlder = () => {
+    const el = scroller.current;
+    if (!el || !thread.hasNextPage || thread.isFetchingNextPage || restore.current !== null) return;
+    restore.current = el.scrollHeight - el.scrollTop;
+    void thread.fetchNextPage().then((result) => {
+      // Nothing was added: forget the saved position.
+      if (result.isError) restore.current = null;
+    });
+  };
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    const fromBottom = restore.current;
+    if (!el || fromBottom === null || thread.isFetchingNextPage) return;
+    restore.current = null;
+    el.scrollTop = el.scrollHeight - fromBottom;
+  }, [thread.data, thread.isFetchingNextPage]);
+  const maybeLoadOlder = () => {
+    const el = scroller.current;
+    // Only while the person is reading back, never on the first paint at the bottom.
+    if (el && el.scrollHeight > el.clientHeight && !pinned.current) loadOlder();
+  };
+  const onTopVisible = useEffectEvent(maybeLoadOlder);
+  const canLoadOlder = !!thread.hasNextPage && !thread.isFetchingNextPage;
+  useEffect(() => {
+    const node = topSentinel.current;
+    const root = scroller.current;
+    if (!node || !root || !canLoadOlder) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) onTopVisible();
+    }, { root, rootMargin: "240px 0px 0px 0px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [canLoadOlder]);
+  // Live updates: poll only the newest page and fold it into the cache.
+  useEffect(() => {
+    const key = ["messages", userId, "thread", peerId];
+    let stopped = false;
+    let busy = false;
+    let timer: number | undefined;
+    const tick = async () => {
+      if (busy || stopped) return;
+      window.clearTimeout(timer);
+      busy = true;
+      try {
+        if (document.visibilityState === "visible" && !sending.current && client.getQueryData(key)) {
+          const head = await api("messagesList", { params: { id: peerId }, query: { limit: 30 } });
+          if (!stopped && !sending.current) {
+            const cached = client.getQueryData<ThreadData>(key);
+            const known = new Set(cached?.pages[0]?.items.map((m) => m.id));
+            // A heart or confetti message that just arrived plays its screen effect.
+            const arrived = head.items.find((m) => m.senderId !== userId && !known.has(m.id) && Date.parse(m.createdAt) > mountedAt && effectFor(m.content ?? m.sticker?.emoji));
+            const arrivedKind = arrived && effectFor(arrived.content ?? arrived.sticker?.emoji);
+            if (arrived && arrivedKind) setEffect({ kind: arrivedKind, key: arrived.id });
+            const merged = mergeHead(cached, head);
+            if (merged) client.setQueryData(key, merged);
+            else void client.refetchQueries({ queryKey: key, exact: true });
+          }
+        }
+      } catch {
+        /* The next tick tries again. */
+      } finally {
+        busy = false;
+      }
+      if (!stopped) timer = window.setTimeout(tick, HEAD_POLL_MS);
+    };
+    timer = window.setTimeout(tick, HEAD_POLL_MS);
+    const wake = () => {
+      if (document.visibilityState === "visible") void tick();
+    };
+    document.addEventListener("visibilitychange", wake);
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", wake);
+    };
+  }, [client, userId, peerId, mountedAt]);
+  const confirmed = Array.from(
     new Map((thread.data?.pages.flatMap((p) => p.items) ?? []).map((m) => [m.id, m])).values(),
   ).reverse();
+  const deliveries = new Map(outbox.map((o) => [o.message.id, o.status]));
+  const messages = outbox.length ? [...confirmed, ...outbox.map((o) => o.message)] : confirmed;
   const latest = messages.at(-1)?.id;
+  // Consecutive photos/videos from one person become one album entry.
+  const entries: { message: Message; album?: Message[] }[] = [];
+  for (const m of messages) {
+    const previous = entries.at(-1);
+    const tail = previous?.message;
+    if (
+      previous && tail && albumable(m) && albumable(tail) && tail.senderId === m.senderId && !tail.content && !m.replyTo &&
+      Date.parse(m.createdAt) - Date.parse(tail.createdAt) < ALBUM_MS
+    ) {
+      previous.album = [...(previous.album ?? [tail]), m];
+      previous.message = m;
+    } else entries.push({ message: m });
+  }
   const request = !!status.data?.isRequest;
   const canCall = !voiceActive && !calls.busy && !!status.data?.canSend && !request;
   const awaiting = !!status.data?.awaitingAcceptance;
   const typing = !!status.data?.peerTyping;
-  const subtitle = unavailable ? "This account is unavailable" : typing
-    ? "typing..."
-    : (presence(!!status.data?.peerOnline, status.data?.peerLastActiveAt) ?? peer.username);
+  const presenceText = unavailable ? "This account is unavailable" : presence(!!status.data?.peerOnline, status.data?.peerLastActiveAt);
+  const subtitle = presenceText ?? peer.username;
+  const chatTheme = (status.data?.theme ?? "default") as ChatThemeId;
+  /** Telegram-style tray: the chat previews each theme while it is open. */
+  const [themeTray, setThemeTray] = useState(false);
+  const [previewTheme, setPreviewTheme] = useState<ChatThemeId>("default");
+  const openThemeTray = () => {
+    setPreviewTheme(chatTheme);
+    setThemeTray(true);
+  };
+  const shownTheme = themeTray ? previewTheme : chatTheme;
+  // While trying themes on, show them as they are (a personal wallpaper would hide them).
+  const shownWallpaper = themeTray ? null : wallpaperUrl;
+  const statusKey = ["messages", userId, "status", peerId];
+  const setTheme = (theme: ChatThemeId) => {
+    const previous = status.data?.theme ?? null;
+    haptic("tap");
+    client.setQueryData<Models["MessageStatusDto"]>(statusKey, (d) => d && { ...d, theme: theme === "default" ? null : theme });
+    api("messagesSetTheme", { params: { id: peerId }, body: { theme } }).then(
+      () => toast(theme === "default" ? "Chat theme removed." : `Theme changed to ${CHAT_THEMES.find((t) => t.id === theme)?.name}.`),
+      (e: Error) => {
+        client.setQueryData<Models["MessageStatusDto"]>(statusKey, (d) => d && { ...d, theme: previous });
+        toast(e.message, true);
+      },
+    );
+  };
   const accept = useMutation({
     mutationFn: () => api("messagesAccept", { params: { id: peer.id } }),
     onSuccess: () => {
@@ -912,24 +2164,40 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
     },
     onError: (e) => toast(e.message, true),
   });
-  const [unsending, setUnsending] = useState<Message | null>(null);
+  const [unsending, setUnsending] = useState<Message[] | null>(null);
   const [sounds, setSounds] = useState(messageSoundsOn);
   const [deletingChat, setDeletingChat] = useState(false);
+  /** The inbox row and streak follow what was just sent; the thread itself is updated in place. */
+  const refreshAround = () => {
+    void client.invalidateQueries({ queryKey: ["messages", userId, "conversations"] });
+    void client.invalidateQueries({ queryKey: ["messages", userId, "streak", peerId] });
+  };
   const unsend = useMutation({
-    mutationFn: (id: string) => api("messagesDelete", { params: { id } }),
-    onSuccess: () => {
-      setUnsending(null);
-      toast("Message unsent.");
-      void client.invalidateQueries({ queryKey: ["messages"] });
+    mutationFn: async (ids: string[]) => {
+      for (const id of ids) await api("messagesDelete", { params: { id } });
     },
-    onError: (e) => toast(e.message, true),
+    onMutate: (ids) => {
+      setUnsending(null);
+      const previous = client.getQueryData<ThreadData>(threadKey);
+      client.setQueryData<ThreadData>(threadKey, (d) => ids.reduce((data, id) => dropMessage(data, id), d));
+      return { previous };
+    },
+    onSuccess: (_data, ids) => {
+      toast(ids.length > 1 ? `${ids.length} items unsent.` : "Message unsent.");
+      refreshAround();
+      void client.invalidateQueries({ queryKey: ["messages", userId, "favorites", peerId] });
+    },
+    onError: (e, _id, context) => {
+      if (context?.previous) client.setQueryData(threadKey, context.previous);
+      toast(e.message, true);
+    },
   });
   const deleteChat = useMutation({
     mutationFn: () => api("messagesDeleteConversation", { params: { id: peer.id } }),
     onSuccess: () => {
       setDeletingChat(false);
       toast("Chat deleted.");
-      client.removeQueries({ queryKey: ["messages", user?.id, "thread", peer.id] });
+      client.removeQueries({ queryKey: threadKey });
       void client.invalidateQueries({ queryKey: ["messages"] });
       router.push("/messages");
     },
@@ -937,7 +2205,10 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
   });
   const read = useMutation({
     mutationFn: (id: string) => api("messagesRead", { params: { id } }),
-    onSuccess: () => void client.invalidateQueries({ queryKey: ["messages"] }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["messages", userId, "conversations"] });
+      void client.invalidateQueries({ queryKey: ["messages", userId, "unread"] });
+    },
   });
   const markRead = read.mutate;
   const lastAcknowledged=useRef<string|null>(null);
@@ -979,51 +2250,144 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
   useEffect(() => {
     if (pinned.current&&scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
   }, [latest]);
-  // Grow the composer with its content, Instagram-style, up to the CSS max-height.
-  useEffect(() => {
-    const el = textRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [text]);
-  // Stop showing "typing..." to them when leaving the conversation.
-  useEffect(
-    () => () => {
-      if (typingSent.current) void api("messagesStopTyping", { params: { id: peer.id } }).catch(() => {});
-    },
-    [peer.id],
-  );
-  const signalTyping = (value: string) => {
-    const now = Date.now();
-    if (value.trim() && now - typingSent.current > 3000) {
-      typingSent.current = now;
-      void api("messagesTyping", { params: { id: peer.id } }).catch(() => {});
-    } else if (!value.trim() && typingSent.current) {
-      typingSent.current = 0;
-      void api("messagesStopTyping", { params: { id: peer.id } }).catch(() => {});
-    }
+
+  /** Sends in order, one request at a time, while the bubble is already on screen. */
+  const deliver = (localId: string, draft: Draft) => {
+    sending.current += 1;
+    const run = async () => {
+      try {
+        const sent = await api("messagesSend", { params: { id: peerId }, body: draft });
+        setKeyAlias((aliases) => new Map(aliases).set(sent.id, localId));
+        if (client.getQueryData(threadKey)) client.setQueryData<ThreadData>(threadKey, (d) => insertMessage(d, sent));
+        else void client.invalidateQueries({ queryKey: threadKey, exact: true });
+        setOutbox((o) => o.filter((x) => x.message.id !== localId));
+        refreshAround();
+      } catch (e) {
+        // No connection: keep it queued (clock icon) and send it when the phone is back online.
+        const later = unreachable(e);
+        setOutbox((o) => o.map((x) => (x.message.id === localId ? { ...x, status: later ? "waiting" : "failed" } : x)));
+        if (!later) {
+          toast(e instanceof Error ? e.message : "Message not sent.", true);
+          void status.refetch();
+        }
+      } finally {
+        sending.current -= 1;
+      }
+    };
+    sendQueue.current = sendQueue.current.then(run, run);
   };
-  const send = useMutation({
-    mutationFn: (draft: Draft) => api("messagesSend", { params: { id: peer.id }, body: draft }),
-    onSuccess: (_message, draft) => {
-      attachment.attached();
-      setViewOnce(false);
-      // Keep a reply the person started meanwhile; only the one just sent is done.
-      setReplyTo((current) => (current && current.id === draft.replyToId ? null : current));
-      void client.invalidateQueries({ queryKey: ["messages"] });
-    },
-    onError: (e, draft) => {
-      // Give the text back so nothing typed is lost.
-      if (draft.content) setText((current) => current || draft.content!);
-      toast(e.message, true);
-      void status.refetch();
-    },
+  const send = (draft: Draft, preview: Partial<Message>, options?: { noReply?: boolean }) => {
+    if (!userId) return;
+    const id = nextLocalId();
+    const reply = options?.noReply ? null : replyTo;
+    const message: Message = { ...blankMessage(id, userId, peerId), ...preview, replyTo: reply ? replyRef(reply) : null };
+    pinned.current = true;
+    setShowJump(false);
+    setOutbox((o) => [...o, { message, draft: { ...draft, replyToId: reply?.id }, status: "sending" }]);
+    setReplyTo(null);
+    deliver(id, { ...draft, replyToId: reply?.id });
+    const kind = effectFor(draft.content ?? preview.sticker?.emoji);
+    if (kind) setEffect({ kind, key: id });
+  };
+  const react = (message: Message, emoji: string | null) => {
+    if (!userId || message.id.startsWith(LOCAL_PREFIX)) return;
+    const previous = message.reactions ?? [];
+    const next = [...previous.filter((r) => r.userId !== userId), ...(emoji ? [{ userId, emoji }] : [])];
+    client.setQueryData<ThreadData>(threadKey, (d) => patchMessage(d, message.id, { reactions: next }));
+    (emoji ? api("messagesReact", { params: { id: message.id }, body: { emoji } }) : api("messagesUnreact", { params: { id: message.id } })).catch(
+      (e: Error) => {
+        client.setQueryData<ThreadData>(threadKey, (d) => patchMessage(d, message.id, { reactions: previous }));
+        toast(e.message, true);
+      },
+    );
+  };
+  const retry = (id: string) => {
+    const item = outbox.find((o) => o.message.id === id);
+    if (!item) return;
+    setOutbox((o) => o.map((x) => (x.message.id === id ? { ...x, status: "sending" } : x)));
+    deliver(id, item.draft);
+  };
+  const discard = (id: string) => setOutbox((o) => o.filter((x) => x.message.id !== id));
+  useEffect(() => saveOutbox(userId, peerId, outbox), [userId, peerId, outbox]);
+  const resendWaiting = useEffectEvent(() => {
+    if (!isOnline()) return;
+    const waiting = outbox.filter((o) => o.status === "waiting");
+    if (!waiting.length) return;
+    setOutbox((o) => o.map((x) => (x.status === "waiting" ? { ...x, status: "sending" } : x)));
+    for (const item of waiting) deliver(item.message.id, item.draft);
   });
-  const edit = useMutation({
-    mutationFn:()=>api('messagesEdit',{params:{id:editing!.id},body:{content:text.trim()}}),
-    onSuccess:()=>{setEditing(null);setText('');void client.invalidateQueries({queryKey:['messages']});},
-    onError:error=>toast(error.message,true),
-  });
+  useEffect(() => {
+    const up = () => {
+      setOnline(true);
+      resendWaiting();
+    };
+    const down = () => setOnline(false);
+    const visible = () => document.visibilityState === "visible" && resendWaiting();
+    window.addEventListener("online", up);
+    window.addEventListener("offline", down);
+    document.addEventListener("visibilitychange", visible);
+    // Messages saved before a reload (or a lost connection) go out as soon as possible.
+    const first = window.setTimeout(resendWaiting, 600);
+    // Some phones never fire "online"; check again now and then while something waits.
+    const timer = window.setInterval(resendWaiting, 15_000);
+    return () => {
+      window.removeEventListener("online", up);
+      window.removeEventListener("offline", down);
+      document.removeEventListener("visibilitychange", visible);
+      window.clearTimeout(first);
+      window.clearInterval(timer);
+    };
+  }, []);
+  const startGame = (kind: GameKind) => {
+    setTogether(false);
+    haptic("tap");
+    api("messagesStartGame", { params: { id: peerId }, body: { kind } }).then(
+      (sent) => {
+        pinned.current = true;
+        setShowJump(false);
+        client.setQueryData<ThreadData>(threadKey, (d) => insertMessage(d, sent));
+        refreshAround();
+      },
+      (e: Error) => toast(e.message, true),
+    );
+  };
+  const sendGesture = (emoji: string) => {
+    setTogether(false);
+    send({ content: emoji }, { content: emoji }, { noReply: true });
+  };
+  const sendAudio = async (audioId: string) => {
+    const reply = replyTo;
+    const sent = await api("messagesSend", { params: { id: peerId }, body: { audioId, replyToId: reply?.id } });
+    pinned.current = true;
+    client.setQueryData<ThreadData>(threadKey, (d) => insertMessage(d, sent));
+    setReplyTo((current) => (current && current.id === reply?.id ? null : current));
+    refreshAround();
+  };
+  const saveEdit = (message: Message, content: string) => {
+    setEditing(null);
+    const previous = { content: message.content, editedAt: message.editedAt };
+    client.setQueryData<ThreadData>(threadKey, (d) => patchMessage(d, message.id, { content, editedAt: new Date().toISOString() }));
+    api("messagesEdit", { params: { id: message.id }, body: { content } }).then(
+      (saved) => client.setQueryData<ThreadData>(threadKey, (d) => patchMessage(d, message.id, saved)),
+      (e: Error) => {
+        client.setQueryData<ThreadData>(threadKey, (d) => patchMessage(d, message.id, previous));
+        toast(e.message, true);
+      },
+    );
+  };
+  const toggleFavorite = (message: Message) => {
+    const next = !message.isFavorite;
+    haptic("tap");
+    client.setQueryData<ThreadData>(threadKey, (d) => patchMessage(d, message.id, { isFavorite: next }));
+    toast(next ? "Added to favorites." : "Removed from favorites.");
+    api(next ? "messagesFavorite" : "messagesUnfavorite", { params: { id: message.id } }).then(
+      () => void client.invalidateQueries({ queryKey: ["messages", userId, "favorites", peerId] }),
+      (e: Error) => {
+        client.setQueryData<ThreadData>(threadKey, (d) => patchMessage(d, message.id, { isFavorite: !next }));
+        toast(e.message, true);
+      },
+    );
+  };
   const [contactAction,setContactAction]=useState<"block"|"unblock"|null>(null);
   const contact=useMutation({
     mutationFn:(block:boolean)=>api(block?"followsBlock":"followsUnblock",{params:{id:peer.id}}),
@@ -1036,49 +2400,52 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
   const canMessage = !unavailable && (status.data
     ? status.data.canSend
     : !peer.isBlocking && (!peer.isPrivate || peer.isFollowing));
-  const canSend =
-    canMessage &&
-    !send.isPending &&
-    !voiceActive &&
-    !attachment.busy &&
-    !attachment.error &&
-    (!!text.trim() || !!attachment.media);
-  const submit = () => {
-    if(editing){if(text.trim()&&!edit.isPending)edit.mutate();return;}
-    if (!canSend) return;
-    const draft: Draft = {
-      content: text.trim() || undefined,
-      mediaId: attachment.media?.id,
-      viewOnce: attachment.media ? viewOnce : undefined,
-      replyToId: replyTo?.id,
-    };
-    // Clear at once (like WhatsApp) and keep the keyboard open for the next message.
-    setText("");
-    setReplyTo(null);
-    typingSent.current = 0;
-    send.mutate(draft);
-    textRef.current?.focus({ preventScroll: true });
-  };
-  const jumpTo = (id: string) => {
-    const el = document.getElementById(`msg-${id}`);
-    if (!el) return toast("That message is further up the conversation.");
+  const flash = (el: HTMLElement) => {
+    pinned.current = false;
     el.scrollIntoView({ block: "center", behavior: "smooth" });
     el.classList.remove("flash");
     void el.offsetWidth;
     el.classList.add("flash");
   };
+  const jumpTo = async (id: string) => {
+    let el = document.getElementById(`msg-${id}`);
+    // Load older pages until the message is on screen (favorites can be far up).
+    for (let i = 0; !el && i < 20; i++) {
+      const pages = client.getQueryData<ThreadData>(threadKey)?.pages;
+      if (!pages?.at(-1)?.hasMore) break;
+      await thread.fetchNextPage();
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      el = document.getElementById(`msg-${id}`);
+    }
+    if (!el) return toast("That message is no longer in this conversation.");
+    flash(el);
+  };
   const startReply = (m: Message) => {
+    setEditing(null);
     setReplyTo(m);
     textRef.current?.focus({ preventScroll: true });
   };
-  const media = attachment.media;
+  const startEdit = (m: Message) => {
+    setReplyTo(null);
+    setEditing(m);
+    textRef.current?.focus({ preventScroll: true });
+  };
+  const toggleSounds = () => {
+    setMessageSounds(!sounds);
+    setSounds(!sounds);
+  };
   return (
-    <section className="dm-thread" aria-label={`Conversation with ${peer.displayName}`}>
+    <section
+      className={`dm-thread ${themeTray ? "theming" : ""}`}
+      {...themeAttributes(shownTheme, shownWallpaper)}
+      aria-label={`Conversation with ${peer.displayName}`}
+    >
+      <ThemeStage theme={shownTheme} wallpaperUrl={shownWallpaper} />
       <header className="dm-thread-head">
         <Link className="dm-icon dm-back" href="/messages" aria-label="Back to conversations">
           <ArrowLeft size={24} />
         </Link>
-        <Link className="dm-thread-person" href={`/profile/${peer.username}`}>
+        <button type="button" className="dm-thread-person" aria-label={`Chat info: ${peer.displayName}`} onClick={() => setInfo("media")}>
           <span className={`dm-avatar-wrap ${status.data?.peerOnline ? "online" : ""}`}>
             <Avatar user={peer} size={44} />
           </span>
@@ -1088,30 +2455,50 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
               {peer.isVerified && <VerifiedBadge />}
             </strong>
             <small className={typing ? "typing" : ""} aria-live="polite">
-              {subtitle}
+              {typing ? (
+                <>
+                  <span className="dm-typing-dots" aria-hidden="true"><i /><i /><i /></span>
+                  typing
+                </>
+              ) : (
+                subtitle
+              )}
             </small>
           </span>
-        </Link>
+        </button>
+        <StreakChip peer={peer} />
         <div className="dm-thread-actions">
         <button type="button" className="dm-icon" aria-label="Start voice call" title="Voice call" disabled={!canCall} onClick={()=>calls.start(peer,"audio")}><Phone size={21}/></button>
         <button type="button" className="dm-icon" aria-label="Start video call" disabled={!canCall} onClick={()=>calls.start(peer,"video")}><Video size={22}/></button>
-        {!unavailable&&<Link className="dm-icon dm-info" href={`/profile/${peer.username}`} aria-label="View profile">
-          <Info size={24} />
-        </Link>}
         <Dropdown label="Chat options" className="dm-chat-menu" summaryClassName="dm-icon" summary={<MoreHorizontal size={22} />}>
+          <button type="button" onClick={() => setInfo("media")}>
+            <Images size={16} /> Media and links
+          </button>
+          <button type="button" onClick={() => setInfo("favorites")}>
+            <Star size={16} /> Favorite messages
+          </button>
+          {!unavailable && (
+            <button type="button" onClick={openThemeTray}>
+              <Palette size={16} /> Chat theme
+            </button>
+          )}
+          {!unavailable && (
+            <button type="button" onClick={() => setCustomize(true)}>
+              <WandSparkles size={16} /> Nickname, wallpaper & sound
+            </button>
+          )}
+          {canMessage && !request && (
+            <button type="button" onClick={() => setTogether(true)}>
+              <Gamepad2 size={16} /> Play a game
+            </button>
+          )}
           {!unavailable&&<Link href={`/profile/${peer.username}`}>
             <Info size={16} /> View profile
           </Link>}
           <button type="button" className={peer.isBlocking?"":"danger-text"} onClick={()=>setContactAction(peer.isBlocking?"unblock":"block")}>
             {peer.isBlocking?<ShieldOff size={16}/>:<Ban size={16}/>} {peer.isBlocking?"Unblock account":"Block account"}
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMessageSounds(!sounds);
-              setSounds(!sounds);
-            }}
-          >
+          <button type="button" onClick={toggleSounds}>
             {sounds ? <BellOff size={16} /> : <Bell size={16} />} {sounds ? "Mute message sounds" : "Turn on message sounds"}
           </button>
           <button type="button" className="danger-text" disabled={!messages.length} onClick={() => setDeletingChat(true)}>
@@ -1120,17 +2507,80 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
         </Dropdown>
         </div>
       </header>
+      {customize && (
+        <ChatCustomize
+          peer={initialPeer}
+          nickname={nickname}
+          wallpaperUrl={wallpaperUrl}
+          themeName={CHAT_THEMES.find((t) => t.id === chatTheme)?.name ?? "Classic"}
+          themeId={chatTheme}
+          onTheme={() => {
+            setCustomize(false);
+            openThemeTray();
+          }}
+          onClose={() => setCustomize(false)}
+        />
+      )}
+      {together && (
+        <TogetherSheet
+          peer={peer}
+          canPlay={canMessage && !request && !awaiting}
+          onGesture={sendGesture}
+          onGame={startGame}
+          onBaby={() => { setTogether(false); setBabyOpen(true); }}
+          onClose={() => setTogether(false)}
+        />
+      )}
+      {babyOpen && (
+        <BabySheet
+          peer={initialPeer}
+          onRequested={(sent) => {
+            pinned.current = true;
+            client.setQueryData<ThreadData>(threadKey, (d) => insertMessage(d, sent));
+            refreshAround();
+            setBabyOpen(false);
+          }}
+          onClose={() => setBabyOpen(false)}
+        />
+      )}
+      {info && (
+        <ChatInfo
+          peer={peer}
+          initialTab={info}
+          presenceText={presenceText}
+          canCall={canCall}
+          sounds={sounds}
+          onToggleSounds={toggleSounds}
+          themeId={chatTheme}
+          themeName={CHAT_THEMES.find((t) => t.id === chatTheme)?.name ?? "Classic"}
+          onTheme={unavailable ? undefined : () => { setInfo(null); openThemeTray(); }}
+          onBaby={canMessage && !request ? () => { setInfo(null); setBabyOpen(true); } : undefined}
+          onBlock={() => { setInfo(null); setContactAction(peer.isBlocking ? "unblock" : "block"); }}
+          onDelete={messages.length ? () => { setInfo(null); setDeletingChat(true); } : undefined}
+          onCustomize={unavailable ? undefined : () => { setInfo(null); setCustomize(true); }}
+          onTogether={canMessage && !request ? () => { setInfo(null); setTogether(true); } : undefined}
+          onCall={(kind) => {
+            setInfo(null);
+            calls.start(peer, kind);
+          }}
+          onJump={(id) => {
+            setInfo(null);
+            requestAnimationFrame(() => void jumpTo(id));
+          }}
+          onClose={() => setInfo(null)}
+        />
+      )}
       {contactAction&&<ConfirmDialog className="ig-block-dialog" title={contactAction==="block"?"Block this account?":"Unblock this account?"}
         description={contactAction==="block"?"You won't be able to message or call each other. Your previous messages will stay in this chat. Follows are removed; their likes and comments on your posts are removed. They won't be notified.":"You can contact each other again, subject to account privacy. Previous follows, likes and comments are not restored."}
         confirmLabel={contactAction==="block"?"Block":"Unblock"} tone={contactAction==="block"?"danger":"primary"}
         pending={contact.isPending} onClose={()=>setContactAction(null)} onConfirm={()=>contact.mutate(contactAction==="block")}/>}
       {unsending && (
         <ConfirmDialog
-          title="Unsend message?"
+          title={unsending.length > 1 ? `Unsend ${unsending.length} items?` : "Unsend message?"}
           description="It will be removed for everyone in this chat. This can't be undone."
           confirmLabel="Unsend"
           pending={unsend.isPending}
-          onConfirm={() => unsend.mutate(unsending.id)}
+          onConfirm={() => unsend.mutate(unsending.map((m) => m.id))}
           onClose={() => setUnsending(null)}
         />
       )}
@@ -1149,7 +2599,14 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
         ref={scroller}
         onScroll={() => {
           const el = scroller.current;
-          if (el) pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+          if (!el) return;
+          const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+          pinned.current = distance < 80;
+          // Reached the top by flinging: start the next page right away.
+          if (el.scrollTop < 120 && !pinned.current) maybeLoadOlder();
+          // Only re-render when crossing the threshold, never on every scroll event.
+          const far = distance > 320;
+          if (far !== showJump) setShowJump(far);
         }}
       >
         {!thread.hasNextPage && !thread.isPending && (
@@ -1165,23 +2622,33 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
             </Link>}
           </div>
         )}
-        <LoadMore
-          hasMore={thread.hasNextPage}
-          pending={thread.isFetchingNextPage}
-          onClick={() => void thread.fetchNextPage()}
-        />
+        {thread.hasNextPage && (
+          <div className="dm-older" ref={topSentinel} role="status" aria-live="polite">
+            {thread.isFetchingNextPage ? (
+              <span className="dm-older-spinner" aria-label="Loading earlier messages" />
+            ) : (
+              <button type="button" className="dm-older-button" onClick={loadOlder}>
+                Load earlier messages
+              </button>
+            )}
+          </div>
+        )}
         {thread.isPending && (
-          <p className="dm-status" role="status">
-            Loading messages...
-          </p>
+          <ol className="dm-messages dm-messages-skeleton" aria-busy="true" aria-label="Loading messages">
+            {[62, 38, 74, 46, 58].map((width, i) => (
+              <li key={i} className={`dm-skeleton-bubble ${i % 2 ? "own" : ""}`} style={{ width: `${width}%` }} />
+            ))}
+          </ol>
         )}
         {thread.error && <ErrorState error={thread.error} retry={() => void thread.refetch()} />}
-        {!unavailable&&<MessageStreak peerId={peer.id}/>}
         <ol className="dm-messages" ref={messageList}>
-          {messages.map((m, i) => {
-            const prev = messages[i - 1];
-            const next = messages[i + 1];
-            const at = Date.parse(m.createdAt);
+          {entries.map((entry, i) => {
+            const m = entry.message;
+            const head = entry.album?.[0] ?? m;
+            const prevEntry = entries[i - 1];
+            const prev = prevEntry?.message;
+            const next = entries[i + 1] && (entries[i + 1].album?.[0] ?? entries[i + 1].message);
+            const at = Date.parse(head.createdAt);
             const separated =
               !prev ||
               at - Date.parse(prev.createdAt) > SEPARATOR_MS ||
@@ -1194,11 +2661,15 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
               separated || prev.senderId !== m.senderId || at - Date.parse(prev.createdAt) > GROUP_MS;
             const last =
               nextSeparated || next.senderId !== m.senderId || Date.parse(next.createdAt) - at > GROUP_MS;
+            const states = (entry.album ?? [m]).map((x) => deliveries.get(x.id));
+            const delivery: Delivery | undefined = states.includes("failed") ? "failed" : states.includes("sending") ? "sending" : states.includes("waiting") ? "waiting" : undefined;
+            const failedIds = (entry.album ?? [m]).filter((x) => deliveries.get(x.id) === "failed").map((x) => x.id);
+            const key = keyAlias.get(head.id) ?? head.id;
             return (
-              <Fragment key={m.id}>
+              <Fragment key={key}>
                 {separated && (
                   <li className="dm-separator" role="separator">
-                    {separatorLabel(m.createdAt)}
+                    <span>{separatorLabel(m.createdAt)}</span>
                   </li>
                 )}
                 <MessageItem
@@ -1207,17 +2678,26 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
                   peer={peer}
                   first={first}
                   last={last}
+                  album={entry.album}
+                  enter={at > mountedAt}
+                  delivery={delivery}
+                  onRetry={delivery ? () => failedIds.forEach(retry) : undefined}
+                  onRematch={canMessage ? startGame : undefined}
+                  onBaby={() => setBabyOpen(true)}
+                  onDiscard={delivery ? () => failedIds.forEach(discard) : undefined}
                   onReply={startReply}
                   onJump={jumpTo}
-                  onUnsend={setUnsending}
-                  onEdit={message=>{setEditing(message);setReplyTo(null);setText(message.content??'');attachment.clear();textRef.current?.focus({preventScroll:true});}}
+                  onUnsend={(message, album) => setUnsending(album ?? [message])}
+                  onEdit={startEdit}
+                  onFavorite={toggleFavorite}
+                  onReact={react}
                   onCall={canCall ? (kind) => calls.start(peer, kind) : undefined}
                 />
               </Fragment>
             );
           })}
           {typing && (
-            <li className="dm-message first last dm-typing-row" aria-label={`${peer.displayName} is typing`}>
+            <li className="dm-message first last dm-typing-row enter" aria-label={`${peer.displayName} is typing`}>
               <span className="dm-message-avatar" aria-hidden="true">
                 <Avatar user={peer} size={28} />
               </span>
@@ -1230,6 +2710,26 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
           )}
         </ol>
       </div>
+      <button
+        type="button"
+        className={`dm-jump-latest ${showJump ? "show" : ""}`}
+        aria-label="Jump to latest message"
+        tabIndex={showJump ? undefined : -1}
+        aria-hidden={!showJump || undefined}
+        onClick={() => {
+          const el = scroller.current;
+          pinned.current = true;
+          setShowJump(false);
+          el?.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+        }}
+      >
+        <ChevronDown size={22} />
+      </button>
+      {!online && (
+        <div className="dm-offline" role="status">
+          <WifiOff size={15} /> No connection. Messages will send when you&apos;re back online.
+        </div>
+      )}
       {unavailable ? <div className="dm-blocked-state" role="status">
         <Ban size={22}/><strong>{peer.isBlocking?"You blocked this account":"You can't message this account"}</strong>
         <p>Your previous messages are still here. New messages and calls are unavailable.</p>
@@ -1261,192 +2761,41 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
           </div>
         </div>
       ) : (
-        <form
-          className="dm-composer"
-          onSubmit={(e) => {
-            e.preventDefault();
-            submit();
-          }}
-        >
-          {editing&&<div className="dm-replying dm-editing"><Pencil size={17}/><span><strong>Editing message</strong><small>{editing.content}</small></span><button type="button" className="dm-icon" aria-label="Cancel edit" onClick={()=>{setEditing(null);setText('');}}><X size={18}/></button></div>}
-          {awaiting && (
-            <p className="dm-notice">
-              Message request sent. You can send more once {peer.displayName} accepts.
-            </p>
-          )}
-          {!canMessage && !awaiting && (
-            <p className="dm-notice">
-              {peer.isBlocking
-                ? "You blocked this account. Unblock it to send messages."
-                : "Follow this private account before sending a message."}
-            </p>
-          )}
-          {replyTo && (
-            <div className="dm-replying">
-              <Reply size={16} />
-              <span>
-                <strong>
-                  Replying to {replyTo.senderId === user?.id ? "yourself" : peer.displayName}
-                </strong>
-                <small>
-                  <QuoteSummary
-                    kind={replyTo.viewOnce ? "VIEW_ONCE" : replyTo.content ? "TEXT" : replyTo.audioUrl ? "AUDIO" : replyTo.gif ? "GIF"
-                      : replyTo.hasSticker ? "STICKER" : replyTo.call ? "CALL" : replyTo.media?.type === "VIDEO" ? "VIDEO" : replyTo.media ? "PHOTO" : "TEXT"}
-                    text={replyTo.viewOnce ? null : replyTo.content || replyTo.sticker?.emoji || attachmentLabel(replyTo)}
-                    durationMs={replyTo.audioDurationMs}
-                  />
-                </small>
-              </span>
-              {!replyTo.viewOnce && (replyTo.gif?.previewUrl ?? (replyTo.media?.type === "IMAGE" ? replyTo.media.url : replyTo.sticker?.url)) && (
-                <img className="dm-quote-thumb" src={(replyTo.gif?.previewUrl ?? (replyTo.media?.type === "IMAGE" ? replyTo.media.url : replyTo.sticker?.url))!} alt="" />
-              )}
-              <button
-                type="button"
-                className="dm-icon"
-                aria-label="Cancel reply"
-                onPointerDown={(e) => e.preventDefault()}
-                onClick={() => setReplyTo(null)}
-              >
-                <X size={16} />
-              </button>
-            </div>
-          )}
-          {(media||attachment.previewUrl) && (
-            <div className="dm-attachment dm-attachment-preview">
-              <div className="dm-draft-media">
-                {(media?.type??attachment.previewType)==='IMAGE'?<button type="button" aria-label="Enlarge photo preview" onClick={()=>setPreviewOpen(true)}>
-                  <img src={attachment.previewUrl??media?.url} alt="Photo preview before sending"/>
-                </button>:<video src={attachment.previewUrl??media?.url} controls playsInline preload="metadata" aria-label="Video preview before sending"/>}
-              </div>
-              {previewOpen&&(attachment.previewUrl??media?.url)&&<ImageViewer src={(attachment.previewUrl??media?.url)!} alt="Photo preview" onClose={()=>setPreviewOpen(false)}/>}
-              <div className="dm-draft-details">
-              <span>
-                {attachment.uploading?`Uploading… ${attachment.progress}%`:media?.status === "READY"
-                  ? `${media.type === "IMAGE" ? "Photo" : "Video"} ready to send` : "Processing video..."}
-              </span>
-              <button
-                type="button"
-                className={`dm-once-toggle ${viewOnce ? "on" : ""}`}
-                aria-pressed={viewOnce}
-                aria-label="View once"
-                disabled={!media}
-                title={viewOnce ? "View once: on" : "View once: off"}
-                onPointerDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  haptic("tap");
-                  setViewOnce((v) => !v);
-                }}
-              >
-                1
-              </button>
-              <button
-                type="button"
-                className="dm-icon"
-                aria-label="Remove attachment"
-                disabled={send.isPending}
-                onClick={() => {
-                  attachment.clear();
-                  setViewOnce(false);
-                  setPreviewOpen(false);
-                }}
-              >
-                <X size={16} />
-              </button>
-              </div>
-            </div>
-          )}
-          {viewOnce && media && (
-            <p className="dm-notice">They can open it once. It disappears after it&apos;s viewed.</p>
-          )}
-          {attachment.uploading && (
-            <p className="dm-notice" role="status">
-              Uploading... {attachment.progress}%
-            </p>
-          )}
-          {attachment.error && (
-            <p className="dm-notice error" role="alert">
-              {attachment.error}
-            </p>
-          )}
-          <div className="dm-compose-row">
-            <button type="button" className="dm-camera-launch dm-icon" aria-label="Attach photo or video" hidden={!!text.trim()||!!media||!!editing} disabled={!canMessage||attachment.busy||voiceActive} onClick={()=>inputRef.current?.click()}><ImagePlus size={21}/></button>
-            <textarea
-              ref={textRef}
-              aria-label="Message"
-              placeholder="Message..."
-              maxLength={2000}
-              value={text}
-              // Never disabled while sending: disabling would blur it and close the phone keyboard.
-              disabled={!canMessage}
-              onChange={(e) => {
-                setText(e.target.value);
-                signalTyping(e.target.value);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") {setReplyTo(null);if(editing){setEditing(null);setText('');}}
-                // Enter sends on devices with a keyboard; Shift+Enter keeps a new line.
-                if (
-                  e.key === "Enter" &&
-                  !e.shiftKey &&
-                  !e.nativeEvent.isComposing &&
-                  window.matchMedia("(hover: hover)").matches
-                ) {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
-              rows={1}
-            />
-            <div className="dm-compose-actions" hidden={!!text.trim()||!!editing||!!media}>
-            <EmojiButton
-              disabled={!canMessage||voiceActive}
-              onPick={(emoji) => {
-                const el = textRef.current;
-                const start = el?.selectionStart ?? text.length;
-                const end = el?.selectionEnd ?? text.length;
-                const next = (text.slice(0, start) + emoji + text.slice(end)).slice(0, 2000);
-                setText(next);
-                signalTyping(next);
-                requestAnimationFrame(() => {
-                  el?.focus({ preventScroll: true });
-                  el?.setSelectionRange(start + emoji.length, start + emoji.length);
-                });
-              }}
-            />
-            <StickerButton conversation dock={stickerDock} disabled={!canMessage||voiceActive||send.isPending||attachment.busy||!!media}
-              onPick={sticker=>{send.mutate({stickerId:sticker.id,replyToId:replyTo?.id});setReplyTo(null);}}
-              onGif={gif=>{send.mutate({gifId:gif.id,replyToId:replyTo?.id});setReplyTo(null);}}/>
-            {!calls.busy&&<VoiceRecorder disabled={!canMessage||attachment.busy||!!media||send.isPending} onActiveChange={setVoiceActive}
-              onSend={async id=>{await send.mutateAsync({audioId:id,replyToId:replyTo?.id});setReplyTo(null);}}/>}
-            </div>
-
-            <input
-              ref={inputRef}
-              hidden
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif,video/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                e.target.value = "";
-                void attachment.select(file);
-              }}
-            />
-            {(!!text.trim() || !!media || !!editing) && (
-              <button
-                type="submit"
-                className="dm-send"
-                aria-label={editing?'Save edit':'Send message'}
-                disabled={editing?(!text.trim()||edit.isPending):!canSend}
-                // Keep focus in the textarea so the phone keyboard stays open after sending.
-                onPointerDown={(e) => e.preventDefault()}
-              >
-                <span>{editing?'Save':'Send'}</span>
-              </button>
-            )}
-          </div>
-        </form>
+        <Composer
+          peer={peer}
+          canMessage={canMessage}
+          awaiting={awaiting}
+          callsBusy={calls.busy}
+          fieldRef={textRef}
+          stickerDock={stickerDock}
+          voiceActive={voiceActive}
+          onVoiceActiveChange={setVoiceActive}
+          replyTo={replyTo}
+          editing={editing}
+          onCancelReply={() => setReplyTo(null)}
+          onCancelEdit={() => setEditing(null)}
+          onJumpTo={(id) => void jumpTo(id)}
+          onSaveEdit={saveEdit}
+          onSend={send}
+          onSendAudio={sendAudio}
+          onTogether={() => setTogether(true)}
+        />
       )}
       <div className="dm-sticker-dock" ref={setStickerDock}/>
+      {themeTray && (
+        <ThemeTray
+          current={chatTheme}
+          value={previewTheme}
+          onChange={setPreviewTheme}
+          onApply={(theme) => {
+            setThemeTray(false);
+            setTheme(theme);
+          }}
+          onCancel={() => setThemeTray(false)}
+        />
+      )}
+      {!unavailable && !themeTray && <BabyBubble peer={peer} onOpen={() => setBabyOpen(true)} />}
+      {effect && <ScreenEffect key={effect.key} effect={effect} onDone={() => setEffect(null)} />}
     </section>
   );
 }
@@ -1467,7 +2816,7 @@ function ConversationRow({
         className={`dm-row ${active ? "active" : ""} ${unread ? "unread" : ""}`}
         href={`/messages?to=${encodeURIComponent(c.user.username)}`}
         aria-current={active ? "page" : undefined}
-        title={c.user.displayName}
+        title={c.nickname ?? c.user.displayName}
       >
         <span className={`dm-avatar-wrap ${c.online ? "online" : ""}`}>
           <Avatar user={c.user} size={56} />
@@ -1475,8 +2824,8 @@ function ConversationRow({
         </span>
         <span className="dm-row-copy">
           <strong>
-            {c.user.displayName}
-            {!!c.streakDays&&<span className={`dm-streak-badge ${c.streakFading?"fading":""}`} aria-label={`${c.streakDays} day streak`}><Flame size={14}/>{c.streakDays}</span>}
+            {c.nickname ?? c.user.displayName}
+            {!!c.streakDays&&<span className={`dm-streak-badge ${c.streakFading?"fading":""}`} aria-label={`${c.streakDays} day streak${c.streakFading?", about to end":""}`}><FlameIcon size={14} dim={c.streakFading}/>{c.streakDays}{c.streakFading&&<span aria-hidden="true">⌛</span>}</span>}
             {c.user.isVerified && <VerifiedBadge />}
           </strong>
           <span>

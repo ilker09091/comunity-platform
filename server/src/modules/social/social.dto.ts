@@ -17,6 +17,8 @@ import {
   MinLength,
 } from 'class-validator';
 import { CursorQueryDto } from '../../common/dto/common.dto.js';
+import { GAME_KINDS, type GameKind } from '../../database/migrations/1760193000000-MoreChatGames.js';
+import { CHAT_THEMES, type ChatTheme } from '../../database/migrations/1760192700000-StrictStreaksAndChatThemes.js';
 import { SanitizedText } from '../../common/utils/sanitize.js';
 import { MediaDto } from '../media/dto/media.dto.js';
 import { PostDto } from '../posts/dto/post.dto.js';
@@ -62,9 +64,9 @@ export class MessageReplyRefDto {
   @ApiProperty({ format: 'uuid' }) id: string;
   @ApiProperty({ format: 'uuid' }) senderId: string;
   @ApiProperty({
-    enum: ['TEXT', 'PHOTO', 'VIDEO', 'POST', 'STORY', 'VIEW_ONCE', 'STICKER', 'AUDIO', 'CALL', 'GIF', 'UNAVAILABLE'],
+    enum: ['TEXT', 'PHOTO', 'VIDEO', 'POST', 'STORY', 'VIEW_ONCE', 'STICKER', 'AUDIO', 'CALL', 'GIF', 'GAME', 'BABY', 'UNAVAILABLE'],
   })
-  kind: 'TEXT' | 'PHOTO' | 'VIDEO' | 'POST' | 'STORY' | 'VIEW_ONCE' | 'STICKER' | 'AUDIO' | 'CALL' | 'GIF' | 'UNAVAILABLE';
+  kind: 'TEXT' | 'PHOTO' | 'VIDEO' | 'POST' | 'STORY' | 'VIEW_ONCE' | 'STICKER' | 'AUDIO' | 'CALL' | 'GIF' | 'GAME' | 'BABY' | 'UNAVAILABLE';
   @ApiProperty({ type: String, nullable: true, description: 'Up to 140 characters' })
   preview: string | null;
   @ApiProperty({ type: Number, nullable: true, description: 'Length of a quoted voice message' })
@@ -155,6 +157,123 @@ export class DirectMessageDto {
   @ApiProperty({ format: 'date-time' }) createdAt: string;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) readAt:
     string | null;
+  @ApiProperty({ description: 'Starred by the viewer (private to them)' }) isFavorite: boolean;
+  @ApiProperty({ type: () => MessageReactionDto, isArray: true }) reactions: MessageReactionDto[];
+  @ApiProperty({ type: () => ChatGameDto, nullable: true, description: 'Set when this message is a mini game' })
+  game: ChatGameDto | null;
+  @ApiProperty({ type: () => BabyInviteDto, nullable: true, description: 'Set when this message asks to have a baby together' })
+  baby: BabyInviteDto | null;
+}
+export class BabyInviteDto {
+  @ApiProperty({ format: 'uuid' }) id: string;
+  @ApiProperty() name: string;
+  @ApiProperty({ enum: ['girl', 'boy'] }) gender: 'girl' | 'boy';
+  @ApiProperty({ enum: ['pending', 'active', 'declined', 'ended'] }) status: 'pending' | 'active' | 'declined' | 'ended';
+  @ApiProperty({ format: 'uuid' }) requestedBy: string;
+}
+export class BabyCareDto {
+  @ApiProperty() feeds: number;
+  @ApiProperty() plays: number;
+  @ApiProperty() chats: number;
+  @ApiProperty() games: number;
+}
+export class BabyDto extends BabyInviteDto {
+  @ApiProperty({ type: String, nullable: true, format: 'date-time' }) bornAt: string | null;
+  @ApiProperty({ description: 'Whole days since birth' }) ageDays: number;
+  @ApiProperty() xp: number;
+  @ApiProperty({ description: '1 baby, 2 toddler, 3 child, 4 big kid' }) stage: number;
+  @ApiProperty() stageName: string;
+  @ApiProperty({ description: 'XP where the current stage started' }) stageXp: number;
+  @ApiProperty({ type: Number, nullable: true, description: 'XP for the next stage; null at the last stage' }) nextStageXp: number | null;
+  @ApiProperty({ description: '0-100, runs down over about 16 hours' }) fullness: number;
+  @ApiProperty({ description: '0-100, runs down over about 36 hours' }) happiness: number;
+  @ApiProperty({ enum: ['happy', 'hungry', 'sad'] }) mood: 'happy' | 'hungry' | 'sad';
+  @ApiProperty({ description: 'Outfit index 0-5 for the current stage' }) outfit: number;
+  @ApiProperty({ type: () => BabyCareDto, description: 'What you did today (UTC day)' }) mine: BabyCareDto;
+  @ApiProperty({ type: () => BabyCareDto, description: 'What the other parent did today' }) theirs: BabyCareDto;
+  @ApiProperty({ type: () => BabyCareDto, description: 'Daily limits per parent' }) limits: BabyCareDto;
+}
+export class BabyStateDto {
+  @ApiProperty({ type: () => BabyDto, nullable: true, description: 'The open request or the child you raise together' })
+  baby: BabyDto | null;
+}
+export class StartBabyDto {
+  @ApiProperty({ minLength: 1, maxLength: 24 }) @IsString() @MinLength(1) @MaxLength(24) @SanitizedText() name: string;
+  @ApiProperty({ enum: ['girl', 'boy'] }) @IsIn(['girl', 'boy']) gender: 'girl' | 'boy';
+}
+export class BabyItemDto {
+  @ApiProperty({ description: 'Food (0-11) or toy (0-5) index' }) @Type(() => Number) @IsInt() @Min(0) @Max(11) item: number;
+}
+export class BabyOutfitDto {
+  @ApiProperty({ minimum: 0, maximum: 5 }) @Type(() => Number) @IsInt() @Min(0) @Max(5) outfit: number;
+}
+export class GameRoundDto {
+  @ApiProperty({ type: String, isArray: true, description: 'Choices of players[0] and players[1]' }) choices: string[];
+  @ApiProperty({ type: Number, nullable: true, description: 'Index of the round winner in players; null for a tie' }) winner: number | null;
+  @ApiProperty({ type: String, isArray: true, description: 'This or That: the two options of that question' }) labels: string[];
+}
+export class ChatGameDto {
+  @ApiProperty({ format: 'uuid' }) id: string;
+  @ApiProperty({ enum: GAME_KINDS }) kind: GameKind;
+  @ApiProperty({ type: String, isArray: true, format: 'uuid', description: 'players[0] starts; on boards, 1 marks players[0] and 2 players[1]' })
+  players: string[];
+  @ApiProperty({ type: Number, isArray: true, description: 'Board cells, row by row (XOX, Connect Four, Five in a Row)' }) board: number[];
+  @ApiProperty({ type: Number, isArray: true, description: 'Winning cells once someone won a board game' }) line: number[];
+  @ApiProperty({ type: String, nullable: true, format: 'uuid' }) turnId: string | null;
+  @ApiProperty({ enum: ['active', 'won', 'draw', 'done'], description: '"done" ends a game nobody wins (This or That)' })
+  status: 'active' | 'won' | 'draw' | 'done';
+  @ApiProperty({ type: String, nullable: true, format: 'uuid' }) winnerId: string | null;
+  @ApiProperty({ type: Number, isArray: true, description: 'Round wins (rock-paper-scissors) or pairs found (Memory) per player' }) scores: number[];
+  @ApiProperty({ type: () => GameRoundDto, isArray: true, description: 'Finished rounds (rock-paper-scissors, This or That)' }) rounds: GameRoundDto[];
+  @ApiProperty({ type: String, isArray: true, description: "Memory: each card's face while it is turned up or matched, otherwise empty" }) cards: string[];
+  @ApiProperty({ type: Number, isArray: true, description: 'Memory: who found each card (0 nobody, 1 players[0], 2 players[1])' }) owners: number[];
+  @ApiProperty({ type: Number, isArray: true, description: 'Memory: cards turned this turn, plus the last mismatched pair' }) flipped: number[];
+  @ApiProperty({ type: String, isArray: true, description: 'This or That: the two options of the current question' }) prompt: string[];
+  @ApiProperty({ description: 'This or That: current question number (0-based)' }) round: number;
+  @ApiProperty({ description: 'This or That: number of questions' }) totalRounds: number;
+  @ApiProperty({ type: String, nullable: true, description: "Your pick in the current rock-paper-scissors round (theirs stays hidden)" })
+  myChoice: string | null;
+  @ApiProperty({ description: 'The other player already picked in the current round' }) peerReady: boolean;
+  @ApiProperty({ format: 'date-time' }) updatedAt: string;
+}
+export class StartGameDto {
+  @ApiProperty({ enum: GAME_KINDS }) @IsIn([...GAME_KINDS]) kind: GameKind;
+}
+export class GameMoveDto {
+  @ApiPropertyOptional({ description: 'Board cell (XOX, Five in a Row, Memory) or column (Connect Four)' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(80) cell?: number;
+  @ApiPropertyOptional({ enum: ['rock', 'paper', 'scissors', 'a', 'b'], description: 'Rock-paper-scissors pick, or This or That answer' })
+  @IsOptional() @IsIn(['rock', 'paper', 'scissors', 'a', 'b']) choice?: 'rock' | 'paper' | 'scissors' | 'a' | 'b';
+}
+export class ChatPrefsResultDto {
+  @ApiProperty({ type: String, nullable: true }) nickname: string | null;
+  @ApiProperty({ type: String, nullable: true }) wallpaperUrl: string | null;
+}
+export class ChatPrefsDto {
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: 40, description: 'Private nickname for them; null or empty clears it' })
+  @IsOptional() @IsString() @MaxLength(40) @SanitizedText() nickname?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, format: 'uuid', description: 'Uploaded image to use as your wallpaper; null removes it' })
+  @IsOptional() @IsUUID() wallpaperMediaId?: string | null;
+}
+export class MessageReactionDto {
+  @ApiProperty({ format: 'uuid' }) userId: string;
+  @ApiProperty() emoji: string;
+}
+export class ReactDto {
+  @ApiProperty({ maxLength: 16, example: '❤️' }) @IsString() @MinLength(1) @MaxLength(16)
+  @Matches(/^(?=.*\p{Extended_Pictographic})(?:\p{Extended_Pictographic}|\p{Emoji_Component}|‍|️)+$/u, { message: 'Choose an emoji' }) emoji: string;
+}
+export class TogetherDto {
+  @ApiProperty({ type: String, format: 'date-time', nullable: true, description: 'First message between you' }) since: string | null;
+  @ApiProperty() messages: number;
+  @ApiProperty() photos: number;
+  @ApiProperty() voiceNotes: number;
+  @ApiProperty() callMinutes: number;
+  @ApiProperty({ description: 'UTC days on which both of you messaged' }) daysTogether: number;
+}
+export class SharedMediaQueryDto extends CursorQueryDto {
+  @ApiPropertyOptional({ enum: ['media', 'links'], default: 'media' })
+  @IsOptional() @IsIn(['media', 'links']) kind?: 'media' | 'links';
 }
 export class EditMessageDto {
   @ApiProperty({maxLength:2000}) @IsString() @MinLength(1) @MaxLength(2000)
@@ -179,7 +298,14 @@ export class MessageAudioDto {
 export class MessageAudioUploadDto {
   @ApiProperty({type:'string',format:'binary',description:'Recorded audio, up to two minutes / 10 MB'}) file: unknown;
 }
+export class ChatThemeDto {
+  @ApiProperty({ enum: CHAT_THEMES }) @IsIn([...CHAT_THEMES]) theme: ChatTheme;
+}
 export class MessageStatusDto {
+  @ApiProperty({ type: String, nullable: true, enum: CHAT_THEMES, description: 'Chat theme shared by both people; null is the default look' })
+  theme: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Your private nickname for them' }) nickname: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Your wallpaper for this chat (only you see it)' }) wallpaperUrl: string | null;
   @ApiProperty({description:'Conversation history is available, but contact is unavailable'}) isUnavailable: boolean;
   @ApiProperty({description:'The viewer can unblock this account'}) isBlocking: boolean;
   @ApiProperty({
@@ -204,6 +330,7 @@ export class ConversationDto {
   @ApiProperty() isUnavailable: boolean;
   @ApiProperty({description:'Visible streak badge from three mutual days; zero if inactive'}) streakDays: number;
   @ApiProperty() streakFading: boolean;
+  @ApiProperty({ type: String, nullable: true, description: 'Your private nickname for them' }) nickname: string | null;
   @ApiProperty({ type: UserSummaryDto }) user: UserSummaryDto;
   @ApiProperty({ type: DirectMessageDto }) lastMessage: DirectMessageDto;
   @ApiProperty() unreadCount: number;

@@ -20,6 +20,8 @@ function preview(message) {
     return message.call.status === "completed" ? `Ended a ${kind} call` : `Missed ${kind} call`;
   }
   if (message.audioUrl) return "Sent a voice message";
+  if (message.game) return "Wants to play a game 🎮";
+  if (message.baby) return "Wants to have a baby with you 👶";
   if (message.gif) return "Sent a GIF";
   if (message.hasSticker) return "Sent a sticker";
   if (message.viewOnce) return "Sent a view once photo";

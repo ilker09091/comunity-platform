@@ -8,12 +8,20 @@ import { StreakDto } from './calls.dto.js';
 
 export interface StreakRow { days:number; last_day:string|null; low_day:string|null; high_day:string|null; month:string|null; restores_used:number }
 const DAY=86400000;
+/** The flame turns grey (about to end) when this little of the UTC day is left without both messages. */
+export const AT_RISK_MS=8*3600000;
+/**
+ * TikTok rules: a streak starts after 3 consecutive days on which both people messaged, and
+ * continues only while both message on every UTC day. A missed day ends it; it can be
+ * restored within 48 hours, up to three times per pair per month.
+ */
 export function describeStreak(row: StreakRow|null, viewerIsLow:boolean, now=new Date()): StreakDto {
   const today=now.toISOString().slice(0,10), month=today.slice(0,7)+'-01';
   const last=row?.last_day?Date.parse(row.last_day+'T00:00:00Z'):NaN;
-  const expires=last+3*DAY, expired=Number.isFinite(last)&&now.getTime()>=expires;
+  const expires=last+2*DAY, expired=Number.isFinite(last)&&now.getTime()>=expires;
   const remaining=3-(row?.month===month?row.restores_used:0);
-  return { days:row?.days??0,state:expired?'expired':(row?.days??0)<3?'building':now.getTime()>=last+2*DAY?'fading':'active',
+  const atRisk=Number.isFinite(last)&&now.getTime()>=expires-AT_RISK_MS;
+  return { days:row?.days??0,state:expired?'expired':(row?.days??0)<3?'building':atRisk?'fading':'active',
     sentToday:(viewerIsLow?row?.low_day:row?.high_day)===today,peerSentToday:(viewerIsLow?row?.high_day:row?.low_day)===today,
     canRestore:expired&&(row?.days??0)>=3&&now.getTime()<expires+2*DAY&&remaining>0,
     restoresRemaining:remaining,expiresAt:Number.isFinite(last)?new Date(expires).toISOString():null };
@@ -33,8 +41,8 @@ export class StreaksService {
       restores_used=CASE WHEN restore_month=date_trunc('month',now() AT TIME ZONE 'UTC')::date THEN restores_used+1 ELSE 1 END,
       restore_month=date_trunc('month',now() AT TIME ZONE 'UTC')::date
       WHERE low_id=least($1::uuid,$2::uuid) AND high_id=greatest($1::uuid,$2::uuid) AND days>=3
-        AND now()>=(last_completed_day+3)::timestamp AT TIME ZONE 'UTC'
-        AND now()<(last_completed_day+5)::timestamp AT TIME ZONE 'UTC'
+        AND now()>=(last_completed_day+2)::timestamp AT TIME ZONE 'UTC'
+        AND now()<(last_completed_day+4)::timestamp AT TIME ZONE 'UTC'
         AND (restore_month IS DISTINCT FROM date_trunc('month',now() AT TIME ZONE 'UTC')::date OR restores_used<3)
       RETURNING low_id`,[viewer,peer]);
     // pg UPDATE query returns [rows,count] through TypeORM.

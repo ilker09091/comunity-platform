@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, upload, type Models } from "./api/client";
 import { useToast } from "@/components/providers";
+import { compressImage } from "./compress-image";
 
 export function useMediaAttachment(videoOnly = false) {
   const [uploaded, setUploaded] = useState<Models["MediaDto"] | null>(null);
@@ -40,7 +41,9 @@ export function useMediaAttachment(videoOnly = false) {
     local.current=URL.createObjectURL(file);setPreviewUrl(local.current);setPreviewType(file.type.startsWith('video/')?'VIDEO':'IMAGE');
     setProgress(0);
     try {
-      const media=(await upload(file, value=>{if(run===generation.current)setProgress(value);})) as Models['MediaDto'];
+      const sending=await compressImage(file);
+      if(run!==generation.current)return;
+      const media=(await upload(sending, value=>{if(run===generation.current)setProgress(value);})) as Models['MediaDto'];
       if(run!==generation.current){void api('mediaRemove',{params:{id:media.id}}).catch(()=>{});return;}
       owned.current=media.id;setUploaded(media);
     } catch (e) {

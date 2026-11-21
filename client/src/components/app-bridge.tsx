@@ -110,29 +110,59 @@ export const messageSoundsOn = () => read(SOUND_KEY) !== "off";
 export const setMessageSounds = (on: boolean) => write(SOUND_KEY, on ? null : "off");
 
 let audio: AudioContext | null = null;
-/** A short two-note "ping", generated (no sound file to download). */
-export function playMessageSound() {
-  if (typeof window === "undefined" || !messageSoundsOn()) return;
+
+/** Notification sounds, generated on the device (nothing to download). */
+type Note = { f: number; t: number; d: number; type?: OscillatorType; to?: number; v?: number };
+export const MESSAGE_SOUNDS = {
+  classic: { name: "Classic", notes: [{ f: 880, t: 0, d: 0.28 }, { f: 1318.5, t: 0.12, d: 0.28 }] },
+  pop: { name: "Pop", notes: [{ f: 900, to: 420, t: 0, d: 0.16, v: 0.3 }] },
+  chime: { name: "Chime", notes: [{ f: 1046.5, t: 0, d: 0.5, type: "triangle" }, { f: 1318.5, t: 0.1, d: 0.5, type: "triangle" }, { f: 1568, t: 0.2, d: 0.7, type: "triangle" }] },
+  heartbeat: { name: "Heartbeat", notes: [{ f: 120, to: 70, t: 0, d: 0.16, v: 0.5 }, { f: 110, to: 65, t: 0.2, d: 0.2, v: 0.45 }] },
+  bubble: { name: "Bubble", notes: [{ f: 520, to: 780, t: 0, d: 0.12 }, { f: 780, to: 1180, t: 0.1, d: 0.14 }] },
+  silent: { name: "Silent", notes: [] },
+} satisfies Record<string, { name: string; notes: Note[] }>;
+export type MessageSound = keyof typeof MESSAGE_SOUNDS;
+const PEER_SOUND = "circle-sound:";
+
+/** The sound you picked for messages from this person (this device only). */
+export const peerSound = (peerId: string): MessageSound => {
+  const value = read(PEER_SOUND + peerId);
+  return value && value in MESSAGE_SOUNDS ? (value as MessageSound) : "classic";
+};
+export const setPeerSound = (peerId: string, sound: MessageSound) => write(PEER_SOUND + peerId, sound === "classic" ? null : sound);
+
+function playNotes(notes: Note[]) {
+  if (typeof window === "undefined" || !notes.length) return;
   try {
     audio ??= new AudioContext();
     if (audio.state === "suspended") void audio.resume();
     const now = audio.currentTime;
-    for (const [i, freq] of [880, 1318.5].entries()) {
+    for (const note of notes) {
       const osc = audio.createOscillator();
       const gain = audio.createGain();
-      osc.type = "sine";
-      osc.frequency.value = freq;
-      const start = now + i * 0.12;
+      osc.type = note.type ?? "sine";
+      const start = now + note.t;
+      osc.frequency.setValueAtTime(note.f, start);
+      if (note.to) osc.frequency.exponentialRampToValueAtTime(note.to, start + note.d);
       gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.22, start + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.28);
+      gain.gain.exponentialRampToValueAtTime(note.v ?? 0.22, start + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + note.d);
       osc.connect(gain).connect(audio.destination);
       osc.start(start);
-      osc.stop(start + 0.3);
+      osc.stop(start + note.d + 0.02);
     }
   } catch {
     /* audio not available */
   }
+}
+
+/** Plays a sound even while message sounds are muted (the picker's preview). */
+export const previewSound = (sound: MessageSound) => playNotes(MESSAGE_SOUNDS[sound].notes);
+
+/** A short "ping" for a new message; with `peerId`, the sound picked for that person. */
+export function playMessageSound(peerId?: string) {
+  if (!messageSoundsOn()) return;
+  playNotes(MESSAGE_SOUNDS[peerId ? peerSound(peerId) : "classic"].notes);
 }
 
 const pushSupported = () =>
@@ -243,13 +273,13 @@ export default function AppBridge() {
     const before = previous.current;
     previous.current = count;
     if (before === null || count <= before) return;
-    playMessageSound();
-    // Show who wrote, unless a messages screen is open (it shows the message already).
-    if (window.location.pathname.startsWith("/messages")) return;
+    // The newest conversation tells who wrote, so their own sound can play.
     void api("messagesConversations", { query: { limit: 1 } })
       .then((page) => {
         const c = page.items[0];
-        if (!c || c.lastMessage.senderId === me) return;
+        playMessageSound(c && c.lastMessage.senderId !== me ? c.user.id : undefined);
+        // Show who wrote, unless a messages screen is open (it shows the message already).
+        if (!c || c.lastMessage.senderId === me || window.location.pathname.startsWith("/messages")) return;
         haptic("tap");
         setNotice({
           key: c.lastMessage.id,
@@ -258,7 +288,7 @@ export default function AppBridge() {
           url: `/messages?to=${encodeURIComponent(c.user.username)}`,
         });
       })
-      .catch(() => undefined);
+      .catch(() => playMessageSound());
   }, [count, me]);
   const closeNotice = useCallback(() => setNotice(null), []);
 

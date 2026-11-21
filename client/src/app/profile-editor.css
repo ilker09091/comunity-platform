@@ -3,7 +3,7 @@
 .profile-editor-page .page-header { margin-bottom: 24px; border: 0; background: transparent; box-shadow: none; padding: 0; }
 .profile-editor-page .page-header h1 { font-size: clamp(24px, 2.2vw, 32px); font-weight: 600; letter-spacing: -.04em; }
 .profile-editor-page .page-header p { margin-top: 5px; }
-.profile-editor-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr); gap: 28px; align-items: start; }
+.profile-editor-grid { display: grid; grid-template-columns: minmax(0, 1fr); max-width: 760px; gap: 28px; align-items: start; }
 .profile-editor-form { padding: 0; min-width: 0; overflow: visible; }
 .editor-section { padding: 28px; border-bottom: 1px solid var(--border); }
 .editor-section-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
