@@ -2191,15 +2191,33 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Group settings and current members */
+        /** Group info, settings and members */
         get: operations["groupsGet"];
+        put?: never;
+        post?: never;
+        /** Owner deletes the group for everyone */
+        delete: operations["groupsDelete"];
+        options?: never;
+        head?: never;
+        /** Change the group name or description */
+        patch: operations["groupsUpdate"];
+        trace?: never;
+    };
+    "/api/group-chats/{id}/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** Group owner renames the conversation */
-        patch: operations["groupsRename"];
+        /** Owner sets what members (not only admins) may do */
+        patch: operations["groupsPermissions"];
         trace?: never;
     };
     "/api/group-chats/{id}/avatar": {
@@ -2211,9 +2229,9 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Group owner sets an uploaded photo */
+        /** Set an uploaded photo as the group photo */
         post: operations["groupsSetAvatar"];
-        /** Group owner removes the group photo */
+        /** Remove the group photo */
         delete: operations["groupsRemoveAvatar"];
         options?: never;
         head?: never;
@@ -2229,7 +2247,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Group owner adds accepted contacts */
+        /** Add accepted contacts */
         post: operations["groupsAddMembers"];
         delete?: never;
         options?: never;
@@ -2247,11 +2265,12 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Owner removes a member */
+        /** An admin removes a member */
         delete: operations["groupsRemoveMember"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Owner makes someone an admin, a member again, or the new owner */
+        patch: operations["groupsSetRole"];
         trace?: never;
     };
     "/api/group-chats/{id}/membership": {
@@ -2264,8 +2283,59 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Leave; transfer ownership or delete the empty group */
+        /** Leave; an admin (or the longest member) takes over, the last one out deletes it */
         delete: operations["groupsLeave"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/group-chats/{id}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pin a message at the top of the chat (null unpins) */
+        post: operations["groupsPin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/group-chats/{id}/mute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Turn notifications for this group off or on */
+        patch: operations["groupsMute"];
+        trace?: never;
+    };
+    "/api/group-chats/{id}/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Photos and videos shared in the group */
+        get: operations["groupsMedia"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2283,6 +2353,23 @@ export interface paths {
         put?: never;
         /** Send a group message or attachment */
         post: operations["groupsSend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/group-chats/{id}/messages/{messageId}/receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Who has seen a message, who got it and who has not yet */
+        get: operations["groupsReceipts"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5978,6 +6065,45 @@ export interface components {
         CreateGroupDto: {
             memberIds: string[];
             name: string;
+            description?: string;
+            /**
+             * Format: uuid
+             * @description An uploaded photo for the group
+             */
+            avatarMediaId?: string;
+        };
+        GroupMemberDto: {
+            /**
+             * Format: uuid
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            /** @example jane_doe */
+            username: string;
+            /** @example Jane Doe */
+            displayName: string;
+            /**
+             * @description Signed URL
+             * @example null
+             */
+            avatarUrl: string | null;
+            /** @example false */
+            isPrivate: boolean;
+            /**
+             * @description Blue verification badge, granted by administrators
+             * @example false
+             */
+            isVerified: boolean;
+            /** @enum {string} */
+            role: "owner" | "admin" | "member";
+            /** Format: date-time */
+            joinedAt: string;
+        };
+        GroupPinnedDto: {
+            /** Format: uuid */
+            id: string;
+            senderName: string;
+            preview: string;
         };
         GroupDetailDto: {
             /** Format: uuid */
@@ -5989,9 +6115,22 @@ export interface components {
             memberCount: number;
             unreadCount: number;
             lastMessage: string | null;
+            /** @description First name of whoever sent the last message; null for your own or a system event */
+            lastSenderName: string | null;
+            muted: boolean;
             /** Format: date-time */
             updatedAt: string;
-            members: components["schemas"]["UserSummaryDto"][];
+            members: components["schemas"]["GroupMemberDto"][];
+            description: string | null;
+            /** @enum {string} */
+            myRole: "owner" | "admin" | "member";
+            /** @description Everyone (not only admins) may add people */
+            membersCanAdd: boolean;
+            /** @description Everyone (not only admins) may change the name, photo, description and pin */
+            membersCanEdit: boolean;
+            pinned: components["schemas"]["GroupPinnedDto"] | null;
+            /** Format: date-time */
+            createdAt: string;
         };
         GroupDto: {
             /** Format: uuid */
@@ -6003,6 +6142,9 @@ export interface components {
             memberCount: number;
             unreadCount: number;
             lastMessage: string | null;
+            /** @description First name of whoever sent the last message; null for your own or a system event */
+            lastSenderName: string | null;
+            muted: boolean;
             /** Format: date-time */
             updatedAt: string;
         };
@@ -6016,8 +6158,14 @@ export interface components {
             /** @example false */
             hasMore: boolean;
         };
-        RenameGroupDto: {
-            name: string;
+        UpdateGroupDto: {
+            name?: string;
+            /** @description Empty removes it */
+            description?: string;
+        };
+        GroupPermissionsDto: {
+            membersCanAdd?: boolean;
+            membersCanEdit?: boolean;
         };
         GroupAvatarDto: {
             /** Format: uuid */
@@ -6025,6 +6173,43 @@ export interface components {
         };
         GroupMembersDto: {
             memberIds: string[];
+        };
+        GroupRoleDto: {
+            /**
+             * @description owner hands the group over (you become an admin)
+             * @enum {string}
+             */
+            role: "admin" | "member" | "owner";
+        };
+        GroupPinDto: {
+            /**
+             * Format: uuid
+             * @description null unpins
+             */
+            messageId: string | null;
+        };
+        GroupMuteDto: {
+            muted: boolean;
+        };
+        GroupMediaDto: {
+            /** Format: uuid */
+            messageId: string;
+            /** @enum {string} */
+            type: "IMAGE" | "VIDEO";
+            url: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        GroupMediaListDto: {
+            items: components["schemas"]["GroupMediaDto"][];
+        };
+        GroupEventDto: {
+            /** @enum {string} */
+            type: "created" | "added" | "removed" | "left" | "joined" | "renamed" | "photo" | "description" | "pinned" | "unpinned" | "admin" | "unadmin" | "owner";
+            /** @description Names of the people it was about (added, removed, made admin) */
+            targets: string[];
+            /** @description The new name or description, or the pinned text */
+            value: string | null;
         };
         GroupMessageDto: {
             /** Format: date-time */
@@ -6076,6 +6261,8 @@ export interface components {
             /** @description Set when this message asks to have a baby together */
             baby: components["schemas"]["BabyInviteDto"] | null;
             sender: components["schemas"]["UserSummaryDto"];
+            /** @description Set on system messages; the sender is who did it */
+            event: components["schemas"]["GroupEventDto"] | null;
         };
         PaginatedGroupMessage: {
             items: components["schemas"]["GroupMessageDto"][];
@@ -6086,6 +6273,18 @@ export interface components {
             nextCursor: string | null;
             /** @example false */
             hasMore: boolean;
+        };
+        GroupReceiptDto: {
+            user: components["schemas"]["UserSummaryDto"];
+            /** Format: date-time */
+            at: string | null;
+        };
+        GroupReceiptsDto: {
+            readBy: components["schemas"]["GroupReceiptDto"][];
+            /** @description Got it but has not read it yet */
+            deliveredTo: components["schemas"]["GroupReceiptDto"][];
+            /** @description Has not received it yet */
+            waiting: components["schemas"]["UserSummaryDto"][];
         };
         GroupAckDto: {
             /** Format: uuid */
@@ -17347,7 +17546,79 @@ export interface operations {
             };
         };
     };
-    groupsRename: {
+    groupsDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    groupsUpdate: {
         parameters: {
             query?: never;
             header?: never;
@@ -17358,7 +17629,85 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RenameGroupDto"];
+                "application/json": components["schemas"]["UpdateGroupDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupDetailDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    groupsPermissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupPermissionsDto"];
             };
         };
         responses: {
@@ -17728,6 +18077,85 @@ export interface operations {
             };
         };
     };
+    groupsSetRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupRoleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupDetailDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
     groupsLeave: {
         parameters: {
             query?: never;
@@ -17744,6 +18172,236 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    groupsPin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupPinDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupDetailDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    groupsMute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupMuteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupDetailDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    groupsMedia: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupMediaListDto"];
+                };
             };
             /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
             400: {
@@ -17899,6 +18557,81 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GroupMessageDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    groupsReceipts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                messageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupReceiptsDto"];
                 };
             };
             /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */

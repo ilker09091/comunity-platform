@@ -740,8 +740,18 @@ export const endpoints = {
     "method": "GET",
     "authenticated": true
   },
-  "groupsRename": {
+  "groupsUpdate": {
     "path": "/api/group-chats/{id}",
+    "method": "PATCH",
+    "authenticated": true
+  },
+  "groupsDelete": {
+    "path": "/api/group-chats/{id}",
+    "method": "DELETE",
+    "authenticated": true
+  },
+  "groupsPermissions": {
+    "path": "/api/group-chats/{id}/permissions",
     "method": "PATCH",
     "authenticated": true
   },
@@ -760,6 +770,11 @@ export const endpoints = {
     "method": "POST",
     "authenticated": true
   },
+  "groupsSetRole": {
+    "path": "/api/group-chats/{id}/members/{userId}",
+    "method": "PATCH",
+    "authenticated": true
+  },
   "groupsRemoveMember": {
     "path": "/api/group-chats/{id}/members/{userId}",
     "method": "DELETE",
@@ -770,6 +785,21 @@ export const endpoints = {
     "method": "DELETE",
     "authenticated": true
   },
+  "groupsPin": {
+    "path": "/api/group-chats/{id}/pin",
+    "method": "POST",
+    "authenticated": true
+  },
+  "groupsMute": {
+    "path": "/api/group-chats/{id}/mute",
+    "method": "PATCH",
+    "authenticated": true
+  },
+  "groupsMedia": {
+    "path": "/api/group-chats/{id}/media",
+    "method": "GET",
+    "authenticated": true
+  },
   "groupsMessages": {
     "path": "/api/group-chats/{id}/messages",
     "method": "GET",
@@ -778,6 +808,11 @@ export const endpoints = {
   "groupsSend": {
     "path": "/api/group-chats/{id}/messages",
     "method": "POST",
+    "authenticated": true
+  },
+  "groupsReceipts": {
+    "path": "/api/group-chats/{id}/messages/{messageId}/receipts",
+    "method": "GET",
     "authenticated": true
   },
   "groupsEdit": {

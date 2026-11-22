@@ -207,7 +207,17 @@ export function BabyWorld({
   };
 
   const S = size.h * 2; // panorama width
-  const cam = Math.max(0, Math.min(S - size.w, pos.x * S - size.w / 2));
+  // The camera follows the walking child; in bed, the tub or the high chair it frames that instead.
+  const anchor = mode === "bed" ? "bed" : mode === "bath" ? "tub" : mode === "chair" ? "highchair" : null;
+  const anchorX = anchor ? PROPS[scene].find((p) => p.id === anchor)?.x : undefined;
+  // Getting out of bed (or the tub, or the chair), the child starts walking from there.
+  const [lastAnchorX, setLastAnchorX] = useState(anchorX);
+  if (lastAnchorX !== anchorX) {
+    setLastAnchorX(anchorX);
+    if (anchorX === undefined && lastAnchorX !== undefined) setPos((p) => ({ ...p, x: lastAnchorX, dur: 0 }));
+  }
+  const focusX = anchorX ?? pos.x;
+  const cam = Math.max(0, Math.min(S - size.w, focusX * S - size.w / 2));
   const outdoor = scene === "garden" || scene === "park";
 
   /** Walks to `x` (share of the scene width), then runs `then`. */
@@ -369,7 +379,7 @@ export function BabyWorld({
       >
         <div
           className="w-scene"
-          style={{ width: S, transform: `translate3d(${-cam}px,0,0)`, transition: `transform ${pos.dur}s linear` }}
+          style={{ width: S, transform: `translate3d(${-cam}px,0,0)`, transition: anchorX !== undefined ? "transform 0.7s cubic-bezier(0.3, 0.8, 0.3, 1)" : `transform ${pos.dur}s linear` }}
           onClick={onSceneTap}
         >
           <img className="w-bg" src={bg} alt="" draggable={false} />

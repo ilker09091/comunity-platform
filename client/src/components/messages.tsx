@@ -43,6 +43,7 @@ import {
   Bell,
   BellOff,
   Reply,
+  Pin,
   Clapperboard,
   ContactRound as Info,
   Search,
@@ -683,6 +684,9 @@ export const MessageItem = memo(function MessageItem({
   onDiscard,
   onRematch,
   onBaby,
+  onInfo,
+  onPin,
+  pinned = false,
 }: {
   message: Message;
   own: boolean;
@@ -712,6 +716,11 @@ export const MessageItem = memo(function MessageItem({
   onRematch?: (kind: GameKind) => void;
   /** Opens the baby screen (from a baby request in the chat). */
   onBaby?: () => void;
+  /** Group chats: who has seen it. */
+  onInfo?: (message: Message) => void;
+  /** Group chats: pins (or unpins) it at the top of the chat. */
+  onPin?: (message: Message) => void;
+  pinned?: boolean;
 }) {
   const toast = useToast();
   /**
@@ -725,7 +734,7 @@ export const MessageItem = memo(function MessageItem({
   const openPopover = () => {
     const rect = bodyRef.current?.getBoundingClientRect();
     if (!rect) return setMenu({ mode: "sheet" });
-    const height = (own ? 150 : 108) + (onFavorite ? 42 : 0) + (onReact ? 56 : 0);
+    const height = (own ? 150 : 108) + (onFavorite ? 42 : 0) + (onReact ? 56 : 0) + (onInfo ? 42 : 0) + (onPin ? 42 : 0);
     const top = window.innerHeight - rect.bottom > height + 16 ? rect.bottom + 6 : Math.max(8, rect.top - height - 6);
     setMenu(
       own
@@ -986,6 +995,16 @@ export const MessageItem = memo(function MessageItem({
               >
                 <Reply size={18} /> Reply
               </button>
+              {onInfo && (
+                <button type="button" role="menuitem" onClick={() => { setMenu(null); onInfo(message); }}>
+                  <Eye size={18} /> Message info
+                </button>
+              )}
+              {onPin && (
+                <button type="button" role="menuitem" onClick={() => { setMenu(null); onPin(message); }}>
+                  <Pin size={18} /> {pinned ? "Unpin" : "Pin"}
+                </button>
+              )}
               {onFavorite && (
                 <button
                   type="button"
@@ -2992,7 +3011,7 @@ export default function Messages() {
             />
           )}
           <ul className="dm-list">
-            {groupItems.map(group=><li key={group.id}><Link href={`/messages?group=${group.id}`} className={`dm-row dm-group-row ${groupId===group.id?'active':''}`} aria-current={groupId===group.id?'page':undefined}><GroupAvatar group={group}/><span className="dm-row-copy"><strong>{group.name}</strong><span className="dm-row-preview">{group.lastMessage??`${group.memberCount} members`}</span></span>{group.unreadCount>0&&<span className="group-unread" aria-label={`${group.unreadCount} unread`}>{group.unreadCount}</span>}</Link></li>)}
+            {groupItems.map(group=><li key={group.id}><Link href={`/messages?group=${group.id}`} className={`dm-row dm-group-row ${groupId===group.id?'active':''}`} aria-current={groupId===group.id?'page':undefined}><GroupAvatar group={group}/><span className="dm-row-copy"><strong>{group.name}{group.muted&&<BellOff size={13} className="grp-muted-icon" aria-label="Muted"/>}</strong><span className="dm-row-preview">{group.lastSenderName&&<b className="grp-row-sender">{group.lastSenderName}: </b>}{group.lastMessage??`${group.memberCount} members`}</span></span>{group.unreadCount>0&&<span className={`group-unread ${group.muted?'muted':''}`} aria-label={`${group.unreadCount} unread`}>{group.unreadCount}</span>}</Link></li>)}
             {items.map((c) => (
               <ConversationRow
                 key={c.user.id}

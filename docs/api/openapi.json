@@ -12478,13 +12478,13 @@
             "access-token": []
           }
         ],
-        "summary": "Group settings and current members",
+        "summary": "Group info, settings and members",
         "tags": [
           "Group chats"
         ]
       },
       "patch": {
-        "operationId": "groupsRename",
+        "operationId": "groupsUpdate",
         "parameters": [
           {
             "name": "id",
@@ -12500,7 +12500,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RenameGroupDto"
+                "$ref": "#/components/schemas/UpdateGroupDto"
               }
             }
           }
@@ -12572,7 +12572,180 @@
             "access-token": []
           }
         ],
-        "summary": "Group owner renames the conversation",
+        "summary": "Change the group name or description",
+        "tags": [
+          "Group chats"
+        ]
+      },
+      "delete": {
+        "operationId": "groupsDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Owner deletes the group for everyone",
+        "tags": [
+          "Group chats"
+        ]
+      }
+    },
+    "/api/group-chats/{id}/permissions": {
+      "patch": {
+        "operationId": "groupsPermissions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupPermissionsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Owner sets what members (not only admins) may do",
         "tags": [
           "Group chats"
         ]
@@ -12668,7 +12841,7 @@
             "access-token": []
           }
         ],
-        "summary": "Group owner sets an uploaded photo",
+        "summary": "Set an uploaded photo as the group photo",
         "tags": [
           "Group chats"
         ]
@@ -12752,7 +12925,7 @@
             "access-token": []
           }
         ],
-        "summary": "Group owner removes the group photo",
+        "summary": "Remove the group photo",
         "tags": [
           "Group chats"
         ]
@@ -12848,13 +13021,115 @@
             "access-token": []
           }
         ],
-        "summary": "Group owner adds accepted contacts",
+        "summary": "Add accepted contacts",
         "tags": [
           "Group chats"
         ]
       }
     },
     "/api/group-chats/{id}/members/{userId}": {
+      "patch": {
+        "operationId": "groupsSetRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Owner makes someone an admin, a member again, or the new owner",
+        "tags": [
+          "Group chats"
+        ]
+      },
       "delete": {
         "operationId": "groupsRemoveMember",
         "parameters": [
@@ -12935,7 +13210,7 @@
             "access-token": []
           }
         ],
-        "summary": "Owner removes a member",
+        "summary": "An admin removes a member",
         "tags": [
           "Group chats"
         ]
@@ -13014,7 +13289,285 @@
             "access-token": []
           }
         ],
-        "summary": "Leave; transfer ownership or delete the empty group",
+        "summary": "Leave; an admin (or the longest member) takes over, the last one out deletes it",
+        "tags": [
+          "Group chats"
+        ]
+      }
+    },
+    "/api/group-chats/{id}/pin": {
+      "post": {
+        "operationId": "groupsPin",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupPinDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Pin a message at the top of the chat (null unpins)",
+        "tags": [
+          "Group chats"
+        ]
+      }
+    },
+    "/api/group-chats/{id}/mute": {
+      "patch": {
+        "operationId": "groupsMute",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupMuteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Turn notifications for this group off or on",
+        "tags": [
+          "Group chats"
+        ]
+      }
+    },
+    "/api/group-chats/{id}/media": {
+      "get": {
+        "operationId": "groupsMedia",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupMediaListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Photos and videos shared in the group",
         "tags": [
           "Group chats"
         ]
@@ -13217,6 +13770,100 @@
           }
         ],
         "summary": "Send a group message or attachment",
+        "tags": [
+          "Group chats"
+        ]
+      }
+    },
+    "/api/group-chats/{id}/messages/{messageId}/receipts": {
+      "get": {
+        "operationId": "groupsReceipts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "messageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupReceiptsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Who has seen a message, who got it and who has not yet",
         "tags": [
           "Group chats"
         ]
@@ -24774,7 +25421,7 @@
   "tags": [],
   "servers": [
     {
-      "url": "http://localhost:3000"
+      "url": "https://api.rosefly.store"
     }
   ],
   "components": {
@@ -29507,11 +30154,95 @@
           "name": {
             "type": "string",
             "maxLength": 60
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "avatarMediaId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "An uploaded photo for the group"
           }
         },
         "required": [
           "memberIds",
           "name"
+        ]
+      },
+      "GroupMemberDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "username": {
+            "type": "string",
+            "example": "jane_doe"
+          },
+          "displayName": {
+            "type": "string",
+            "example": "Jane Doe"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true,
+            "example": null,
+            "description": "Signed URL"
+          },
+          "isPrivate": {
+            "type": "boolean",
+            "example": false
+          },
+          "isVerified": {
+            "type": "boolean",
+            "example": false,
+            "description": "Blue verification badge, granted by administrators"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "member"
+            ]
+          },
+          "joinedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "displayName",
+          "avatarUrl",
+          "isPrivate",
+          "isVerified",
+          "role",
+          "joinedAt"
+        ]
+      },
+      "GroupPinnedDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "senderName": {
+            "type": "string"
+          },
+          "preview": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "senderName",
+          "preview"
         ]
       },
       "GroupDetailDto": {
@@ -29542,6 +30273,14 @@
             "type": "string",
             "nullable": true
           },
+          "lastSenderName": {
+            "type": "string",
+            "nullable": true,
+            "description": "First name of whoever sent the last message; null for your own or a system event"
+          },
+          "muted": {
+            "type": "boolean"
+          },
           "updatedAt": {
             "type": "string",
             "format": "date-time"
@@ -29549,8 +30288,41 @@
           "members": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/UserSummaryDto"
+              "$ref": "#/components/schemas/GroupMemberDto"
             }
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "myRole": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "member"
+            ]
+          },
+          "membersCanAdd": {
+            "type": "boolean",
+            "description": "Everyone (not only admins) may add people"
+          },
+          "membersCanEdit": {
+            "type": "boolean",
+            "description": "Everyone (not only admins) may change the name, photo, description and pin"
+          },
+          "pinned": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GroupPinnedDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [
@@ -29561,8 +30333,16 @@
           "memberCount",
           "unreadCount",
           "lastMessage",
+          "lastSenderName",
+          "muted",
           "updatedAt",
-          "members"
+          "members",
+          "description",
+          "myRole",
+          "membersCanAdd",
+          "membersCanEdit",
+          "pinned",
+          "createdAt"
         ]
       },
       "GroupDto": {
@@ -29593,6 +30373,14 @@
             "type": "string",
             "nullable": true
           },
+          "lastSenderName": {
+            "type": "string",
+            "nullable": true,
+            "description": "First name of whoever sent the last message; null for your own or a system event"
+          },
+          "muted": {
+            "type": "boolean"
+          },
           "updatedAt": {
             "type": "string",
             "format": "date-time"
@@ -29606,6 +30394,8 @@
           "memberCount",
           "unreadCount",
           "lastMessage",
+          "lastSenderName",
+          "muted",
           "updatedAt"
         ]
       },
@@ -29635,17 +30425,30 @@
           "hasMore"
         ]
       },
-      "RenameGroupDto": {
+      "UpdateGroupDto": {
         "type": "object",
         "properties": {
           "name": {
             "type": "string",
             "maxLength": 60
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "Empty removes it"
           }
-        },
-        "required": [
-          "name"
-        ]
+        }
+      },
+      "GroupPermissionsDto": {
+        "type": "object",
+        "properties": {
+          "membersCanAdd": {
+            "type": "boolean"
+          },
+          "membersCanEdit": {
+            "type": "boolean"
+          }
+        }
       },
       "GroupAvatarDto": {
         "type": "object",
@@ -29673,6 +30476,131 @@
         },
         "required": [
           "memberIds"
+        ]
+      },
+      "GroupRoleDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "member",
+              "owner"
+            ],
+            "description": "owner hands the group over (you become an admin)"
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "GroupPinDto": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "null unpins"
+          }
+        },
+        "required": [
+          "messageId"
+        ]
+      },
+      "GroupMuteDto": {
+        "type": "object",
+        "properties": {
+          "muted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "muted"
+        ]
+      },
+      "GroupMediaDto": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "IMAGE",
+              "VIDEO"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "messageId",
+          "type",
+          "url",
+          "createdAt"
+        ]
+      },
+      "GroupMediaListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupMediaDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "GroupEventDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "created",
+              "added",
+              "removed",
+              "left",
+              "joined",
+              "renamed",
+              "photo",
+              "description",
+              "pinned",
+              "unpinned",
+              "admin",
+              "unadmin",
+              "owner"
+            ]
+          },
+          "targets": {
+            "description": "Names of the people it was about (added, removed, made admin)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "value": {
+            "type": "string",
+            "nullable": true,
+            "description": "The new name or description, or the pinned text"
+          }
+        },
+        "required": [
+          "type",
+          "targets",
+          "value"
         ]
       },
       "GroupMessageDto": {
@@ -29850,6 +30778,16 @@
           },
           "sender": {
             "$ref": "#/components/schemas/UserSummaryDto"
+          },
+          "event": {
+            "nullable": true,
+            "description": "Set on system messages; the sender is who did it",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GroupEventDto"
+              }
+            ]
           }
         },
         "required": [
@@ -29879,7 +30817,8 @@
           "reactions",
           "game",
           "baby",
-          "sender"
+          "sender",
+          "event"
         ]
       },
       "PaginatedGroupMessage": {
@@ -29906,6 +30845,53 @@
           "items",
           "nextCursor",
           "hasMore"
+        ]
+      },
+      "GroupReceiptDto": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserSummaryDto"
+          },
+          "at": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "user",
+          "at"
+        ]
+      },
+      "GroupReceiptsDto": {
+        "type": "object",
+        "properties": {
+          "readBy": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupReceiptDto"
+            }
+          },
+          "deliveredTo": {
+            "description": "Got it but has not read it yet",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupReceiptDto"
+            }
+          },
+          "waiting": {
+            "description": "Has not received it yet",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserSummaryDto"
+            }
+          }
+        },
+        "required": [
+          "readBy",
+          "deliveredTo",
+          "waiting"
         ]
       },
       "GroupAckDto": {

@@ -4,6 +4,52 @@
  */
 export const TR_PATTERNS: [string, string][] = [
   // Most specific first: these contain the shorter patterns below.
+  // Groups: things you did first (Turkish verbs change with the person)
+  ["You created the group", "Grubu oluşturdun"],
+  ["You added {}", "{0} kişisini ekledin"],
+  ["You removed {}", "{0} kişisini çıkardın"],
+  ["You left the group", "Gruptan ayrıldın"],
+  ["You changed the group name to “{}”", "Grup adını “{0}” yaptın"],
+  ["You changed the group photo", "Grup fotoğrafını değiştirdin"],
+  ["You removed the group photo", "Grup fotoğrafını kaldırdın"],
+  ["You changed the group description", "Grup açıklamasını değiştirdin"],
+  ["You removed the group description", "Grup açıklamasını kaldırdın"],
+  ["You pinned “{}”", "“{0}” mesajını sabitledin"],
+  ["You unpinned a message", "Bir mesajın sabitlemesini kaldırdın"],
+  ["You made {} an admin", "{0} kişisini yönetici yaptın"],
+  ["You removed {} as admin", "{0} kişisini yöneticilikten aldın"],
+  ["You made {} the group owner", "{0} kişisini grup kurucusu yaptın"],
+  ["{} created the group", "{0} grubu oluşturdu"],
+  ["{} added {}", "{0}, {1} kişisini ekledi"],
+  ["{} removed {}", "{0}, {1} kişisini çıkardı"],
+  ["{} left the group", "{0} gruptan ayrıldı"],
+  ["{} joined the group", "{0} gruba katıldı"],
+  ["{} changed the group name to “{}”", "{0} grup adını “{1}” yaptı"],
+  ["{} changed the group photo", "{0} grup fotoğrafını değiştirdi"],
+  ["{} removed the group photo", "{0} grup fotoğrafını kaldırdı"],
+  ["{} changed the group description", "{0} grup açıklamasını değiştirdi"],
+  ["{} removed the group description", "{0} grup açıklamasını kaldırdı"],
+  ["{} pinned “{}”", "{0}, “{1}” mesajını sabitledi"],
+  ["{} unpinned a message", "{0} bir mesajın sabitlemesini kaldırdı"],
+  ["{} made {} an admin", "{0}, {1} kişisini yönetici yaptı"],
+  ["{} removed {} as admin", "{0}, {1} kişisini yöneticilikten aldı"],
+  ["{} made {} the group owner", "{0}, {1} kişisini grup kurucusu yaptı"],
+  ["Seen by {}", "Gören: {0}"],
+  ["Delivered to {}", "Ulaştı: {0}"],
+  ["Not delivered yet {}", "Henüz ulaşmadı: {0}"],
+  ["Group · {} members", "Grup · {0} üye"],
+  ["A private group · {} members", "Özel grup · {0} üye"],
+  ["{} admins · created {}", "{0} yönetici · kuruluş {1}"],
+  ["1 admin · created {}", "1 yönetici · kuruluş {0}"],
+  ["{} (You)", "{0} (Sen)"],
+  ["Make {} the owner?", "{0} kurucu yapılsın mı?"],
+  ["Remove {}?", "{0} çıkarılsın mı?"],
+  ["Remove {} from group", "{0} kişisini gruptan çıkar"],
+  ["Next · {}", "İleri · {0}"],
+  ["Add · {}", "Ekle · {0}"],
+  ["Group conversation {}", "{0} grup sohbeti"],
+  ["{} group photo", "{0} grup fotoğrafı"],
+
   ["Active {} ago", "{0} önce aktifti"],
   // Time and counts
   ["{}m ago", "{0} dk önce"],
@@ -83,7 +129,6 @@ export const TR_PATTERNS: [string, string][] = [
   ["Chat info: {}", "Sohbet bilgisi: {0}"],
   ["{} is here", "{0} burada"],
   ["{} is away", "{0} şu an burada değil"],
-  ["{} · {}", "{0} · {1}"],
 
   // Follow and profile
   ["You’re now following {}.", "Artık {0} kişisini takip ediyorsun."],
@@ -179,6 +224,9 @@ export const TR_PATTERNS: [string, string][] = [
   ["{} picked Dare 🔥", "{0} cesareti seçti 🔥"],
   ["{} passed 🙈", "{0} pas geçti 🙈"],
   ["Show {} earlier", "Önceki {0} turu göster"],
+
+  // Most general last.
+  ["{} · {}", "{0} · {1}"],
 ];
 
 /** Regular expressions for things like dates and short times ("Oct 17", "37m"). */
