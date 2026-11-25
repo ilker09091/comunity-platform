@@ -332,6 +332,8 @@ export const TR_PATTERNS: [string, string][] = [
   ["{} took {}", "{0}, {1} taş aldı"],
   ["· last: {}", "· son hamle: {0}"],
 
+  ["If the game has a winner, {} wins. Ending a game early doesn't count for your baby.", "Oyunun bir kazananı varsa {0} kazanır. Erken bitirilen oyun bebeğinize sayılmaz."],
+
   // Most general last.
   ["{} · {}", "{0} · {1}"],
 ];

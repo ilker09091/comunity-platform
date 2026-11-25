@@ -10555,6 +10555,181 @@
         ]
       }
     },
+    "/api/messages/games/{gameId}/resign": {
+      "post": {
+        "operationId": "messagesGameResign",
+        "parameters": [
+          {
+            "name": "gameId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatGameDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "End a game early: the other player wins (or it just closes if nobody wins it)",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
+    "/api/messages/{id}/games/active": {
+      "get": {
+        "operationId": "messagesActiveGames",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChatGameDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`VALIDATION_ERROR`) or malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)\n\nMissing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or not visible to the viewer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (`RATE_LIMITED`)\n\nRate limit exceeded (`RATE_LIMITED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Games still going on in this chat, newest first",
+        "tags": [
+          "Messages"
+        ]
+      }
+    },
     "/api/messages/games/{gameId}/move": {
       "post": {
         "operationId": "messagesGameMove",

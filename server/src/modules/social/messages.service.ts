@@ -16,7 +16,7 @@ import type { ChatTheme } from '../../database/migrations/1760192700000-StrictSt
 import type { GameKind } from '../../database/migrations/1760193700000-EvenMoreGames.js';
 import { EXTRA_KINDS, extraPicks, extraView, type ExtraKind, type ExtraState } from './games-extra.js';
 import { THIRD_KINDS, thirdPicks, thirdView, type ThirdKind, type ThirdState } from './games-third.js';
-import { applyMove, firstTurn, GameRuleError, initialState, THIS_OR_THAT, type BoardState, type GameState, type MemoryState, type RpsState, type TotState, type QaState, type TodState, type GameMove } from './games.js';
+import { applyMove, firstTurn, GameRuleError, initialState, NO_WINNER, THIS_OR_THAT, type BoardState, type GameState, type MemoryState, type RpsState, type TotState, type QaState, type TodState, type GameMove } from './games.js';
 import { PostsQueryService } from '../posts/posts-query.service.js';
 import {
   USER_AVATAR_JOIN,
@@ -709,6 +709,30 @@ export class MessagesService {
   async game(viewerId:string,gameId:string) {
     const g=await this.gameRow(this.db,viewerId,gameId);
     await this.historyPeer(viewerId,(g.players as string[]).find(id=>id!==viewerId)!);
+    return this.gameDto(g,viewerId);
+  }
+
+  /** Games still going on in this chat (moved in during the last two weeks), newest first. */
+  async activeGames(viewerId:string,peerId:string) {
+    await this.historyPeer(viewerId,peerId);
+    const rows=await sqlRows(this.db,`SELECT * FROM chat_games WHERE low_id=least($1::uuid,$2::uuid) AND high_id=greatest($1::uuid,$2::uuid)
+      AND status='active' AND updated_at>now()-interval '14 days' ORDER BY updated_at DESC LIMIT 6`,[viewerId,peerId]);
+    return rows.map(g=>this.gameDto(g,viewerId));
+  }
+
+  /**
+   * Ends a game early: the other player wins (games nobody wins are just closed). It doesn't
+   * count as a finished game for the baby, so starting and ending games earns nothing.
+   */
+  async resign(viewerId:string,gameId:string) {
+    const g=await this.db.transaction(async m=>{
+      const g=await this.gameRow(m,viewerId,gameId,true);
+      if(g.status!=='active')throw AppException.badRequest(ErrorCode.INVALID_STATE,'This game is over');
+      const other=(g.players as string[]).find(id=>id!==viewerId)!;
+      const scored=!NO_WINNER.includes(g.kind as GameKind);
+      return (await sqlOne(m,`UPDATE chat_games SET status=$2,winner_id=$3,turn_id=NULL,updated_at=now() WHERE id=$1 RETURNING *`,
+        [gameId,scored?'won':'done',scored?other:null]))!;
+    });
     return this.gameDto(g,viewerId);
   }
 

@@ -200,6 +200,14 @@ export class MessagesController {
   @Get('games/:gameId')
   @ApiOperation({operationId:'messagesGame',summary:'Current state of a mini game you play in'}) @ApiOkResponse({type:ChatGameDto})
   game(@CurrentUser() u:AuthUser,@Param('gameId',ParseUUIDPipe) id:string){return this.messages.game(u.id,id);}
+  @Post('games/:gameId/resign') @HttpCode(200)
+  @ApiOperation({operationId:'messagesGameResign',summary:'End a game early: the other player wins (or it just closes if nobody wins it)'})
+  @ApiOkResponse({type:ChatGameDto})
+  gameResign(@CurrentUser() u:AuthUser,@Param('gameId',ParseUUIDPipe) id:string){return this.messages.resign(u.id,id);}
+  @Get(':id/games/active')
+  @ApiOperation({operationId:'messagesActiveGames',summary:'Games still going on in this chat, newest first'})
+  @ApiOkResponse({type:ChatGameDto,isArray:true})
+  activeGames(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string){return this.messages.activeGames(u.id,id);}
   @Post('games/:gameId/move') @HttpCode(200)
   @ApiOperation({operationId:'messagesGameMove',summary:'Play a move: a cell (XOX), a column (Connect Four) or a pick (rock-paper-scissors)'})
   @ApiOkResponse({type:ChatGameDto})

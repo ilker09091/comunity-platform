@@ -200,7 +200,7 @@ export function sudokuConflicts(board: number[]) {
   return [...bad];
 }
 export function sudokuSolution(random: () => number) {
-  const grid = new Array(81).fill(0);
+  const grid = Array.from({ length: 81 }, () => 0);
   const ok = (i: number, n: number) => {
     const r = Math.floor(i / 9), c = i % 9;
     for (let k = 0; k < 9; k++) {
@@ -229,7 +229,7 @@ const SEARCH_DIRS = [[0, 1], [1, 0], [1, 1], [-1, 1], [0, -1], [-1, 0], [-1, -1]
 export function buildSearch(lang: Lang, random: () => number): WordSearchState {
   const n = SEARCH_SIZE;
   for (let attempt = 0; attempt < 50; attempt++) {
-    const grid: string[] = new Array(n * n).fill('');
+    const grid: string[] = Array.from({ length: n * n }, () => '');
     const words: WordSearchState['words'] = [];
     for (const word of shuffle(SEARCH_LISTS[lang].filter((w) => [...w].length <= n), random)) {
       if (words.length >= SEARCH_WORDS) break;

@@ -72,6 +72,9 @@ export const SIMULTANEOUS_START: readonly GameKind[] = ['rps', 'thisorthat', 'nh
 const isExtra = (kind: GameKind): kind is ExtraKind => (EXTRA_KINDS as readonly string[]).includes(kind);
 export const isThird = (kind: GameKind): kind is ThirdKind => (THIRD_KINDS as readonly string[]).includes(kind);
 
+/** Games nobody wins: ending one early just closes it. */
+export const NO_WINNER: readonly GameKind[] = ['qa', 'tod', 'thisorthat', 'nhie', 'story', 'daily', 'whomore', 'bucket', 'wheel'];
+
 /** Index (into players) of who moves first, or null when both may play at once. */
 export function firstTurn(kind: GameKind, state: GameState): number | null {
   if (isThird(kind)) return thirdFirstTurn(kind, state as ThirdState);
@@ -88,19 +91,19 @@ export function initialState(kind: GameKind, random: () => number = Math.random,
     case 'rps':
       return { picks: [null, null], scores: [0, 0], rounds: [] };
     case 'memory':
-      return { cards: shuffle([...MEMORY_FACES, ...MEMORY_FACES], random), owners: new Array(16).fill(0), flipped: [], shown: [], scores: [0, 0] };
+      return { cards: shuffle([...MEMORY_FACES, ...MEMORY_FACES], random), owners: Array.from({ length: 16 }, () => 0), flipped: [], shown: [], scores: [0, 0] };
     case 'thisorthat':
       return { order: shuffle(THIS_OR_THAT.map((_, i) => i), random).slice(0, TOT_ROUNDS), round: 0, picks: [null, null], rounds: [] };
     case 'gomoku':
-      return { board: new Array(GOMOKU_SIZE * GOMOKU_SIZE).fill(0), line: [] };
+      return { board: Array.from({ length: GOMOKU_SIZE * GOMOKU_SIZE }, () => 0), line: [] };
     case 'qa':
       return { rounds: [qaRound(0)], phase: 'ask', chances: [QA_CLARIFY, QA_CLARIFY], total: QA_ROUNDS };
     case 'tod':
       return { rounds: [todRound(0)], phase: 'pick', chances: [TOD_PASSES, TOD_PASSES], total: TOD_ROUNDS };
     case 'connect4':
-      return { board: new Array(C4_COLS * C4_ROWS).fill(0), line: [] };
+      return { board: Array.from({ length: C4_COLS * C4_ROWS }, () => 0), line: [] };
     default:
-      return { board: new Array(9).fill(0), line: [] };
+      return { board: Array.from({ length: 9 }, () => 0), line: [] };
   }
 }
 

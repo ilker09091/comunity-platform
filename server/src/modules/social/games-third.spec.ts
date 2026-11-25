@@ -14,7 +14,7 @@ function seeded(seed: number) {
     return s / 2147483648;
   };
 }
-const empty = () => new Array(64).fill(0);
+const empty = () => Array.from({ length: 64 }, () => 0);
 
 describe('russian draughts', () => {
   const sq = (r: number, c: number) => r * 8 + c;
@@ -131,7 +131,7 @@ describe('tavla', () => {
   });
 
   it('bearing off needs everyone home; higher dice only from the furthest point', () => {
-    const points = new Array(24).fill(0);
+    const points = Array.from({ length: 24 }, () => 0);
     points[0] = 13; points[3] = 2; points[23] = -15;
     const s: TavlaState = { ...base(), points, dice: [6, 1], rolled: [6, 1] };
     expect(destination(s, 0, 3, 6)).toBe(OFF);
@@ -149,14 +149,14 @@ describe('tavla', () => {
     const two = tavlaMove(one.state, 0, 12, 5, seeded(3))!;
     expect(two.state.toMove).toBe(1);
     expect(two.state.played).toEqual([]);
-    const points = new Array(24).fill(0);
+    const points = Array.from({ length: 24 }, () => 0);
     points[0] = 1; points[23] = -15;
     const last: TavlaState = { ...base(), points, off: [14, 0], dice: [1, 2], rolled: [1, 2] };
     expect(tavlaMove(last, 0, 0, 2, seeded(1))!.winner).toBe(0);
   });
 
   it('when only one die can be played, it must be the higher one', () => {
-    const points = new Array(24).fill(0);
+    const points = Array.from({ length: 24 }, () => 0);
     points[8] = 1;
     points[2] = -2; points[3] = -2; // 8-6=2 blocked, 8-5=3 blocked … only one die works
     points[23] = -11;

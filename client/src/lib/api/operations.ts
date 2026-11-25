@@ -630,6 +630,16 @@ export const endpoints = {
     "method": "GET",
     "authenticated": true
   },
+  "messagesGameResign": {
+    "path": "/api/messages/games/{gameId}/resign",
+    "method": "POST",
+    "authenticated": true
+  },
+  "messagesActiveGames": {
+    "path": "/api/messages/{id}/games/active",
+    "method": "GET",
+    "authenticated": true
+  },
   "messagesGameMove": {
     "path": "/api/messages/games/{gameId}/move",
     "method": "POST",

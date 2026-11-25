@@ -1891,6 +1891,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/messages/games/{gameId}/resign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** End a game early: the other player wins (or it just closes if nobody wins it) */
+        post: operations["messagesGameResign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{id}/games/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Games still going on in this chat, newest first */
+        get: operations["messagesActiveGames"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/messages/games/{gameId}/move": {
         parameters: {
             query?: never;
@@ -15859,6 +15893,154 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChatGameDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    messagesGameResign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                gameId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatGameDto"];
+                };
+            };
+            /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             *
+             *     Missing, invalid or expired access token (`UNAUTHORIZED`, `INVALID_TOKEN`)
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Not allowed (`FORBIDDEN`, `ACCOUNT_SUSPENDED`, `PRIVATE_ACCOUNT`, `BLOCKED`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Resource not found or not visible to the viewer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /**
+             * @description Rate limit exceeded (`RATE_LIMITED`)
+             *
+             *     Rate limit exceeded (`RATE_LIMITED`)
+             */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    messagesActiveGames: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatGameDto"][];
                 };
             };
             /** @description Validation failed (`VALIDATION_ERROR`) or malformed request */

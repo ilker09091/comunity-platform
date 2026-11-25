@@ -1181,3 +1181,144 @@ button.dm-card-p:disabled {
     transition: none;
   }
 }
+
+/* ---------- Game bar: games in progress, pinned under the chat header ---------- */
+.dm-gamebar {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex: none;
+  gap: 6px;
+  padding: 6px 10px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  scrollbar-width: none;
+  animation: dm-gamebar-in 0.25s var(--ease-out);
+}
+.dm-gamebar::-webkit-scrollbar {
+  display: none;
+}
+@keyframes dm-gamebar-in {
+  from { opacity: 0; transform: translateY(-6px); }
+}
+.dm-thread:not([data-chat-theme="default"]) .dm-gamebar {
+  border-bottom-color: color-mix(in srgb, var(--chat-b, var(--border)) 14%, transparent);
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.dm-gamebar-item {
+  display: flex;
+  flex: 1 0 auto;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 3px 8px 3px 4px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.dm-gamebar.many .dm-gamebar-item {
+  flex: 0 0 auto;
+  max-width: 240px;
+  background: var(--surface-muted);
+}
+.dm-gamebar-item:hover {
+  background: var(--surface-hover);
+}
+.dm-gamebar-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--surface-muted);
+  font-size: 18px;
+}
+/* Telegram's pinned-message line: an accent bar before the text. */
+.dm-gamebar-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  padding-left: 9px;
+  border-left: 2px solid var(--chat-a, var(--primary));
+  line-height: 1.25;
+}
+.dm-gamebar-text small {
+  overflow: hidden;
+  color: var(--chat-a, var(--primary));
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dm-gamebar-text b {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dm-gamebar-item > svg {
+  flex: none;
+  color: var(--muted);
+}
+.dm-gamebar-item > em {
+  flex: none;
+  padding: 4px 11px;
+  border-radius: 99px;
+  background: var(--chat-a, var(--primary));
+  color: #fff;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+  animation: dm-turn-pulse 1.8s ease-in-out infinite;
+}
+.dm-gamebar-item.turn .dm-gamebar-icon {
+  box-shadow: 0 0 0 2px var(--chat-a, var(--primary));
+}
+
+/* The game opened from the bar. */
+.modal.dm-game-modal {
+  width: min(400px, calc(100vw - 24px));
+}
+.modal.dm-game-modal > .dm-game-modal-body {
+  display: flex;
+  justify-content: center;
+  padding: 14px 12px 18px;
+}
+.modal.dm-game-modal .dm-game {
+  width: 100%;
+  border: 0;
+  box-shadow: none;
+}
+.dm-game-end {
+  display: block;
+  margin: 10px auto 0;
+  padding: 4px 10px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dm-game-end:hover {
+  color: var(--danger);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dm-gamebar,
+  .dm-gamebar-item > em {
+    animation: none;
+  }
+}

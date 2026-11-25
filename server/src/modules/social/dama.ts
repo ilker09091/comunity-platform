@@ -21,7 +21,7 @@ export const DAMA_QUIET_LIMIT = 30;
 const dark = (sq: number) => (Math.floor(sq / 8) + (sq % 8)) % 2 === 1;
 
 export function damaStart(): DamaState {
-  const board = new Array(64).fill(0);
+  const board = Array.from({ length: 64 }, () => 0);
   for (let sq = 0; sq < 64; sq++) {
     if (!dark(sq)) continue;
     const r = Math.floor(sq / 8);

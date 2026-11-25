@@ -1467,7 +1467,8 @@ export function BabyBubble({ peer, onOpen }: { peer: Peer; onOpen: () => void })
   const bounds = () => {
     const area = self.current?.parentElement;
     const rect = area?.getBoundingClientRect() ?? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
-    const head = area?.querySelector(".dm-thread-head")?.getBoundingClientRect().height ?? 64;
+    const head = (area?.querySelector(".dm-thread-head")?.getBoundingClientRect().height ?? 64)
+      + (area?.querySelector(".dm-gamebar")?.getBoundingClientRect().height ?? 0);
     const foot = area?.querySelector(".tg-composer, .dm-request, .dm-blocked-state")?.getBoundingClientRect().height ?? 72;
     return { rect, top: head + EDGE, bottom: rect.height - foot - FLOAT_H - EDGE };
   };

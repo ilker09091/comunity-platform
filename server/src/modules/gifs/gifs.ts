@@ -58,12 +58,12 @@ export class GifsService implements OnModuleInit {
     if (hit && Date.now() - hit.at < ttlMs) return hit.value as T;
     const pending=this.pending.get(cacheKey);
     if(pending)return pending as Promise<T>;
-    const request=this.request<T>(path,query,cacheKey,ttlMs);
+    const request=this.request<T>(path,query,cacheKey);
     this.pending.set(cacheKey,request);
     try{return await request;}finally{this.pending.delete(cacheKey);}
   }
 
-  private async request<T>(path:string,query:URLSearchParams,cacheKey:string,ttlMs:number):Promise<T> {
+  private async request<T>(path:string,query:URLSearchParams,cacheKey:string):Promise<T> {
     let response: Response;
     try {
       response = await fetch(`${this.base}${path}?${query}`, { signal: AbortSignal.timeout(6000) });

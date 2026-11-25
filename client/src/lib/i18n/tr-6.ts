@@ -1,5 +1,10 @@
 /** Turkish: the third batch of chat games (Tavla, Chess, Dama, Pişti, Sudoku…). */
 export const TR6: Record<string, string> = {
+  // Game bar
+  "Games in progress": "Devam eden oyunlar",
+  "End game": "Oyunu bitir",
+  "End this game?": "Bu oyun bitirilsin mi?",
+
   // Picker
   "Search games": "Oyun ara",
   "Recently played": "Son oynananlar",

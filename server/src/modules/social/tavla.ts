@@ -29,7 +29,7 @@ export function rollDice(random: () => number) {
 }
 
 export function tavlaStart(random: () => number): TavlaState {
-  const points = new Array(24).fill(0);
+  const points = Array.from({ length: 24 }, () => 0);
   points[23] = 2; points[12] = 5; points[7] = 3; points[5] = 5;
   points[0] = -2; points[11] = -5; points[16] = -3; points[18] = -5;
   // Opening roll: one die each, the higher starts and plays both (no doubles).

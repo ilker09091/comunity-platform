@@ -172,9 +172,9 @@ export function extraInitialState(kind: ExtraKind, random: () => number): ExtraS
     case 'bulls':
       return { secrets: [null, null], guesses: [[], []], phase: 'set' };
     case 'dots':
-      return { lines: new Array(DOTS_LINES).fill(0), boxes: new Array(DOTS * DOTS).fill(0), last: null };
+      return { lines: Array.from({ length: DOTS_LINES }, () => 0), boxes: Array.from({ length: DOTS * DOTS }, () => 0), last: null };
     case 'reversi': {
-      const board = new Array(REVERSI * REVERSI).fill(0);
+      const board = Array.from({ length: REVERSI * REVERSI }, () => 0);
       board[27] = board[36] = 2;
       board[28] = board[35] = 1;
       return { board, passed: null, last: null };
@@ -623,7 +623,7 @@ export function extraView(kind: ExtraKind, current: ExtraState, me: number, over
       /** 0 unknown/water, 1 ship, 2 hit, 3 miss, 4 sunk. */
       const sea = (owner: number, reveal: boolean) => {
         const shots = new Set(s.shots[1 - owner]);
-        const cells = new Array(SEA * SEA).fill(0);
+        const cells = Array.from({ length: SEA * SEA }, () => 0);
         for (const c of shots) cells[c] = 3;
         for (const ship of s.ships[owner]) {
           const sunk = ship.every((c) => shots.has(c));

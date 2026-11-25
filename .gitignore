@@ -2,19 +2,20 @@ node_modules/
 **/node_modules/
 
 # Build output (produced by Dockerfile — don't commit)
+*.tsbuildinfo
 .next/
 **/.next/
 dist/
 server/dist/
 .turbo/
 
-# Local secrets (template .env.example IS committed)
-.env
-.env.turn
-.env.giphy
-server/.env
-client/.env
-client/.env.local
+# Local secrets: every .env file stays on its machine; only the *.example templates are committed.
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example
+*.yedek
+docker-compose.yml.backup
 
 # Runtime state (importer; recreated on start)
 .tools/

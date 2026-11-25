@@ -1,18 +1,15 @@
 "use client";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronRight, ImagePlus, Loader2, Palette, RotateCcw, Search, Send, Trash2, X } from "lucide-react";
-import { api, upload, type Models } from "@/lib/api/client";
-import { compressImage } from "@/lib/compress-image";
-import { toTurkish, useLang } from "@/lib/i18n";
+import { api, type Models } from "@/lib/api/client";
 import { haptic } from "@/lib/haptics";
-import { useSession, useToast } from "./providers";
-import { Avatar, Modal } from "./ui";
-import { MESSAGE_SOUNDS, peerSound, previewSound, setPeerSound, type MessageSound } from "./app-bridge";
-import { themeMeta } from "./chat-themes";
+import { toTurkish, useLang } from "@/lib/i18n";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronRight, Loader2, RotateCcw, Search, Send, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { BabyCard } from "./baby";
-import { isThirdKind, ThirdBoard, thirdAnswered, thirdDone, thirdEndNote, thirdPeerAnswered, thirdSimultaneous, thirdStatus } from "./chat-games-third";
 import { ExtraBoard, extraAnswered, extraDone, extraPeerAnswered, extraSimultaneous, extraStatus, isExtraKind, type ExtraMove } from "./chat-games-more";
+import { ThirdBoard, isThirdKind, thirdAnswered, thirdDone, thirdEndNote, thirdPeerAnswered, thirdSimultaneous, thirdStatus } from "./chat-games-third";
+import { useSession, useToast } from "./providers";
+import { Avatar, ConfirmDialog, Modal } from "./ui";
 
 type Game = Models["ChatGameDto"];
 export type GameKind = Game["kind"];
@@ -116,6 +113,41 @@ function Score({ me, peer, mine, theirs, middle }: { me: Peer | Models["UserSumm
   );
 }
 
+/** Whose turn it is in a game and the one-line status under its title, for the card and the game bar. */
+export function describeGame(game: Game, userId: string | undefined, peer: Peer) {
+  const me = game.players.indexOf(userId ?? "");
+  const peerName = peer.displayName.split(" ")[0];
+  const extra = isExtraKind(game.kind);
+  const third = isThirdKind(game.kind);
+  const simultaneous = game.kind === "rps" || game.kind === "thisorthat" || (extra && extraSimultaneous(game)) || (third && thirdSimultaneous(game));
+  const answered = extra ? extraAnswered(game, me) : third ? thirdAnswered(game, me) : !!game.myChoice;
+  const myTurn = game.status === "active" && (simultaneous ? !answered : game.turnId === userId);
+  const matches = game.kind === "thisorthat" ? game.rounds.filter((r) => r.choices[0] === r.choices[1]).length : 0;
+  const statusText =
+    game.status === "won"
+      ? game.winnerId === userId ? "You won! 🎉" : `${peerName} won`
+      : game.status === "draw"
+        ? "It's a draw 🤝"
+        : game.status === "done"
+          ? game.kind === "qa" ? "Great talk 💬" : game.kind === "tod" ? "What a game 🎲" : extra ? extraDone(game) : third ? thirdDone(game, me, peerName) : `You think alike on ${matches} of ${game.rounds.length} 💞`
+          : extra
+            ? extraStatus(game, me, peerName, myTurn)
+          : third
+            ? thirdStatus(game, me, peerName, myTurn)
+          : game.kind === "qa" || game.kind === "tod"
+            ? myTurn
+              ? game.kind === "qa"
+                ? game.phase === "ask" ? "Your turn to ask" : game.phase === "explain" ? `${peerName} asks what you mean` : "Your turn to answer"
+                : game.phase === "pick" ? "Truth or dare?" : game.phase === "prompt" ? `Write ${peerName}'s ${game.turns[game.turns.length - 1]?.pick === "dare" ? "dare" : "question"}` : "Your turn to reply"
+              : `${peerName}'s turn`
+          : simultaneous
+            ? game.myChoice
+              ? `Waiting for ${peerName}…`
+              : game.peerReady ? `${peerName} answered — your turn` : game.kind === "thisorthat" ? `Question ${game.round + 1} of ${game.totalRounds}` : "Make your pick"
+            : myTurn ? "Your turn" : `${peerName}'s turn`;
+  return { me, peerName, extra, third, simultaneous, myTurn, statusText };
+}
+
 /**
  * A mini game inside the chat. It refreshes itself while waiting for your partner, so both
  * phones stay in step without reloading the conversation.
@@ -158,11 +190,25 @@ export function GameCard({
       if (previous) client.setQueryData<Game>(key, predict(previous, me, body));
       return { previous };
     },
-    onSuccess: (next) => client.setQueryData(key, next),
+    onSuccess: (next) => {
+      client.setQueryData(key, next);
+      // The game bar over the chat shows whose turn it is (and drops finished games).
+      void client.invalidateQueries({ queryKey: ["messages", user?.id, "active-games"] });
+    },
     onError: (error, _body, context) => {
       if (context?.previous) client.setQueryData(key, context.previous);
       toast(error.message, true);
     },
+  });
+  const [ending, setEnding] = useState(false);
+  const resign = useMutation({
+    mutationFn: () => api("messagesGameResign", { params: { gameId: game.id } }),
+    onSuccess: (next) => {
+      setEnding(false);
+      client.setQueryData(key, next);
+      void client.invalidateQueries({ queryKey: ["messages", user?.id, "active-games"] });
+    },
+    onError: (error) => toast(error.message, true),
   });
   // A little cheer (and buzz) the moment the game ends in your favour.
   const [celebrate, setCelebrate] = useState(false);
@@ -175,35 +221,7 @@ export function GameCard({
     seenStatus.current = game.status;
   }, [game.status, game.winnerId, user?.id]);
 
-  const peerName = peer.displayName.split(" ")[0];
-  const extra = isExtraKind(game.kind);
-  const third = isThirdKind(game.kind);
-  const simultaneous = game.kind === "rps" || game.kind === "thisorthat" || (extra && extraSimultaneous(game)) || (third && thirdSimultaneous(game));
-  const answered = extra ? extraAnswered(game, me) : third ? thirdAnswered(game, me) : !!game.myChoice;
-  const myTurn = game.status === "active" && (simultaneous ? !answered : game.turnId === user?.id);
-  const matches = game.kind === "thisorthat" ? game.rounds.filter((r) => r.choices[0] === r.choices[1]).length : 0;
-  const statusText =
-    game.status === "won"
-      ? game.winnerId === user?.id ? "You won! 🎉" : `${peerName} won`
-      : game.status === "draw"
-        ? "It's a draw 🤝"
-        : game.status === "done"
-          ? game.kind === "qa" ? "Great talk 💬" : game.kind === "tod" ? "What a game 🎲" : extra ? extraDone(game) : third ? thirdDone(game, me, peerName) : `You think alike on ${matches} of ${game.rounds.length} 💞`
-          : extra
-            ? extraStatus(game, me, peerName, myTurn)
-          : third
-            ? thirdStatus(game, me, peerName, myTurn)
-          : game.kind === "qa" || game.kind === "tod"
-            ? myTurn
-              ? game.kind === "qa"
-                ? game.phase === "ask" ? "Your turn to ask" : game.phase === "explain" ? `${peerName} asks what you mean` : "Your turn to answer"
-                : game.phase === "pick" ? "Truth or dare?" : game.phase === "prompt" ? `Write ${peerName}'s ${game.turns[game.turns.length - 1]?.pick === "dare" ? "dare" : "question"}` : "Your turn to reply"
-              : `${peerName}'s turn`
-          : simultaneous
-            ? game.myChoice
-              ? `Waiting for ${peerName}…`
-              : game.peerReady ? `${peerName} answered — your turn` : game.kind === "thisorthat" ? `Question ${game.round + 1} of ${game.totalRounds}` : "Make your pick"
-            : myTurn ? "Your turn" : `${peerName}'s turn`;
+  const { peerName, extra, third, simultaneous, myTurn, statusText } = describeGame(game, user?.id, peer);
   const markOf = (value: number) => (value === 0 ? null : game.players[value - 1] === user?.id ? "mine" : "theirs");
   const playable = myTurn && !move.isPending && me >= 0;
   const winning = new Set(game.line);
@@ -388,7 +406,65 @@ export function GameCard({
           <RotateCcw size={15} /> Play again
         </button>
       )}
+      {game.status === "active" && me >= 0 && (
+        <button type="button" className="dm-game-end" onClick={() => setEnding(true)}>End game</button>
+      )}
+      {ending && (
+        <ConfirmDialog
+          title="End this game?"
+          description={`If the game has a winner, ${peerName} wins. Ending a game early doesn't count for your baby.`}
+          confirmLabel="End game"
+          pending={resign.isPending}
+          onConfirm={() => resign.mutate()}
+          onClose={() => setEnding(false)}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * Games still going on in this chat, pinned under the header like Telegram's pinned message,
+ * so you never have to scroll up to find the board. Tap one to play it right here.
+ */
+export function GameBar({ peer, onRematch }: { peer: Peer; onRematch?: (kind: GameKind) => void }) {
+  const { user } = useSession();
+  const [opened, setOpened] = useState<Game | null>(null);
+  const games = useQuery({
+    queryKey: ["messages", user?.id, "active-games", peer.id],
+    queryFn: ({ signal }) => api("messagesActiveGames", { params: { id: peer.id }, signal }),
+    staleTime: 3000,
+    refetchInterval: () => (typeof document !== "undefined" && document.visibilityState === "visible" ? 6000 : false),
+  });
+  const list = games.data ?? [];
+  return (
+    <>
+      {list.length > 0 && (
+        <div className={`dm-gamebar ${list.length > 1 ? "many" : ""}`} role="region" aria-label="Games in progress">
+          {list.map((g) => {
+            const d = describeGame(g, user?.id, peer);
+            const meta = GAMES.find((x) => x.kind === g.kind);
+            return (
+              <button key={g.id} type="button" className={`dm-gamebar-item ${d.myTurn ? "turn" : ""}`} onClick={() => { haptic("tap"); setOpened(g); }}>
+                <span className="dm-gamebar-icon" aria-hidden="true">{meta?.icon ?? "🎮"}</span>
+                <span className="dm-gamebar-text">
+                  <small>{gameName(g.kind)}</small>
+                  <b>{d.statusText}</b>
+                </span>
+                {d.myTurn ? <em>Play</em> : <ChevronRight size={16} aria-hidden="true" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {opened && (
+        <Modal title={gameName(opened.kind)} className="dm-game-modal" onClose={() => setOpened(null)}>
+          <div className="dm-game-modal-body">
+            <GameCard game={opened} peer={peer} own={false} onRematch={onRematch && ((kind) => { setOpened(null); onRematch(kind); })} />
+          </div>
+        </Modal>
+      )}
+    </>
   );
 }
 
@@ -696,164 +772,6 @@ export function TogetherSheet({
           </>
         )}
         {!canPlay && <p className="dm-set-note">Games open up once your message request is accepted.</p>}
-      </div>
-    </Modal>
-  );
-}
-
-/**
- * Telegram-style settings for one chat: a private nickname, the shared theme, your own
- * wallpaper and a notification sound for this person.
- */
-export function ChatCustomize({
-  peer,
-  nickname,
-  wallpaperUrl,
-  themeName,
-  themeId,
-  onTheme,
-  onClose,
-}: {
-  peer: Peer;
-  nickname: string | null;
-  wallpaperUrl: string | null;
-  themeName: string;
-  themeId: string;
-  onTheme?: () => void;
-  onClose: () => void;
-}) {
-  const { user } = useSession();
-  const toast = useToast();
-  const client = useQueryClient();
-  const [name, setName] = useState(nickname ?? "");
-  const [sound, setSound] = useState<MessageSound>(() => peerSound(peer.id));
-  const [uploading, setUploading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const statusKey = ["messages", user?.id, "status", peer.id];
-  const applyPrefs = (prefs: Models["ChatPrefsResultDto"]) => {
-    client.setQueryData<Models["MessageStatusDto"]>(statusKey, (d) => d && { ...d, ...prefs });
-    void client.invalidateQueries({ queryKey: ["messages", user?.id, "conversations"] });
-  };
-  const save = useMutation({
-    mutationFn: (body: { nickname?: string | null; wallpaperMediaId?: string | null }) =>
-      api("messagesSetPrefs", { params: { id: peer.id }, body }),
-    onSuccess: applyPrefs,
-    onError: (e) => toast(e.message, true),
-  });
-  const pickWallpaper = async (file?: File) => {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) return toast("Choose a photo.", true);
-    setUploading(true);
-    try {
-      let media = (await upload(await compressImage(file), () => {})) as Models["MediaDto"];
-      while (media.status === "PROCESSING") {
-        await new Promise((resolve) => window.setTimeout(resolve, 1200));
-        media = await api("mediaGet", { params: { id: media.id } });
-      }
-      if (media.status !== "READY") throw new Error("This photo could not be processed.");
-      const uploaded = media;
-      const prefs = await api("messagesSetPrefs", { params: { id: peer.id }, body: { wallpaperMediaId: uploaded.id } }).catch((e) => {
-        void api("mediaRemove", { params: { id: uploaded.id } }).catch(() => {});
-        throw e;
-      });
-      applyPrefs(prefs);
-      haptic("success");
-      toast("Wallpaper set.");
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Upload failed.", true);
-    } finally {
-      setUploading(false);
-    }
-  };
-  const trimmed = name.trim();
-  const nameChanged = trimmed !== (nickname ?? "");
-  const saveName = () => {
-    if (!nameChanged || save.isPending) return;
-    save.mutate({ nickname: trimmed || null }, { onSuccess: () => toast(trimmed ? "Nickname saved." : "Nickname removed.") });
-  };
-  const accent = themeMeta(themeId).accent ?? "var(--primary)";
-  return (
-    <Modal
-      title="Customize"
-      className="dm-customize-sheet"
-      onClose={onClose}
-      headerActions={
-        nameChanged ? (
-          <button type="button" className="dm-set-done" disabled={save.isPending} onClick={saveName}>
-            {save.isPending ? <Loader2 size={16} className="spin" /> : "Save"}
-          </button>
-        ) : undefined
-      }
-    >
-      <div className="dm-set">
-        <div className="dm-set-hero">
-          <Avatar user={peer} size={84} />
-          <strong>{trimmed || peer.displayName}</strong>
-          <span>@{peer.username}</span>
-        </div>
-
-        <h3 className="dm-set-label">Nickname</h3>
-        <form className="dm-set-group" onSubmit={(e) => { e.preventDefault(); saveName(); }}>
-          <input
-            className="dm-set-input"
-            value={name}
-            maxLength={40}
-            placeholder={peer.displayName}
-            onChange={(e) => setName(e.target.value)}
-            aria-label="Nickname"
-            enterKeyHint="done"
-          />
-        </form>
-        <p className="dm-set-note">Only you see this name, in your chats and here.</p>
-
-        <h3 className="dm-set-label">Appearance</h3>
-        <div className="dm-set-group">
-          {onTheme && (
-            <button type="button" className="dm-set-item" onClick={onTheme}>
-              <span className="dm-set-icon" style={{ background: accent }}><Palette size={17} /></span>
-              <span className="dm-set-text"><strong>Chat theme</strong></span>
-              <span className="dm-set-value">{themeName}</span>
-              <ChevronRight size={18} className="dm-set-chevron" aria-hidden="true" />
-            </button>
-          )}
-          <button type="button" className="dm-set-item" disabled={uploading} onClick={() => fileRef.current?.click()}>
-            <span className="dm-set-icon" style={{ background: "#1c7ed6" }}><ImagePlus size={17} /></span>
-            <span className="dm-set-text"><strong>Wallpaper</strong></span>
-            <span className="dm-set-value">{uploading ? "Uploading…" : wallpaperUrl ? "Your photo" : "Theme"}</span>
-            {uploading ? <Loader2 size={17} className="spin dm-set-chevron" /> : <ChevronRight size={18} className="dm-set-chevron" aria-hidden="true" />}
-          </button>
-          {wallpaperUrl && (
-            <button type="button" className="dm-set-item danger" disabled={uploading || save.isPending}
-              onClick={() => save.mutate({ wallpaperMediaId: null }, { onSuccess: () => toast("Wallpaper removed.") })}>
-              <span className="dm-set-icon" style={{ background: "#fa5252" }}><Trash2 size={17} /></span>
-              <span className="dm-set-text"><strong>Remove wallpaper</strong></span>
-            </button>
-          )}
-        </div>
-        <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { void pickWallpaper(e.target.files?.[0]); e.target.value = ""; }} />
-        <p className="dm-set-note">Both of you see the theme. Your wallpaper is only visible to you.</p>
-
-        <h3 className="dm-set-label">Notification sound</h3>
-        <div className="dm-set-group" role="radiogroup" aria-label="Notification sound">
-          {(Object.keys(MESSAGE_SOUNDS) as MessageSound[]).map((id) => (
-            <button
-              key={id}
-              type="button"
-              role="radio"
-              aria-checked={sound === id}
-              className="dm-set-item"
-              onClick={() => {
-                setSound(id);
-                setPeerSound(peer.id, id);
-                previewSound(id);
-              }}
-            >
-              <span className="dm-set-text"><strong>{MESSAGE_SOUNDS[id].name}</strong></span>
-              {sound === id && <Check size={18} strokeWidth={2.6} className="dm-set-check" style={{ color: accent }} />}
-            </button>
-          ))}
-        </div>
-        <p className="dm-set-note">Plays for {trimmed || peer.displayName}&apos;s messages on this device while Circle is open.</p>
       </div>
     </Modal>
   );
