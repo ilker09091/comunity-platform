@@ -18,8 +18,13 @@ import {
   FAMILY_HUG_HAPPINESS,
   FAMILY_HUG_MINUTES,
   FEED_FULLNESS,
+  CLEAN_AT,
+  favoriteWord,
   FREE_TOYS,
+  FULL_AT,
   HERE_SECONDS,
+  HUG_COOLDOWN_MINUTES,
+  RESTED_AT,
   FULLNESS_HOURS,
   grantedXp,
   HAPPINESS_HOURS,
@@ -82,9 +87,10 @@ export class BabiesService {
 
   /** Meters as they are right now (they run down between visits). */
   private meters(b: BabyRow, now = new Date()) {
-    const fullness = decayed(b.fullness, b.fullness_at, FULLNESS_HOURS, now);
-    const happiness = decayed(b.happiness, b.happiness_at, HAPPINESS_HOURS, now);
-    const clean = decayed(b.clean, b.clean_at, CLEAN_HOURS, now);
+    // Asleep, the child gets hungry, sad and dirty more slowly.
+    const fullness = decayed(b.fullness, b.fullness_at, FULLNESS_HOURS, now, b.asleep_at);
+    const happiness = decayed(b.happiness, b.happiness_at, HAPPINESS_HOURS, now, b.asleep_at);
+    const clean = decayed(b.clean, b.clean_at, CLEAN_HOURS, now, b.asleep_at);
     const energy = energyOf(b.energy, b.energy_at, b.asleep_at, now);
     return { fullness, happiness, clean, energy, asleep: !!b.asleep_at, sick: !!b.sick_since };
   }
@@ -175,8 +181,12 @@ export class BabiesService {
       if (next) row = next;
     };
     if (row.asleep_at && now - row.asleep_at.getTime() >= MAX_SLEEP_HOURS * HOUR) {
-      await set(`UPDATE babies SET energy = 100, energy_at = asleep_at + interval '${MAX_SLEEP_HOURS} hours', asleep_at = NULL
-        WHERE id = $1 AND asleep_at <= now() - interval '${MAX_SLEEP_HOURS} hours' RETURNING *`, [row.id]);
+      // Woke up on their own: the meters (which ran down slowly in bed) start running at full speed from then.
+      const wokeAt = new Date(row.asleep_at.getTime() + MAX_SLEEP_HOURS * HOUR);
+      const m = this.meters(row, wokeAt);
+      await set(`UPDATE babies SET energy = 100, energy_at = $2, asleep_at = NULL, fullness = $3, fullness_at = $2,
+        happiness = $4, happiness_at = $2, clean = $5, clean_at = $2
+        WHERE id = $1 AND asleep_at IS NOT NULL RETURNING *`, [row.id, wokeAt, m.fullness, m.happiness, m.clean]);
     }
     const meters = this.meters(row);
     if (!row.sick_since && catchesCold(meters.fullness, meters.clean, meters.happiness)) {
@@ -282,7 +292,7 @@ export class BabiesService {
    * (plus a bonus the first time both parents cared on the same day). Returns null over the limit.
    */
   private async award(m: Db, b: BabyRow, userId: string, kind: CareKind): Promise<BabyRow | null> {
-    const xp = grantedXp(kind, decayed(b.fullness, b.fullness_at, FULLNESS_HOURS), !!b.sick_since);
+    const xp = grantedXp(kind, this.meters(b).fullness, !!b.sick_since);
     const counted = await sqlOne(m, `INSERT INTO baby_care(baby_id, user_id, day, ${kind}, xp) VALUES ($1, $2, ${TODAY}, 1, $3)
       ON CONFLICT (baby_id, user_id, day) DO UPDATE SET ${kind} = baby_care.${kind} + 1, xp = baby_care.xp + EXCLUDED.xp
       WHERE baby_care.${kind} < $4 RETURNING 1`, [b.id, userId, xp, DAILY_LIMITS[kind]]);
@@ -308,6 +318,7 @@ export class BabiesService {
     return this.act(viewerId, id, async (m, b) => {
       this.awake(b);
       const now = this.meters(b);
+      if (now.fullness >= FULL_AT) throw AppException.badRequest(ErrorCode.INVALID_STATE, `${b.name} is full right now. Try again a bit later`);
       // Feed first, so a hungry child's meal counts at full speed.
       const fed = (await sqlOne<BabyRow>(m, `UPDATE babies SET fullness = $2, fullness_at = now(), happiness = $3, happiness_at = now()
         WHERE id = $1 RETURNING *`, [b.id, Math.min(100, now.fullness + FEED_FULLNESS), Math.min(100, now.happiness + 5)]))!;
@@ -331,6 +342,7 @@ export class BabiesService {
   bath(viewerId: string, id: string) {
     return this.act(viewerId, id, async (m, b) => {
       this.awake(b);
+      if (this.meters(b).clean >= CLEAN_AT) throw AppException.badRequest(ErrorCode.INVALID_STATE, `${b.name} is already clean`);
       const grown = await this.award(m, b, viewerId, 'baths');
       if (!grown) throw AppException.badRequest(ErrorCode.INVALID_STATE, `${b.name} had enough baths from you today`);
       return (await sqlOne<BabyRow>(m, `UPDATE babies SET clean = 100, clean_at = now(), happiness = $2, happiness_at = now()
@@ -342,6 +354,7 @@ export class BabiesService {
   sleep(viewerId: string, id: string) {
     return this.act(viewerId, id, async (m, b) => {
       if (b.asleep_at) throw AppException.badRequest(ErrorCode.INVALID_STATE, `${b.name} is already asleep`);
+      if (this.meters(b).energy >= RESTED_AT) throw AppException.badRequest(ErrorCode.INVALID_STATE, `${b.name} isn't sleepy yet`);
       const tucked = (await sqlOne<BabyRow>(m, 'UPDATE babies SET energy = $2, energy_at = now(), asleep_at = now() WHERE id = $1 RETURNING *',
         [b.id, this.meters(b).energy]))!;
       return (await this.award(m, tucked, viewerId, 'sleeps')) ?? tucked;
@@ -353,19 +366,26 @@ export class BabiesService {
     return this.act(viewerId, id, async (m, b) => {
       if (!b.asleep_at) throw AppException.badRequest(ErrorCode.INVALID_STATE, `${b.name} is already awake`);
       const now = this.meters(b);
-      return (await sqlOne<BabyRow>(m, `UPDATE babies SET energy = $2, energy_at = now(), asleep_at = NULL, happiness = $3, happiness_at = now()
-        WHERE id = $1 RETURNING *`, [b.id, now.energy, Math.max(0, now.happiness - (now.energy < 50 ? 10 : 0))]))!;
+      // From now on the meters run down at the awake speed again.
+      return (await sqlOne<BabyRow>(m, `UPDATE babies SET energy = $2, energy_at = now(), asleep_at = NULL, happiness = $3, happiness_at = now(),
+        fullness = $4, fullness_at = now(), clean = $5, clean_at = now()
+        WHERE id = $1 RETURNING *`, [b.id, now.energy, Math.max(0, now.happiness - (now.energy < 50 ? 10 : 0)), now.fullness, now.clean]))!;
     });
   }
 
-  /** A hug always cheers the child up; both parents hugging within minutes is a family hug. */
+  /**
+   * A hug cheers the child up (once every few minutes per parent, so tapping Hug again and again
+   * doesn't fill the happiness meter); both parents hugging within minutes is a family hug.
+   */
   hug(viewerId: string, id: string) {
     return this.act(viewerId, id, async (m, b) => {
       const mine = b.low_id === viewerId ? 'hug_low_at' : 'hug_high_at';
+      const myLast = b.low_id === viewerId ? b.hug_low_at : b.hug_high_at;
       const theirs = b.low_id === viewerId ? b.hug_high_at : b.hug_low_at;
       const today = new Date().toISOString().slice(0, 10);
       const family = !!theirs && Date.now() - theirs.getTime() <= FAMILY_HUG_MINUTES * 60_000 && this.dayOf(b.last_hug_day) !== today;
-      const happiness = Math.min(100, this.meters(b).happiness + (family ? FAMILY_HUG_HAPPINESS : HUG_HAPPINESS));
+      const fresh = !myLast || Date.now() - myLast.getTime() >= HUG_COOLDOWN_MINUTES * 60_000;
+      const happiness = Math.min(100, this.meters(b).happiness + (family ? FAMILY_HUG_HAPPINESS : fresh ? HUG_HAPPINESS : 0));
       if (!family) {
         return (await sqlOne<BabyRow>(m, `UPDATE babies SET ${mine} = now(), happiness = $2, happiness_at = now() WHERE id = $1 RETURNING *`,
           [b.id, happiness]))!;
@@ -457,14 +477,15 @@ export class BabiesService {
       const today = await sqlOne<{ n: number }>(m, `SELECT count(*)::int AS n FROM baby_words WHERE baby_id = $1 AND taught_by = $2
         AND (learned_at AT TIME ZONE 'UTC')::date = ${TODAY}`, [b.id, viewerId]);
       if ((today?.n ?? 0) >= 3) throw AppException.badRequest(ErrorCode.INVALID_STATE, `${b.name} learned enough words from you today`);
-      if (!(await this.learn(m, b, word, viewerId, false))) throw AppException.badRequest(ErrorCode.INVALID_STATE, `${b.name} already knows "${word}"`);
+      if (!(await this.learn(m, b, word, viewerId, false, true))) throw AppException.badRequest(ErrorCode.INVALID_STATE, `${b.name} already knows "${word}"`);
       return b;
     });
   }
 
-  private async learn(m: Db, b: BabyRow, word: string, byId: string | null, first: boolean) {
+  /** `taught` marks a word a parent taught on purpose (those count toward the daily three). */
+  private async learn(m: Db, b: BabyRow, word: string, byId: string | null, first: boolean, taught = !!byId) {
     const added = await sqlOne(m, `INSERT INTO baby_words(baby_id, word, taught_by, learned_at) VALUES ($1, $2, $3, clock_timestamp())
-      ON CONFLICT DO NOTHING RETURNING 1`, [b.id, word.slice(0, 24), byId]);
+      ON CONFLICT DO NOTHING RETURNING 1`, [b.id, word.slice(0, 24), taught ? byId : null]);
     if (!added) return false;
     await this.remember(m, b.id, 'word', first ? { word, first: true } : { word }, byId);
     return true;
@@ -479,12 +500,11 @@ export class BabiesService {
 
   /** A toddler's first word is the love word their parents use most in the chat. */
   private async firstWord(m: Db, b: BabyRow) {
-    const words = (await this.candidates(m, b)).map((w) => w.toLocaleLowerCase('tr'));
-    const top = await sqlOne<{ word: string }>(m, `SELECT w AS word, count(*) AS n FROM unnest($3::text[]) w
-      JOIN (SELECT lower(content) AS c FROM direct_messages WHERE least(sender_id, recipient_id) = $1
-        AND greatest(sender_id, recipient_id) = $2 AND content IS NOT NULL ORDER BY created_at DESC LIMIT 3000) d
-      ON position(w IN d.c) > 0 GROUP BY w ORDER BY n DESC, w LIMIT 1`, [b.low_id, b.high_id, words]);
-    await this.learn(m, b, top?.word ?? FALLBACK_FIRST_WORD, null, true);
+    // Counted here rather than in SQL: a word has to start a word ("anne" isn't in "zannedersem").
+    const messages = await sqlRows<{ content: string }>(m, `SELECT content FROM direct_messages WHERE least(sender_id, recipient_id) = $1
+      AND greatest(sender_id, recipient_id) = $2 AND content IS NOT NULL ORDER BY created_at DESC LIMIT 3000`, [b.low_id, b.high_id]);
+    const top = favoriteWord(messages.map((r) => r.content), await this.candidates(m, b));
+    await this.learn(m, b, top ?? FALLBACK_FIRST_WORD, null, true);
     await sqlRows(m, `UPDATE babies SET last_word_day = ${TODAY} WHERE id = $1`, [b.id]);
   }
 
@@ -572,7 +592,8 @@ export class BabiesService {
         if (!fresh) return;
         const known = new Set((await sqlRows<{ word: string }>(m, 'SELECT word FROM baby_words WHERE baby_id = $1', [b.id])).map((w) => w.word));
         const word = wordToLearn(text, await this.candidates(m, b), known);
-        if (word && (await this.learn(m, b, word, senderId, false))) {
+        // Picked up from a message: remembered as said by the sender, but not counted as taught.
+        if (word && (await this.learn(m, b, word, senderId, false, false))) {
           await sqlRows(m, `UPDATE babies SET last_word_day = ${TODAY} WHERE id = $1`, [b.id]);
           this.push.notifyUser(recipientId);
         }

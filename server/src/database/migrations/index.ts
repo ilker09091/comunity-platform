@@ -39,6 +39,8 @@ import { BabyLife1760193200000 } from './1760193200000-BabyLife.js';
 import { BabyTogether1760193300000 } from './1760193300000-BabyTogether.js';
 import { GroupDetails1760193500000 } from './1760193500000-GroupDetails.js';
 import { TalkGames1760193400000 } from './1760193400000-TalkGames.js';
+import { MoreGames1760193600000 } from './1760193600000-MoreGames.js';
+import { EvenMoreGames1760193700000 } from './1760193700000-EvenMoreGames.js';
 import { MoreChatGames1760193000000 } from './1760193000000-MoreChatGames.js';
 import { ChatPrefsAndGames1760192900000 } from './1760192900000-ChatPrefsAndGames.js';
 import { GroupMessaging1760192400000 } from './1760192400000-GroupMessaging.js';
@@ -85,4 +87,6 @@ export const migrations = [
   BabyTogether1760193300000,
   TalkGames1760193400000,
   GroupDetails1760193500000,
+  MoreGames1760193600000,
+  EvenMoreGames1760193700000,
 ];

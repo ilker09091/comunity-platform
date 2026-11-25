@@ -18,6 +18,14 @@ export const XP = { feeds: 4, plays: 3, chats: 1, games: 5, baths: 3, sleeps: 3,
 /** Coins go into one shared piggy bank. */
 export const COINS = { feeds: 2, plays: 2, chats: 1, games: 5, baths: 3, sleeps: 3, bothBonus: 10, familyHug: 20, stageUp: 100 } as const;
 export const FEED_FULLNESS = 35;
+/** A full child won't eat, a clean one needs no bath and a rested one won't go to bed (no free XP). */
+export const FULL_AT = 95;
+export const CLEAN_AT = 90;
+export const RESTED_AT = 80;
+/** While asleep, tummy, happiness and cleanliness run down at this share of the awake speed. */
+export const ASLEEP_DECAY = 0.5;
+/** Each parent's hug cheers the child up at most once in this many minutes (a family hug still counts). */
+export const HUG_COOLDOWN_MINUTES = 20;
 export const PLAY_HAPPINESS = 25;
 export const CHAT_HAPPINESS = 2;
 export const HUG_HAPPINESS = 4;
@@ -73,9 +81,16 @@ export const LOVE_WORDS = [
 export const FALLBACK_FIRST_WORD = 'mama';
 export const WORD_STAGE = 2;
 
-/** A meter (0-100) that was `value` at `at` and runs down over `hours`. */
-export function decayed(value: number, at: Date, hours: number, now = new Date()) {
-  const elapsed = Math.max(0, now.getTime() - at.getTime()) / 3_600_000;
+/**
+ * A meter (0-100) that was `value` at `at` and runs down over `hours`. Time spent asleep (since
+ * `asleepAt`) counts at ASLEEP_DECAY, so a night's sleep doesn't leave the child starving.
+ */
+export function decayed(value: number, at: Date, hours: number, now = new Date(), asleepAt: Date | null = null) {
+  const from = at.getTime(), to = now.getTime();
+  const sleepFrom = asleepAt ? Math.max(from, asleepAt.getTime()) : to;
+  const awake = Math.max(0, Math.min(to, sleepFrom) - from);
+  const asleep = Math.max(0, to - sleepFrom);
+  const elapsed = (awake + asleep * ASLEEP_DECAY) / 3_600_000;
   return Math.max(0, Math.min(100, Math.round(value - (elapsed * 100) / hours)));
 }
 
@@ -128,10 +143,32 @@ export function teachableWord(word: string) {
   return /^\p{L}[\p{L}' -]{0,19}$/u.test(w) && !/[' -]$/.test(w) ? w : null;
 }
 
+/**
+ * Whether `word` is used in `text`: it has to start a word ("aşkımı" counts for "aşkım"), so
+ * "anne" is not found inside "zannedersem" nor "mama" inside "tamamam".
+ */
+export function usesWord(text: string, word: string) {
+  const t = normalizeWord(text), w = normalizeWord(word);
+  if (!w) return false;
+  for (let i = t.indexOf(w); i >= 0; i = t.indexOf(w, i + 1)) {
+    if (i === 0 || !/[\p{L}\p{N}]/u.test(t[i - 1])) return true;
+  }
+  return false;
+}
+
 /** The first candidate that appears in `text` and isn't known yet. */
 export function wordToLearn(text: string, candidates: string[], known: Set<string>) {
-  const t = normalizeWord(text);
-  return candidates.map(normalizeWord).find((w) => w && !known.has(w) && t.includes(w)) ?? null;
+  return candidates.map(normalizeWord).find((w) => w && !known.has(w) && usesWord(text, w)) ?? null;
+}
+
+/** The candidate used in the most messages (ties: the earlier candidate), or null. */
+export function favoriteWord(messages: string[], candidates: string[]) {
+  let best: string | null = null, most = 0;
+  for (const w of [...new Set(candidates.map(normalizeWord))].filter(Boolean)) {
+    const n = messages.reduce((sum, m) => sum + (usesWord(m, w) ? 1 : 0), 0);
+    if (n > most) { best = w; most = n; }
+  }
+  return best;
 }
 
 /** Places in the baby's world, and the little signals parents can send each other there. */

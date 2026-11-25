@@ -1,29 +1,65 @@
 "use client";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronRight, ImagePlus, Loader2, Palette, RotateCcw, Send, Trash2 } from "lucide-react";
+import { Check, ChevronRight, ImagePlus, Loader2, Palette, RotateCcw, Search, Send, Trash2, X } from "lucide-react";
 import { api, upload, type Models } from "@/lib/api/client";
 import { compressImage } from "@/lib/compress-image";
+import { toTurkish, useLang } from "@/lib/i18n";
 import { haptic } from "@/lib/haptics";
 import { useSession, useToast } from "./providers";
 import { Avatar, Modal } from "./ui";
 import { MESSAGE_SOUNDS, peerSound, previewSound, setPeerSound, type MessageSound } from "./app-bridge";
 import { themeMeta } from "./chat-themes";
 import { BabyCard } from "./baby";
+import { isThirdKind, ThirdBoard, thirdAnswered, thirdDone, thirdEndNote, thirdPeerAnswered, thirdSimultaneous, thirdStatus } from "./chat-games-third";
+import { ExtraBoard, extraAnswered, extraDone, extraPeerAnswered, extraSimultaneous, extraStatus, isExtraKind, type ExtraMove } from "./chat-games-more";
 
 type Game = Models["ChatGameDto"];
 export type GameKind = Game["kind"];
 type Peer = Models["MessagePeerDto"];
 
-export const GAMES: { kind: GameKind; name: string; blurb: string; icon: string; tone: string }[] = [
-  { kind: "qa", name: "Q&A", blurb: "Ask each other anything, take turns", icon: "💬", tone: "#e6fcf5" },
-  { kind: "tod", name: "Truth or Dare", blurb: "Pick truth or dare, the other one decides", icon: "🎲", tone: "#ffe8f0" },
-  { kind: "thisorthat", name: "This or That", blurb: "Answer in secret, see if you think alike", icon: "💞", tone: "#ffe3ec" },
-  { kind: "memory", name: "Memory", blurb: "Find the pairs, take turns", icon: "🃏", tone: "#e7f5ff" },
-  { kind: "xox", name: "Tic-tac-toe", blurb: "Three in a row wins", icon: "⭕", tone: "#fff0f6" },
-  { kind: "connect4", name: "Connect Four", blurb: "Drop discs, line up four", icon: "🔴", tone: "#edf2ff" },
-  { kind: "gomoku", name: "Five in a Row", blurb: "Bigger board, five to win", icon: "⚫", tone: "#fff4e6" },
-  { kind: "rps", name: "Rock Paper Scissors", blurb: "Secret picks, best of three", icon: "✌️", tone: "#f3f0ff" },
+type GameGroup = "talk" | "board" | "words" | "luck";
+export const GAME_GROUPS: { id: GameGroup; name: string }[] = [
+  { id: "talk", name: "Get closer" },
+  { id: "board", name: "Board games" },
+  { id: "words", name: "Words & puzzles" },
+  { id: "luck", name: "Cards, dice & luck" },
+];
+export const GAMES: { kind: GameKind; name: string; blurb: string; icon: string; group: GameGroup }[] = [
+  { kind: "daily", name: "Question of the Day", blurb: "Both answer, then see each other's", icon: "☀️", group: "talk" },
+  { kind: "lovemap", name: "Love Map", blurb: "How well do you remember me?", icon: "🗺️", group: "talk" },
+  { kind: "whomore", name: "Who's More Likely", blurb: "Point at each other in secret", icon: "👉", group: "talk" },
+  { kind: "qa", name: "Q&A", blurb: "Ask each other anything, take turns", icon: "💬", group: "talk" },
+  { kind: "tod", name: "Truth or Dare", blurb: "Pick truth or dare, the other one decides", icon: "🎲", group: "talk" },
+  { kind: "thisorthat", name: "This or That", blurb: "Answer in secret, see if you think alike", icon: "💞", group: "talk" },
+  { kind: "knowme", name: "How Well Do You Know Me", blurb: "Answer for yourself, guess their answer", icon: "🧠", group: "talk" },
+  { kind: "nhie", name: "Never Have I Ever", blurb: "Confess in secret, then compare", icon: "🙊", group: "talk" },
+  { kind: "lies", name: "Two Truths and a Lie", blurb: "Spot the lie in three statements", icon: "🤥", group: "talk" },
+  { kind: "story", name: "Story Together", blurb: "Write a story one line each", icon: "📖", group: "talk" },
+  { kind: "bucket", name: "Bucket List", blurb: "Things to do together, tick them off", icon: "📝", group: "talk" },
+  { kind: "tavla", name: "Tavla", blurb: "Backgammon: roll, move, bear off", icon: "🎲", group: "board" },
+  { kind: "chess", name: "Chess", blurb: "The full game, checkmate wins", icon: "♟️", group: "board" },
+  { kind: "dama", name: "Russian Draughts", blurb: "Diagonal moves, flying kings", icon: "⛀", group: "board" },
+  { kind: "xox", name: "Tic-tac-toe", blurb: "Three in a row wins", icon: "⭕", group: "board" },
+  { kind: "connect4", name: "Connect Four", blurb: "Drop discs, line up four", icon: "🔴", group: "board" },
+  { kind: "gomoku", name: "Five in a Row", blurb: "Bigger board, five to win", icon: "⚫", group: "board" },
+  { kind: "reversi", name: "Reversi", blurb: "Flank discs to flip them", icon: "⚪", group: "board" },
+  { kind: "dots", name: "Dots and Boxes", blurb: "Draw lines, close the boxes", icon: "🔲", group: "board" },
+  { kind: "mangala", name: "Mangala", blurb: "The classic stone-sowing game", icon: "🪨", group: "board" },
+  { kind: "battleship", name: "Battleship", blurb: "Find and sink the hidden fleet", icon: "🚢", group: "board" },
+  { kind: "colorword", name: "Color Word", blurb: "Guess the 5-letter word in 6 tries", icon: "🟩", group: "words" },
+  { kind: "wordsearch", name: "Word Search", blurb: "Race to find the hidden words", icon: "🔍", group: "words" },
+  { kind: "sudoku", name: "Sudoku Duel", blurb: "Same puzzle, first to solve wins", icon: "🔢", group: "words" },
+  { kind: "emoji", name: "Emoji Riddle", blurb: "Guess the film or song from emojis", icon: "🤔", group: "words" },
+  { kind: "hangman", name: "Hangman", blurb: "Hide a word, guess letter by letter", icon: "🔤", group: "words" },
+  { kind: "bulls", name: "Number Puzzle", blurb: "Crack the secret 4-digit number", icon: "🧮", group: "words" },
+  { kind: "wordchain", name: "Word Chain", blurb: "Start with the last letter", icon: "🔗", group: "words" },
+  { kind: "memory", name: "Memory", blurb: "Find the pairs, take turns", icon: "🃏", group: "words" },
+  { kind: "pisti", name: "Pişti", blurb: "The classic card game for two", icon: "🂡", group: "luck" },
+  { kind: "pig", name: "Dice Duel", blurb: "Roll or hold, race to 50", icon: "🎯", group: "luck" },
+  { kind: "rps", name: "Rock Paper Scissors", blurb: "Secret picks, best of three", icon: "✌️", group: "luck" },
+  { kind: "coin", name: "Coin Toss", blurb: "Settle it: heads or tails", icon: "🪙", group: "luck" },
+  { kind: "wheel", name: "Spin the Wheel", blurb: "Can't decide? Let the wheel pick", icon: "🎡", group: "luck" },
 ];
 export const gameName = (kind: GameKind) => GAMES.find((g) => g.kind === kind)?.name ?? "Game";
 
@@ -39,13 +75,22 @@ export const GESTURES = [
 
 const RPS = { rock: "✊", paper: "✋", scissors: "✌️" } as const;
 type RpsChoice = keyof typeof RPS;
-type Move = { cell?: number; choice?: RpsChoice | "a" | "b" | "truth" | "dare"; action?: Models["GameMoveDto"]["action"]; text?: string };
+type Move = { cell?: number; choice?: RpsChoice | "a" | "b" | "truth" | "dare"; action?: Models["GameMoveDto"]["action"]; text?: string } | ExtraMove;
 const C4_COLS = 7;
 const C4_ROWS = 6;
 
 /** What the game looks like right after your move, before the server confirms it. */
 function predict(game: Game, me: number, move: Move): Game {
-  if (game.kind === "rps" || game.kind === "thisorthat") return { ...game, myChoice: move.choice ?? null };
+  if (game.kind === "rps" || game.kind === "thisorthat" || game.kind === "nhie" || game.kind === "knowme" || game.kind === "whomore") return { ...game, myChoice: move.choice ?? null };
+  // Sudoku: show the number right away.
+  if (game.kind === "sudoku" && move.cell !== undefined) {
+    const board = [...((game.view?.board as number[] | undefined) ?? [])];
+    board[move.cell] = Number(move.text ?? 0);
+    return { ...game, view: { ...game.view, board } };
+  }
+  if (isThirdKind(game.kind)) return thirdSimultaneous(game) ? game : { ...game, turnId: null };
+  // The newer games: lock the controls until the server answers.
+  if (isExtraKind(game.kind)) return { ...game, turnId: null };
   if (game.kind === "memory") return game;
   // Written games: just lock the controls until the server answers.
   if (game.kind === "qa" || game.kind === "tod") return { ...game, turnId: null };
@@ -103,7 +148,7 @@ export function GameCard({
     },
   });
   // Older servers don't send the written-game fields yet: default them so nothing breaks.
-  const game: Game = { ...query.data, turns: query.data.turns ?? [], chances: query.data.chances ?? [], phase: query.data.phase ?? null };
+  const game: Game = { ...query.data, turns: query.data.turns ?? [], chances: query.data.chances ?? [], phase: query.data.phase ?? null, view: query.data.view ?? {} };
   const me = game.players.indexOf(user?.id ?? "");
   const move = useMutation({
     mutationFn: (body: Move) => api("messagesGameMove", { params: { gameId: game.id }, body }),
@@ -131,8 +176,11 @@ export function GameCard({
   }, [game.status, game.winnerId, user?.id]);
 
   const peerName = peer.displayName.split(" ")[0];
-  const simultaneous = game.kind === "rps" || game.kind === "thisorthat";
-  const myTurn = game.status === "active" && (simultaneous ? !game.myChoice : game.turnId === user?.id);
+  const extra = isExtraKind(game.kind);
+  const third = isThirdKind(game.kind);
+  const simultaneous = game.kind === "rps" || game.kind === "thisorthat" || (extra && extraSimultaneous(game)) || (third && thirdSimultaneous(game));
+  const answered = extra ? extraAnswered(game, me) : third ? thirdAnswered(game, me) : !!game.myChoice;
+  const myTurn = game.status === "active" && (simultaneous ? !answered : game.turnId === user?.id);
   const matches = game.kind === "thisorthat" ? game.rounds.filter((r) => r.choices[0] === r.choices[1]).length : 0;
   const statusText =
     game.status === "won"
@@ -140,7 +188,11 @@ export function GameCard({
       : game.status === "draw"
         ? "It's a draw 🤝"
         : game.status === "done"
-          ? game.kind === "qa" ? "Great talk 💬" : game.kind === "tod" ? "What a game 🎲" : `You think alike on ${matches} of ${game.rounds.length} 💞`
+          ? game.kind === "qa" ? "Great talk 💬" : game.kind === "tod" ? "What a game 🎲" : extra ? extraDone(game) : third ? thirdDone(game, me, peerName) : `You think alike on ${matches} of ${game.rounds.length} 💞`
+          : extra
+            ? extraStatus(game, me, peerName, myTurn)
+          : third
+            ? thirdStatus(game, me, peerName, myTurn)
           : game.kind === "qa" || game.kind === "tod"
             ? myTurn
               ? game.kind === "qa"
@@ -166,6 +218,7 @@ export function GameCard({
           <small aria-live="polite">{statusText}</small>
         </span>
         {myTurn && <span className="dm-game-turn">Your move</span>}
+        {!myTurn && simultaneous && game.status === "active" && (extra ? extraPeerAnswered(game, me) : third && thirdPeerAnswered(game, me)) && <span className="dm-game-turn soft">✓</span>}
       </div>
 
       {(game.kind === "xox" || game.kind === "gomoku") && (
@@ -315,6 +368,15 @@ export function GameCard({
             );
           })()}
         </div>
+      )}
+
+      {third && game.status !== "active" && thirdEndNote(game) && <p className="dm-xg-endnote">{thirdEndNote(game)}</p>}
+      {third && (
+        <ThirdBoard game={game} me={me} peer={peer} busy={move.isPending} playable={playable} onMove={(m) => move.mutate(m)} />
+      )}
+
+      {extra && (
+        <ExtraBoard game={game} me={me} peer={peer} busy={move.isPending} playable={playable} onMove={(m) => move.mutate(m)} />
       )}
 
       {(game.kind === "qa" || game.kind === "tod") && (
@@ -496,7 +558,49 @@ function TalkBoard({ game, me, peer, busy, myTurn, onMove }: {
   );
 }
 
-/** "Together" sheet from the composer: a gesture with a screen effect, or a mini game. */
+/** Telegram-style icon colors, one per game (top and bottom of a soft gradient). */
+const GAME_COLORS: [string, string][] = [
+  ["#ff8a80", "#ff5252"], ["#ffb74d", "#fb8c00"], ["#ffd54f", "#f9a825"], ["#81c784", "#43a047"], ["#4dd0e1", "#00acc1"],
+  ["#64b5f6", "#1e88e5"], ["#9575cd", "#5e35b1"], ["#ba68c8", "#8e24aa"], ["#f06292", "#d81b60"], ["#4db6ac", "#00897b"],
+];
+const gameColor = (kind: GameKind) => GAME_COLORS[Math.max(0, GAMES.findIndex((g) => g.kind === kind)) % GAME_COLORS.length];
+
+const RECENT_KEY = "circle-recent-games";
+function readRecent(): GameKind[] {
+  try {
+    const list = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]") as unknown;
+    return Array.isArray(list) ? list.filter((k): k is GameKind => GAMES.some((g) => g.kind === k)).slice(0, 3) : [];
+  } catch {
+    return [];
+  }
+}
+function rememberGame(kind: GameKind) {
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify([kind, ...readRecent().filter((k) => k !== kind)].slice(0, 3)));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+/** One game as a Telegram list row: a colored rounded icon, the name, a line about it. */
+function GameRow({ game, disabled, onPick }: { game: (typeof GAMES)[number]; disabled: boolean; onPick: (kind: GameKind) => void }) {
+  const [top, bottom] = gameColor(game.kind);
+  return (
+    <button type="button" className="dm-tg-row" disabled={disabled} onClick={() => onPick(game.kind)}>
+      <span className="dm-tg-icon" style={{ background: `linear-gradient(180deg, ${top}, ${bottom})` }} aria-hidden="true">{game.icon}</span>
+      <span className="dm-tg-text">
+        <strong>{game.name}</strong>
+        <small>{game.blurb}</small>
+      </span>
+      <ChevronRight size={18} className="dm-tg-chevron" aria-hidden="true" />
+    </button>
+  );
+}
+
+/**
+ * "Together" sheet from the composer, Telegram style: search, category tabs, quick gestures,
+ * recently played games and every game as a list row.
+ */
 export function TogetherSheet({
   peer,
   canPlay,
@@ -512,43 +616,86 @@ export function TogetherSheet({
   onBaby?: () => void;
   onClose: () => void;
 }) {
+  const lang = useLang();
+  const [tab, setTab] = useState<"all" | GameGroup>("all");
+  const [query, setQuery] = useState("");
+  const [recent] = useState<GameKind[]>(() => (typeof window === "undefined" ? [] : readRecent()));
+  const pick = (kind: GameKind) => {
+    haptic("tap");
+    rememberGame(kind);
+    onGame(kind);
+  };
+  // Search in English and, in Turkish mode, in the Turkish names too.
+  const text = (s: string) => `${s} ${lang === "tr" ? toTurkish(s) ?? "" : ""}`.toLocaleLowerCase(lang === "tr" ? "tr" : "en");
+  const q = query.trim().toLocaleLowerCase(lang === "tr" ? "tr" : "en");
+  const found = q ? GAMES.filter((g) => text(`${g.name} ${g.blurb}`).includes(q)) : [];
+  const groups = GAME_GROUPS.filter((g) => tab === "all" || g.id === tab);
   return (
-    <Modal title="Together" className="dm-together-sheet" onClose={onClose}>
-      <div className="dm-together-body">
-        {onBaby && canPlay && (
-          <section>
-            <h3>Our baby</h3>
-            <div className="dm-set-group">
-              <BabyCard peer={peer} onOpen={onBaby} />
-            </div>
-          </section>
+    <Modal title="Together" className="dm-together-sheet dm-tg" onClose={onClose}>
+      <div className="dm-tg-head">
+        <label className="dm-tg-search">
+          <Search size={16} aria-hidden="true" />
+          <input value={query} placeholder="Search games" aria-label="Search games" enterKeyHint="search" onChange={(e) => setQuery(e.target.value)} />
+          {query && <button type="button" aria-label="Clear" onClick={() => setQuery("")}><X size={14} /></button>}
+        </label>
+        {!q && (
+          <div className="dm-tg-tabs" role="tablist" aria-label="Categories">
+            {[{ id: "all" as const, name: "All" }, ...GAME_GROUPS].map((t) => (
+              <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={tab === t.id ? "on" : ""}
+                onClick={() => { haptic("tap"); setTab(t.id); }}>
+                {t.name}
+              </button>
+            ))}
+          </div>
         )}
-        <section>
-          <h3>Send a gesture</h3>
-          <div className="dm-gesture-grid">
-            {GESTURES.map((g) => (
-              <button key={g.emoji} type="button" className="dm-gesture" onClick={() => { haptic("tap"); onGesture(g.emoji); }}>
-                <span aria-hidden="true">{g.emoji}</span>
-                <small>{g.label}</small>
-              </button>
+      </div>
+      <div className="dm-tg-body">
+        {q ? (
+          found.length ? (
+            <div className="dm-tg-group">{found.map((g) => <GameRow key={g.kind} game={g} disabled={!canPlay} onPick={pick} />)}</div>
+          ) : (
+            <p className="dm-tg-empty">No games found</p>
+          )
+        ) : (
+          <>
+            {tab === "all" && (
+              <>
+                <div className="dm-tg-gestures" role="group" aria-label="Send a gesture">
+                  {GESTURES.map((g) => (
+                    <button key={g.emoji} type="button" onClick={() => { haptic("tap"); onGesture(g.emoji); }}>
+                      <span aria-hidden="true">{g.emoji}</span>
+                      <small>{g.label}</small>
+                    </button>
+                  ))}
+                </div>
+                {onBaby && canPlay && (
+                  <>
+                    <h3 className="dm-tg-label">Our baby</h3>
+                    <div className="dm-tg-group dm-tg-baby"><BabyCard peer={peer} onOpen={onBaby} /></div>
+                  </>
+                )}
+                {recent.length > 0 && (
+                  <>
+                    <h3 className="dm-tg-label">Recently played</h3>
+                    <div className="dm-tg-group">
+                      {recent.map((k) => GAMES.find((g) => g.kind === k)).filter((g): g is (typeof GAMES)[number] => !!g)
+                        .map((g) => <GameRow key={g.kind} game={g} disabled={!canPlay} onPick={pick} />)}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+            {groups.map((group) => (
+              <section key={group.id}>
+                <h3 className="dm-tg-label">{group.name}</h3>
+                <div className="dm-tg-group">
+                  {GAMES.filter((g) => g.group === group.id).map((g) => <GameRow key={g.kind} game={g} disabled={!canPlay} onPick={pick} />)}
+                </div>
+              </section>
             ))}
-          </div>
-        </section>
-        <section>
-          <h3>Play with {peer.displayName.split(" ")[0]}</h3>
-          <div className="dm-set-group">
-            {GAMES.map((g) => (
-              <button key={g.kind} type="button" className="dm-set-item dm-game-option" disabled={!canPlay} onClick={() => { haptic("tap"); onGame(g.kind); }}>
-                <span className="dm-game-option-art" style={{ "--tone": g.tone } as CSSProperties} aria-hidden="true">{g.icon}</span>
-                <span className="dm-set-text">
-                  <strong>{g.name}</strong>
-                  <small>{g.blurb}</small>
-                </span>
-                <ChevronRight size={18} className="dm-set-chevron" aria-hidden="true" />
-              </button>
-            ))}
-          </div>
-        </section>
+          </>
+        )}
+        {!canPlay && <p className="dm-set-note">Games open up once your message request is accepted.</p>}
       </div>
     </Modal>
   );

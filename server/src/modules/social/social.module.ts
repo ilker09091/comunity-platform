@@ -206,7 +206,7 @@ export class MessagesController {
   gameMove(@CurrentUser() u:AuthUser,@Param('gameId',ParseUUIDPipe) id:string,@Body() dto:GameMoveDto){return this.messages.move(u.id,id,dto);}
   @Post(':id/games')
   @ApiOperation({operationId:'messagesStartGame',summary:'Invite a user to a mini game; it arrives as a message'}) @ApiCreatedResponse({type:DirectMessageDto})
-  startGame(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string,@Body() dto:StartGameDto){return this.messages.startGame(u.id,id,dto.kind);}
+  startGame(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string,@Body() dto:StartGameDto){return this.messages.startGame(u.id,id,dto.kind,dto.lang);}
   @Put(':id/prefs')
   @ApiOperation({operationId:'messagesSetPrefs',summary:'Your private nickname and wallpaper for this conversation'}) @ApiOkResponse({type:ChatPrefsResultDto})
   setPrefs(@CurrentUser() u:AuthUser,@Param('id',ParseUUIDPipe) id:string,@Body() dto:ChatPrefsDto){return this.messages.setPrefs(u.id,id,dto);}

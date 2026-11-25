@@ -30,6 +30,10 @@ const FOODS_BY_STAGE = [[0, 1, 2, 3], FOODS.map((_, i) => i), FOODS.map((_, i) =
 const TOYS = ["🧸", "🦆", "🧱", "⚽", "🪁", "📖", "🚀", "🦖", "🎹", "🫧", "🚂", "🤖"];
 const TOY_NAMES = ["Teddy", "Duck", "Blocks", "Ball", "Kite", "Book", "Rocket", "Dino", "Xylophone", "Bubbles", "Train", "Robot"];
 const FREE_TOYS = 6;
+/** Same as the server: a full child won't eat, a clean one needs no bath, a rested one won't sleep. */
+const FULL_AT = 95;
+const CLEAN_AT = 90;
+const RESTED_AT = 80;
 const OUTFITS: Record<Gender, string[][]> = {
   girl: [
     ["Onesie", "Bunny", "Duckling", "Knit set", "Teddy", "Sailor"],
@@ -111,13 +115,35 @@ function useNow(ms = 15_000) {
   return now;
 }
 
+/** The day of a month a monthly birthday falls on: born on the 31st, it's the 30th in April. */
+const daysIn = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
+const birthdayDay = (born: Date, year: number, month: number) => Math.min(born.getDate(), daysIn(year, month));
+
 /** Whole months since birth, and whether today is a monthly birthday. */
 function monthsOld(bornAt: string | null, now: number) {
   if (!bornAt) return { months: 0, birthday: false };
   const b = new Date(bornAt), n = new Date(now);
   let months = (n.getFullYear() - b.getFullYear()) * 12 + n.getMonth() - b.getMonth();
-  if (n.getDate() < b.getDate()) months--;
-  return { months: Math.max(0, months), birthday: months >= 1 && n.getDate() === b.getDate() };
+  const day = birthdayDay(b, n.getFullYear(), n.getMonth());
+  if (n.getDate() < day) months--;
+  return { months: Math.max(0, months), birthday: months >= 1 && n.getDate() === day };
+}
+/** The date of the n-th monthly birthday (no rolling over into the next month). */
+function nthBirthday(born: Date, n: number) {
+  const year = born.getFullYear() + Math.floor((born.getMonth() + n) / 12);
+  const month = (born.getMonth() + n) % 12;
+  return new Date(year, month, birthdayDay(born, year, month), born.getHours(), born.getMinutes());
+}
+
+type Need = { id: "feed" | "sleep" | "bath" | "play" | "rest" | "ok"; icon: string; text: string; cta?: string };
+/** The most useful thing to do right now (a cold has its own card). */
+function needOf(baby: BabyState, left: (k: "feeds" | "plays" | "baths") => number): Need {
+  if (baby.asleep) return { id: "rest", icon: "💤", text: `Sleeping · ${baby.energy}% rested` };
+  if (baby.fullness < 40 && left("feeds") > 0) return { id: "feed", icon: "🍼", text: baby.fullness < 25 ? `${baby.name} is hungry` : `${baby.name} could eat something`, cta: "Feed" };
+  if (baby.energy < 30) return { id: "sleep", icon: "🥱", text: `${baby.name} is getting sleepy`, cta: "Bedtime" };
+  if (baby.clean < 35 && left("baths") > 0) return { id: "bath", icon: "🫧", text: `${baby.name} needs a bath`, cta: "Bath" };
+  if (baby.happiness < 45 && left("plays") > 0) return { id: "play", icon: "🧸", text: `${baby.name} wants to play`, cta: "Play" };
+  return { id: "ok", icon: "💗", text: `${baby.name} is happy` };
 }
 
 export function moodLabel(baby: BabyState) {
@@ -661,11 +687,35 @@ export function BabySheet({ peer, onRequested, onClose }: { peer: Peer; onReques
   const startBath = () => {
     if (baby.asleep) return toast(`${baby.name} is sleeping`);
     if (left("baths") <= 0) return toast(`${baby.name} is clean for today`);
+    if (baby.clean >= CLEAN_AT) return toast(`${baby.name} is already clean`);
     setPicker(null);
     setBathDone(false);
     setScene("bathroom");
     setView("bath");
   };
+  const openFeed = () => {
+    if (baby.fullness >= FULL_AT) return toast(`${baby.name} is full right now. Try again a bit later`);
+    setView("home");
+    setScene("kitchen");
+    setPicker("feed");
+  };
+  const goToBed = () => {
+    if (baby.energy >= RESTED_AT) return toast(`${baby.name} isn't sleepy yet (${baby.energy}% energy)`);
+    setPicker(null);
+    setView("home");
+    setScene("nursery");
+    act.mutate({ kind: "sleep" });
+  };
+  const need = needOf(baby, left);
+  const doNeed = () => {
+    haptic("tap");
+    if (need.id === "feed") openFeed();
+    else if (need.id === "sleep") goToBed();
+    else if (need.id === "bath") startBath();
+    else if (need.id === "play") { setView("home"); setPicker("play"); }
+  };
+  const careDone = (["feeds", "plays", "baths"] as const).reduce((n, k) => n + baby.mine[k], 0);
+  const careMax = (["feeds", "plays", "baths"] as const).reduce((n, k) => n + baby.limits[k], 0);
   const room = (
     <BabyWorld
       baby={baby}
@@ -679,17 +729,20 @@ export function BabySheet({ peer, onRequested, onClose }: { peer: Peer; onReques
       decor={<WallDecor baby={baby} />}
       bath={view === "bath" ? <BathScene baby={baby} gender={gender} done={bathDone} onClean={() => act.mutate({ kind: "bath" })} /> : null}
       onScene={(next) => { setPicker(null); setScene(next); }}
-      onBed={() => act.mutate({ kind: baby.asleep ? "wake" : "sleep" })}
+      onBed={() => (baby.asleep ? act.mutate({ kind: "wake" }) : goToBed())}
       onWardrobe={() => setPicker("wardrobe")}
       onToys={() => setPicker("play")}
       onFeedSpot={() => {
         if (baby.asleep) return;
         if (left("feeds") <= 0) return toast(`${baby.name} has eaten enough from you today`);
+        if (baby.fullness >= FULL_AT) return toast(`${baby.name} is full right now. Try again a bit later`);
         setPicker("feed");
       }}
       onBath={startBath}
       onIceCream={() => {
+        if (baby.asleep) return toast(`${baby.name} is sleeping`);
         if (baby.stage < 2) return toast(`${baby.name} is a bit too little for ice cream 🍦`);
+        if (baby.fullness >= FULL_AT) return toast(`${baby.name} is full right now. Try again a bit later`);
         if (left("feeds") <= 0) return toast(`${baby.name} has eaten enough from you today`);
         act.mutate({ kind: "feed", item: 10 });
       }}
@@ -699,6 +752,9 @@ export function BabySheet({ peer, onRequested, onClose }: { peer: Peer; onReques
           <div className="dm-baby-tag">
             <strong>{baby.name}{birthday ? " 🎂" : ""}</strong>
             <span>{age} · {baby.stageName}</span>
+            <em className={careDone >= careMax ? "done" : ""} title="Your care today">
+              {`${careDone >= careMax ? "✓ " : ""}${careDone}/${careMax} today`}
+            </em>
           </div>
           <div className="dm-baby-corner">
             <button type="button" className="dm-baby-mute dm-baby-help" aria-label="How it works" aria-pressed={view === "guide"} onClick={() => { setPicker(null); setView(view === "guide" ? "home" : "guide"); }}>
@@ -742,7 +798,7 @@ export function BabySheet({ peer, onRequested, onClose }: { peer: Peer; onReques
     {
       id: "feed", icon: <Utensils size={21} />, label: "Feed", badge: left("feeds") > 0 ? left("feeds") : undefined, active: picker === "feed",
       disabled: left("feeds") <= 0 || baby.asleep,
-      onClick: () => { if (picker === "feed") setPicker(null); else { setView("home"); setScene("kitchen"); setPicker("feed"); } },
+      onClick: () => { if (picker === "feed") setPicker(null); else openFeed(); },
     },
     {
       id: "play", icon: <ToyBrick size={21} />, label: "Play", badge: left("plays") > 0 ? left("plays") : undefined, active: picker === "play",
@@ -753,8 +809,8 @@ export function BabySheet({ peer, onRequested, onClose }: { peer: Peer; onReques
     baby.asleep
       ? { id: "wake", icon: <Sun size={21} />, label: "Wake", disabled: busy, onClick: () => act.mutate({ kind: "wake" }) }
       : {
-        id: "sleep", icon: <Moon size={21} />, label: "Sleep", hint: night || baby.mood === "sleepy", disabled: busy,
-        onClick: () => { setPicker(null); setView("home"); setScene("nursery"); act.mutate({ kind: "sleep" }); },
+        id: "sleep", icon: <Moon size={21} />, label: "Sleep", hint: (night && baby.energy < RESTED_AT) || baby.mood === "sleepy", disabled: busy,
+        onClick: goToBed,
       },
     { id: "hug", icon: <Heart size={21} />, label: "Hug", badge: baby.familyHugToday ? "✓" : undefined, hint: theirHugFresh, disabled: busy, onClick: () => act.mutate({ kind: "hug" }) },
     { id: "dress", icon: <Shirt size={21} />, label: "Dress", active: picker === "wardrobe", onClick: () => { setView("home"); setPicker(picker === "wardrobe" ? null : "wardrobe"); } },
@@ -808,16 +864,26 @@ export function BabySheet({ peer, onRequested, onClose }: { peer: Peer; onReques
           </div>
         ) : (
           <>
+            {!baby.sick && !theirHugFresh && (
+              <div key={need.id} className={`dm-baby-coach ${need.id}`} role="status">
+                <span aria-hidden="true">{need.icon}</span>
+                <strong>{need.text}</strong>
+                {need.cta && <button type="button" disabled={busy} onClick={doNeed}>{need.cta}</button>}
+              </div>
+            )}
             <div className="dm-baby-hud" aria-label="How your baby is doing">
               <span className="dm-baby-hud-grow" title={baby.nextStageXp ? `${(baby.nextStageXp - baby.xp).toLocaleString()} XP to the next stage` : "All grown up"}>
-                <span aria-hidden="true">🌱</span>
+                <span className="dm-baby-hud-grow-top">
+                  <small>🌱 {baby.stageName}</small>
+                  <b>{baby.nextStageXp ? `${progress}%` : "🎓"}</b>
+                </span>
                 <span className="dm-baby-hud-bar"><i style={{ width: `${progress}%` }} /></span>
-                <b>{baby.nextStageXp ? `${progress}%` : "🎓"}</b>
               </span>
               {meters.map((m) => (
-                <span key={m.label} className={`dm-baby-hud-meter ${m.value < 25 ? "low" : ""}`} role="meter" aria-label={m.label} aria-valuenow={m.value} aria-valuemin={0} aria-valuemax={100} title={`${m.label} ${m.value}%`}>
-                  <span aria-hidden="true">{m.icon}</span>
-                  <span className="dm-baby-hud-bar"><i style={{ width: `${m.value}%`, background: m.tone }} /></span>
+                <span key={m.label} className={`dm-baby-hud-meter ${m.value < 25 ? "low" : ""}`} role="meter" aria-label={m.label} aria-valuenow={m.value} aria-valuemin={0} aria-valuemax={100} title={`${m.label} ${m.value}%`}
+                  style={{ "--v": m.value, "--tone": m.tone } as CSSProperties}>
+                  <span className="dm-baby-ring" aria-hidden="true"><i>{m.icon}</i></span>
+                  <b>{m.value}</b>
                 </span>
               ))}
             </div>
@@ -1163,8 +1229,7 @@ function MemoriesPanel({ baby, gender, peer, onBack }: { baby: BabyState; gender
   }
   if (born) {
     for (let n = 1; n <= months; n++) {
-      const at = new Date(born);
-      at.setMonth(at.getMonth() + n);
+      const at = nthBirthday(born, n);
       entries.push({ id: `bday-${n}`, at: at.getTime(), art: <span className="dm-baby-mem-emoji">🎂</span>,
         title: `${n} ${n === 1 ? "month" : "months"} old`, sub: "Happy birthday!" });
     }

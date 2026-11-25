@@ -8,6 +8,8 @@ import { TR1 } from "./tr-1";
 import { TR2 } from "./tr-2";
 import { TR3 } from "./tr-3";
 import { TR4 } from "./tr-4";
+import { TR5 } from "./tr-5";
+import { TR6 } from "./tr-6";
 import { TR_PATTERNS, TR_REGEX } from "./tr-patterns";
 
 export type Lang = "en" | "tr";
@@ -48,7 +50,7 @@ export function useLang(): Lang {
 /* ---------------------------------------------------------------------------------------------- */
 
 const DICT = new Map<string, string>();
-for (const part of [TR1, TR2, TR3, TR4]) for (const [en, tr] of Object.entries(part)) DICT.set(en.trim(), tr);
+for (const part of [TR1, TR2, TR3, TR4, TR5, TR6]) for (const [en, tr] of Object.entries(part)) DICT.set(en.trim(), tr);
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const PATTERNS = TR_PATTERNS.map(([en, tr]) => ({

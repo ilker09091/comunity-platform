@@ -1,4 +1,9 @@
-import type { GameKind } from '../../database/migrations/1760193400000-TalkGames.js';
+import type { GameKind } from '../../database/migrations/1760193700000-EvenMoreGames.js';
+import { GameRuleError, shuffle, TEXT_MAX, written, type GameMove, type GameStatus } from './game-core.js';
+import { applyExtraMove, EXTRA_KINDS, extraInitialState, type ExtraKind, type ExtraState } from './games-extra.js';
+import { applyThirdMove, THIRD_FREE, THIRD_KINDS, thirdFirstTurn, thirdInitialState, type Lang, type ThirdKind, type ThirdState } from './games-third.js';
+
+export { GameRuleError, TEXT_MAX, type GameMove, type GameStatus };
 
 /** Pure rules for the in-chat mini games; the service only stores and authorizes. */
 
@@ -15,9 +20,7 @@ export type QaState = { rounds: QaRound[]; phase: 'ask' | 'answer' | 'explain'; 
 /** Truth or dare: `player` picks, the other writes the question or dare, `player` replies (or passes). */
 export type TodRound = { player: number; pick: 'truth' | 'dare' | null; prompt: string | null; reply: string | null; passed: boolean };
 export type TodState = { rounds: TodRound[]; phase: 'pick' | 'prompt' | 'reply'; chances: number[]; total: number };
-export type GameState = BoardState | RpsState | MemoryState | TotState | QaState | TodState;
-export type GameMove = { cell?: number; choice?: string; action?: string; text?: string };
-export type GameStatus = 'active' | 'won' | 'draw' | 'done';
+export type GameState = BoardState | RpsState | MemoryState | TotState | QaState | TodState | ExtraState | ThirdState;
 
 export type Outcome = { state: GameState; next: number | null; status: GameStatus; winner: number | null };
 
@@ -62,31 +65,25 @@ export const QA_CLARIFY = 2;
 /** Truth or dare: eight turns (four each), and two passes per player. */
 export const TOD_ROUNDS = 8;
 export const TOD_PASSES = 2;
-export const TEXT_MAX = 300;
 
-export class GameRuleError extends Error {}
+/** Games where both play at the same time at the start, so nobody has the first turn. */
+export const SIMULTANEOUS_START: readonly GameKind[] = ['rps', 'thisorthat', 'nhie', 'knowme', 'bulls', ...THIRD_FREE];
+
+const isExtra = (kind: GameKind): kind is ExtraKind => (EXTRA_KINDS as readonly string[]).includes(kind);
+export const isThird = (kind: GameKind): kind is ThirdKind => (THIRD_KINDS as readonly string[]).includes(kind);
+
+/** Index (into players) of who moves first, or null when both may play at once. */
+export function firstTurn(kind: GameKind, state: GameState): number | null {
+  if (isThird(kind)) return thirdFirstTurn(kind, state as ThirdState);
+  return SIMULTANEOUS_START.includes(kind) ? null : 0;
+}
 
 const qaRound = (asker: number): QaRound => ({ asker, question: null, clarify: null, clarification: null, answer: null });
 const todRound = (player: number): TodRound => ({ player, pick: null, prompt: null, reply: null, passed: false });
 
-/** Written moves: trimmed, never empty, never longer than TEXT_MAX. */
-function written(text: string | undefined) {
-  const t = (text ?? '').trim();
-  if (!t) throw new GameRuleError('Write something first');
-  if (t.length > TEXT_MAX) throw new GameRuleError(`Keep it under ${TEXT_MAX} characters`);
-  return t;
-}
-
-function shuffle<T>(items: T[], random: () => number) {
-  const out = [...items];
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out;
-}
-
-export function initialState(kind: GameKind, random: () => number = Math.random): GameState {
+export function initialState(kind: GameKind, random: () => number = Math.random, lang: Lang = 'en'): GameState {
+  if (isExtra(kind)) return extraInitialState(kind, random);
+  if (isThird(kind)) return thirdInitialState(kind, random, lang);
   switch (kind) {
     case 'rps':
       return { picks: [null, null], scores: [0, 0], rounds: [] };
@@ -145,7 +142,10 @@ export function applyMove(
   player: number,
   turn: number | null,
   move: GameMove,
+  random: () => number = Math.random,
 ): Outcome {
+  if (isExtra(kind)) return applyExtraMove(kind, current as ExtraState, player, turn, move, random);
+  if (isThird(kind)) return applyThirdMove(kind, current as ThirdState, player, turn, move, random);
   if (kind === 'rps') {
     const state = structuredClone(current as RpsState);
     const choice = move.choice as RpsChoice;

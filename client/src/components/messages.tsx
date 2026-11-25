@@ -1,4 +1,5 @@
 "use client";
+import { getLang } from "@/lib/i18n";
 import { Fragment, memo, useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -2360,7 +2361,7 @@ function Thread({ peer: initialPeer }: { peer: Models["MessagePeerDto"] }) {
   const startGame = (kind: GameKind) => {
     setTogether(false);
     haptic("tap");
-    api("messagesStartGame", { params: { id: peerId }, body: { kind } }).then(
+    api("messagesStartGame", { params: { id: peerId }, body: { kind, lang: getLang() } }).then(
       (sent) => {
         pinned.current = true;
         setShowJump(false);

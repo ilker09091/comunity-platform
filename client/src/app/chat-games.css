@@ -1,0 +1,985 @@
+/* =====================================================================
+   Chat games, second batch (components/chat-games-more.tsx) and the
+   game picker tiles in the Together sheet. Flat colors that follow the
+   chat theme (--game-a), like the first games in messages-v2.css.
+   ===================================================================== */
+
+.dm-game-turn.soft {
+  background: var(--surface-muted);
+  color: var(--muted);
+  animation: none;
+}
+
+/* ---------- Shared pieces ---------- */
+.dm-xg-note {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.dm-xg-note.small {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  text-align: center;
+}
+.dm-xg-note b {
+  color: var(--text);
+}
+.dm-xg-line {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.dm-xg-line input {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--input);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+.dm-xg-line input:focus {
+  border-color: var(--game-a);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--game-a) 18%, transparent);
+}
+.dm-xg-line button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  height: 38px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--game-a);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.dm-xg-line button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.dm-xg-history {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.dm-xg-history li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--surface-muted);
+  font-size: 12.5px;
+}
+.dm-xg-history b {
+  letter-spacing: 0.08em;
+}
+.dm-xg-history span {
+  color: var(--muted);
+}
+
+/* ---------- Hangman ---------- */
+.dm-hang-stage {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dm-hang-art {
+  flex: none;
+  width: 88px;
+  height: 88px;
+}
+.dm-hang-art * {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 4;
+  stroke-linecap: round;
+  transition: stroke 0.3s ease;
+}
+.dm-hang-art .dm-hang-wood {
+  stroke: var(--muted);
+}
+.dm-hang-art .on {
+  stroke: var(--danger);
+  animation: dm-hang-draw 0.35s ease-out;
+}
+@keyframes dm-hang-draw {
+  from { opacity: 0; }
+}
+.dm-hang-word {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.dm-hang-word span {
+  display: grid;
+  place-items: end center;
+  width: 20px;
+  height: 28px;
+  border-bottom: 2.5px solid var(--text);
+  font-size: 17px;
+  font-weight: 700;
+}
+.dm-hang-word span.shown {
+  border-color: var(--game-a);
+  color: var(--game-a);
+  animation: dm-pop-in 0.25s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+.dm-hang-word .gap {
+  width: 10px;
+}
+@keyframes dm-pop-in {
+  from { transform: scale(0.4); opacity: 0; }
+}
+.dm-hang-lives {
+  display: flex;
+  gap: 3px;
+  margin: 8px 0;
+  color: var(--like);
+  font-size: 13px;
+  font-style: normal;
+}
+.dm-hang-lives i {
+  font-style: normal;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.dm-hang-lives i.lost {
+  opacity: 0.18;
+  transform: scale(0.8);
+}
+.dm-hang-keys {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+.dm-hang-keys button {
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: var(--surface-muted);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: transform var(--dur-fast) ease, background var(--dur-fast) ease;
+}
+.dm-hang-keys button:not(:disabled):hover {
+  background: color-mix(in srgb, var(--game-a) 14%, var(--surface-muted));
+}
+.dm-hang-keys button:not(:disabled):active {
+  transform: scale(0.9);
+}
+.dm-hang-keys button:disabled {
+  cursor: default;
+}
+.dm-hang-keys button.hit {
+  background: var(--game-a);
+  color: #fff;
+}
+.dm-hang-keys button.miss {
+  opacity: 0.3;
+  text-decoration: line-through;
+}
+
+/* ---------- Number puzzle ---------- */
+.dm-bulls-secrets {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 12px;
+}
+.dm-bulls-secrets b {
+  margin-left: 4px;
+  color: var(--text);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.15em;
+}
+.dm-bulls-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.dm-bulls-col small {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.dm-bulls-col ol {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 180px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.dm-bulls-col li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--surface-muted);
+  font-size: 12.5px;
+  animation: dm-pop-in 0.25s ease-out;
+}
+.dm-bulls-col li b {
+  flex: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.12em;
+}
+.dm-bulls-col li.solved {
+  background: var(--game-a);
+  color: #fff;
+}
+.dm-bulls-col .plus {
+  color: var(--success);
+  font-weight: 700;
+}
+.dm-bulls-col .minus {
+  color: #e8590c;
+  font-weight: 700;
+}
+.dm-bulls-col li.solved :is(.plus, .minus) {
+  color: #fff;
+}
+.dm-bulls-empty {
+  color: var(--muted);
+}
+
+/* ---------- Dots and boxes ---------- */
+.dm-dots-board {
+  display: block;
+  width: 100%;
+  max-width: 260px;
+  margin: 0 auto;
+}
+.dm-dots-board .dot {
+  fill: var(--text);
+}
+.dm-dots-board .line line {
+  stroke: var(--border);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-dasharray: 3 7;
+  transition: stroke 0.2s ease;
+}
+.dm-dots-board .line.set line {
+  stroke-dasharray: none;
+}
+.dm-dots-board .line.mine line {
+  stroke: var(--game-a);
+}
+.dm-dots-board .line.theirs line {
+  stroke: #868e96;
+}
+.dm-dots-board .line.last line {
+  animation: dm-line-in 0.35s ease-out;
+}
+@keyframes dm-line-in {
+  from { stroke-width: 10; opacity: 0.4; }
+}
+.dm-dots-board .line.free:hover line:not(.hit) {
+  stroke: color-mix(in srgb, var(--game-a) 55%, transparent);
+  stroke-dasharray: none;
+}
+.dm-dots-board line.hit {
+  stroke: transparent !important;
+  stroke-width: 18 !important;
+  stroke-dasharray: none !important;
+  cursor: pointer;
+}
+.dm-dots-board .box {
+  animation: dm-pop-in 0.3s cubic-bezier(0.3, 1.5, 0.5, 1);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.dm-dots-board .box.mine {
+  fill: color-mix(in srgb, var(--game-a) 30%, transparent);
+}
+.dm-dots-board .box.theirs {
+  fill: color-mix(in srgb, #868e96 28%, transparent);
+}
+
+/* ---------- Reversi ---------- */
+.dm-reversi-board {
+  display: grid;
+  grid-template-columns: repeat(var(--n, 8), 1fr);
+  gap: 2px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #2b8a3e;
+  aspect-ratio: 1;
+}
+.dm-reversi-board button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: #37b24d;
+  cursor: default;
+}
+.dm-reversi-board button.hint {
+  cursor: pointer;
+}
+.dm-reversi-board button.hint::after {
+  content: "";
+  width: 28%;
+  height: 28%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+}
+.dm-reversi-board button.hint:hover::after {
+  width: 60%;
+  height: 60%;
+}
+.dm-reversi-board button.last {
+  box-shadow: inset 0 0 0 2px #ffd43b;
+}
+.dm-reversi-board .disc {
+  width: 80%;
+  height: 80%;
+  border-radius: 50%;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+  animation: dm-disc-flip 0.35s ease-out;
+}
+.dm-reversi-board .disc.mine {
+  background: #212529;
+}
+.dm-reversi-board .disc.theirs {
+  background: #f8f9fa;
+}
+@keyframes dm-disc-flip {
+  from { transform: scaleX(0.1); }
+}
+
+/* ---------- Mangala ---------- */
+.dm-mangala-board {
+  display: grid;
+  grid-template-columns: 38px 1fr 38px;
+  grid-template-rows: 1fr 1fr;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 16px;
+  background: linear-gradient(#b5651d, #9c5518);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.2), 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+.dm-mangala-store {
+  position: relative;
+  display: flex;
+  grid-row: 1 / 3;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20px;
+  background: #6f3b0f;
+  box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.4);
+  color: #ffe8cc;
+}
+.dm-mangala-store.theirs {
+  grid-column: 1;
+}
+.dm-mangala-store.mine {
+  grid-column: 3;
+  outline: 2px solid color-mix(in srgb, var(--game-a) 70%, transparent);
+}
+.dm-mangala-store b {
+  z-index: 1;
+  font-size: 15px;
+}
+.dm-mangala-row {
+  display: grid;
+  grid-column: 2;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+}
+.dm-mangala-row.theirs {
+  grid-row: 1;
+}
+.dm-mangala-row.mine {
+  grid-row: 2;
+}
+.dm-mangala-pit {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #6f3b0f;
+  box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.45);
+  color: #ffe8cc;
+  font: inherit;
+}
+.dm-mangala-pit b {
+  position: absolute;
+  bottom: -2px;
+  z-index: 1;
+  font-size: 10px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+}
+button.dm-mangala-pit {
+  cursor: pointer;
+  transition: transform var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+button.dm-mangala-pit:not(:disabled):hover {
+  box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.45), 0 0 0 2px #ffd43b;
+}
+button.dm-mangala-pit:not(:disabled):active {
+  transform: scale(0.92);
+}
+button.dm-mangala-pit:disabled {
+  cursor: default;
+}
+.dm-mangala-pit.last {
+  box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.45), 0 0 0 2px rgba(255, 212, 59, 0.6);
+}
+.dm-mangala-stones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1px;
+  width: 70%;
+}
+.dm-mangala-stones i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: hsl(calc(var(--i) * 47) 60% 72%);
+  box-shadow: inset -1px -1px 0 rgba(0, 0, 0, 0.25);
+}
+.dm-mangala-store .dm-mangala-stones {
+  position: absolute;
+  inset: 8px 4px;
+  width: auto;
+  align-content: center;
+  opacity: 0.55;
+}
+
+/* ---------- Battleship ---------- */
+.dm-battle-count {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.dm-battle-count b {
+  color: var(--text);
+}
+.dm-battle-label {
+  display: block;
+  margin: 6px 0 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.dm-sea {
+  display: grid;
+  grid-template-columns: repeat(var(--n, 8), 1fr);
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: #1971c2;
+}
+.dm-sea.own {
+  width: 62%;
+  margin: 0 auto;
+  opacity: 0.9;
+}
+.dm-sea > * {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: #4dabf7;
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+}
+.dm-sea.own > * {
+  font-size: 8px;
+}
+.dm-sea button {
+  cursor: default;
+}
+.dm-sea button:not(:disabled) {
+  cursor: crosshair;
+}
+.dm-sea button:not(:disabled):hover {
+  background: #a5d8ff;
+}
+.dm-sea .ship {
+  background: #495057;
+}
+.dm-sea .hit {
+  background: #fa5252;
+  animation: dm-pop-in 0.3s ease-out;
+}
+.dm-sea .sunk {
+  background: #862e2e;
+}
+.dm-sea .miss {
+  background: #a5d8ff;
+  color: #1864ab;
+}
+.dm-sea .last {
+  box-shadow: 0 0 0 2px #ffd43b;
+}
+
+/* ---------- Dice duel ---------- */
+.dm-pig-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.dm-pig-player b {
+  width: 26px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.dm-pig-bar {
+  flex: 1;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--surface-muted);
+}
+.dm-pig-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #868e96;
+  transition: width 0.5s var(--ease-out);
+}
+.dm-pig-player.mine .dm-pig-bar i {
+  background: var(--game-a);
+}
+.dm-pig-table {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 10px 0;
+  padding: 12px;
+  border-radius: 14px;
+  background: #2f9e44;
+}
+.dm-die {
+  display: grid;
+  flex: none;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  width: 58px;
+  height: 58px;
+  padding: 8px;
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 4px 0 #ced4da, 0 6px 10px rgba(0, 0, 0, 0.2);
+  animation: dm-die-roll 0.45s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.dm-die i.pip {
+  border-radius: 50%;
+  background: #212529;
+}
+.dm-die.bust i.pip {
+  background: #e03131;
+}
+.dm-die.rolling {
+  animation: dm-die-shake 0.4s ease-in-out infinite;
+}
+@keyframes dm-die-roll {
+  from { transform: rotate(-200deg) scale(0.6); }
+}
+@keyframes dm-die-shake {
+  25% { transform: rotate(-12deg); }
+  75% { transform: rotate(12deg); }
+}
+.dm-pig-turn {
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+}
+.dm-pig-turn small {
+  opacity: 0.8;
+  font-size: 11px;
+}
+.dm-pig-turn b {
+  font-size: 26px;
+  line-height: 1.1;
+}
+.dm-pig-turn span {
+  opacity: 0.9;
+  font-size: 11.5px;
+}
+.dm-pig-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.dm-pig-actions button {
+  height: 40px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--game-a);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.dm-pig-actions button.secondary {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+.dm-pig-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ---------- Word chain ---------- */
+.dm-chain-words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dm-chain-words li {
+  position: relative;
+  padding: 5px 10px;
+  border-radius: 99px;
+  background: var(--surface-muted);
+  font-size: 13px;
+  animation: dm-pop-in 0.25s ease-out;
+}
+.dm-chain-words li.mine {
+  background: color-mix(in srgb, var(--game-a) 16%, var(--surface));
+}
+.dm-chain-words li b {
+  color: var(--game-a);
+}
+.dm-chain-words li:not(:last-child)::after {
+  content: "→";
+  margin-left: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.dm-chain-letter {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin: 10px auto 0;
+  border-radius: 14px;
+  background: var(--game-a);
+  color: #fff;
+  font-size: 24px;
+  font-weight: 800;
+  animation: dm-pop-in 0.3s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+.dm-chain .dm-talk-chance {
+  margin-top: 8px;
+}
+
+/* ---------- Two truths and a lie ---------- */
+.dm-lies-write {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dm-lies-write label {
+  display: flex;
+  gap: 6px;
+}
+.dm-lies-write input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--input);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.dm-lies-write label button {
+  flex: none;
+  width: 58px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 10px;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dm-lies-write label.lie input {
+  border-color: #e8590c;
+}
+.dm-lies-write label.lie button {
+  border: 0;
+  background: #e8590c;
+  color: #fff;
+}
+.dm-lies-write .dm-talk-send {
+  align-self: flex-end;
+}
+.dm-lies-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dm-lies-pick button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-muted);
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) ease, transform var(--dur-fast) ease;
+}
+.dm-lies-pick button:not(:disabled):hover {
+  border-color: var(--game-a);
+}
+.dm-lies-pick button:not(:disabled):active {
+  transform: scale(0.98);
+}
+.dm-lies-pick button:disabled {
+  cursor: default;
+}
+.dm-lies-pick em {
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: #e8590c;
+  color: #fff;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+}
+.dm-lies-done {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.dm-lies-done li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--surface-muted);
+  font-size: 12.5px;
+}
+.dm-lies-done li > span.lie {
+  color: #e8590c;
+  font-weight: 600;
+}
+.dm-lies-done li > span.guess {
+  text-decoration: underline wavy color-mix(in srgb, var(--game-a) 60%, transparent);
+}
+.dm-lies-done small {
+  margin-top: 2px;
+  color: var(--game-a);
+  font-weight: 650;
+}
+
+/* ---------- Never have I ever / How well do you know me ---------- */
+.dm-nhie,
+.dm-know {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dm-nhie-card {
+  margin: 0;
+  padding: 16px 14px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--game-a) 12%, var(--surface));
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.35;
+  text-align: center;
+  animation: dm-pop-in 0.3s ease-out;
+}
+.dm-nhie-options,
+.dm-know-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.dm-nhie-options button,
+.dm-know-row button {
+  min-height: 42px;
+  padding: 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease, transform var(--dur-fast) ease;
+}
+.dm-nhie-options button:not(:disabled):active,
+.dm-know-row button:not(:disabled):active {
+  transform: scale(0.96);
+}
+.dm-nhie-options button.picked,
+.dm-know-row button.picked {
+  border-color: var(--game-a);
+  background: var(--game-a);
+  color: #fff;
+}
+.dm-know-row button.picked.guess {
+  background: color-mix(in srgb, var(--game-a) 18%, var(--surface));
+  color: var(--text);
+}
+.dm-nhie-options button:disabled:not(.picked),
+.dm-know-row button:disabled:not(.picked) {
+  opacity: 0.5;
+  cursor: default;
+}
+.dm-know-q {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dm-know-q small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.dm-know-q .dm-talk-send {
+  align-self: center;
+  margin-top: 6px;
+}
+.dm-nhie-results,
+.dm-know-results {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dm-nhie-results li,
+.dm-know-results li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--surface-muted);
+  font-size: 12.5px;
+}
+.dm-nhie-results p,
+.dm-know-results p {
+  margin: 0;
+  font-weight: 600;
+}
+.dm-nhie-results span,
+.dm-know-results span {
+  color: var(--muted);
+}
+.dm-know-results span.right::before {
+  content: "✓ ";
+  color: var(--success);
+  font-weight: 800;
+}
+.dm-know-results span.wrong::before {
+  content: "✗ ";
+  color: var(--danger);
+  font-weight: 800;
+}
+
+/* ---------- Story together ---------- */
+.dm-story-starter {
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--game-a);
+  border-radius: 4px 12px 12px 4px;
+  background: var(--surface-muted);
+  font-size: 13.5px;
+  font-style: italic;
+  line-height: 1.45;
+}
+.dm-story-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+.dm-story-lines li {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  animation: dm-pop-in 0.25s ease-out;
+}
+.dm-story-lines li > span {
+  padding: 6px 10px;
+  border-radius: 4px 12px 12px 12px;
+  background: var(--surface-muted);
+}
+.dm-story-lines li.mine > span {
+  background: color-mix(in srgb, var(--game-a) 14%, var(--surface));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dm-die,
+  .dm-die.rolling,
+  .dm-hang-word span.shown,
+  .dm-reversi-board .disc,
+  .dm-dots-board .box,
+  .dm-chain-letter,
+  .dm-nhie-card {
+    animation: none;
+  }
+}

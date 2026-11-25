@@ -1,0 +1,225 @@
+/* =====================================================================
+   Baby screen refresh: ring meters, the "what now?" coach, today's care
+   on the name tag and a lighter dock. Loaded after messages-v2.css, so
+   these rules win over the older baby styles there.
+   ===================================================================== */
+
+/* ---------- Coach: the most useful thing to do, one tap away ---------- */
+.dm-baby-coach {
+  --tone: #7950f2;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 5px 5px 5px 12px;
+  border: 1px solid color-mix(in srgb, var(--tone) 22%, transparent);
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--tone) 10%, var(--surface));
+  animation: dm-baby-coach-in 0.35s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+.dm-baby-coach.feed { --tone: #f76707; }
+.dm-baby-coach.sleep,
+.dm-baby-coach.rest { --tone: #4c6ef5; }
+.dm-baby-coach.bath { --tone: #1098ad; }
+.dm-baby-coach.play { --tone: #37b24d; }
+.dm-baby-coach.ok { --tone: #e64980; }
+.dm-baby-coach > span {
+  font-size: 18px;
+  line-height: 1;
+}
+.dm-baby-coach.feed > span,
+.dm-baby-coach.sleep > span,
+.dm-baby-coach.bath > span,
+.dm-baby-coach.play > span {
+  animation: dm-baby-bubble 1.8s ease-in-out infinite;
+}
+.dm-baby-coach strong {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dm-baby-coach button {
+  flex: none;
+  height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 99px;
+  background: var(--tone);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--tone) 40%, transparent);
+  transition: transform var(--dur-fast, 150ms) ease;
+}
+.dm-baby-coach button:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.dm-baby-coach button:disabled {
+  opacity: 0.5;
+}
+@keyframes dm-baby-coach-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+}
+
+/* ---------- HUD: growth bar with the stage, ring meters with the number ---------- */
+.dm-baby-hud {
+  grid-template-columns: minmax(0, 1.7fr) repeat(4, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 6px;
+}
+.dm-baby-hud > span {
+  height: auto;
+  min-height: 42px;
+  border-radius: 16px;
+}
+.dm-baby-hud-grow {
+  flex-direction: column;
+  align-items: stretch !important;
+  justify-content: center;
+  gap: 4px !important;
+  padding: 5px 10px !important;
+}
+.dm-baby-hud-grow-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+.dm-baby-hud-grow-top small {
+  overflow: hidden;
+  font-size: 11.5px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dm-baby-hud-grow .dm-baby-hud-bar {
+  flex: none;
+  height: 7px;
+}
+.dm-baby-hud-grow .dm-baby-hud-bar i {
+  background: linear-gradient(90deg, #9775fa, #7950f2);
+}
+.dm-baby-hud-meter {
+  justify-content: center;
+  gap: 4px !important;
+  padding: 0 6px !important;
+}
+.dm-baby-ring {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: conic-gradient(var(--tone) calc(var(--v) * 1%), color-mix(in srgb, var(--tone) 16%, var(--surface)) 0);
+  isolation: isolate;
+}
+/* The white center makes the conic gradient a ring; the emoji sits on top of it. */
+.dm-baby-ring::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--surface);
+}
+.dm-baby-ring i {
+  position: relative;
+  font-size: 13px;
+  font-style: normal;
+  line-height: 1;
+}
+.dm-baby-hud-meter > b {
+  min-width: 18px;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.dm-baby-hud-meter.low > b {
+  color: #e03131;
+}
+.dm-baby-hud-meter.low .dm-baby-ring {
+  animation: dm-baby-bubble 1.8s ease-in-out infinite;
+}
+@media (max-width: 380px) {
+  .dm-baby-hud-meter > b {
+    display: none;
+  }
+}
+
+/* ---------- Name tag: today's care ---------- */
+.dm-baby-tag em {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: rgba(121, 80, 242, 0.14);
+  color: #6741d9;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+}
+.dm-baby-tag em.done {
+  background: #37b24d;
+  color: #fff;
+}
+.dm-baby-room.night .dm-baby-tag em:not(.done) {
+  background: rgba(255, 255, 255, 0.16);
+  color: #e5dbff;
+}
+
+/* ---------- Dock: lighter, with a clear active state ---------- */
+.dm-baby-dock {
+  padding: 7px 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--surface-muted) 70%, var(--surface));
+}
+.dm-baby-dock-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 15px;
+  background: color-mix(in srgb, currentColor 10%, var(--surface));
+  box-shadow: none;
+}
+.dm-baby-dock button.active .dm-baby-dock-icon {
+  background: currentColor;
+  box-shadow: 0 4px 12px rgba(20, 16, 30, 0.18);
+}
+.dm-baby-dock button.active .dm-baby-dock-icon svg {
+  color: #fff;
+}
+.dm-baby-dock button.active small {
+  color: var(--text);
+}
+.dm-baby-dock small {
+  color: var(--muted);
+}
+.dm-baby-dock-icon em {
+  border-color: var(--surface);
+  background: #e64980;
+}
+.dm-baby-dock button:disabled {
+  opacity: 0.35;
+}
+
+/* Dark theme */
+:root[data-theme="dark"] .dm-baby-tag em:not(.done) {
+  background: rgba(151, 117, 250, 0.22);
+  color: #d0bfff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dm-baby-coach,
+  .dm-baby-coach > span,
+  .dm-baby-hud-meter.low .dm-baby-ring {
+    animation: none !important;
+  }
+}

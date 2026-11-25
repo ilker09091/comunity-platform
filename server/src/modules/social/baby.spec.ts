@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  catchesCold, decayed, energyOf, FULLNESS_HOURS, grantedXp, moodOf, normalizeWord, SHOP, stageOf, STAGE_XP, teachableWord, wordToLearn, XP,
+  ASLEEP_DECAY, catchesCold, decayed, favoriteWord, usesWord, energyOf, FULLNESS_HOURS, grantedXp, moodOf, normalizeWord, SHOP, stageOf, STAGE_XP, teachableWord, wordToLearn, XP,
 } from './baby.js';
 
 describe('our baby rules', () => {
@@ -69,5 +69,25 @@ describe('our baby rules', () => {
   it('shop ids are unique and every decoration has a slot', () => {
     expect(new Set(SHOP.map((i) => i.id)).size).toBe(SHOP.length);
     for (const item of SHOP) expect(item.kind === 'toy' ? !item.slot : !!item.slot).toBe(true);
+  });
+
+  it('asleep, the meters run down more slowly', () => {
+    const at = new Date('2026-01-01T00:00:00Z');
+    const later = new Date('2026-01-01T08:00:00Z');
+    // Awake for 8 hours: half the tummy is gone. Asleep the whole time: a quarter.
+    expect(decayed(100, at, FULLNESS_HOURS, later)).toBe(50);
+    expect(decayed(100, at, FULLNESS_HOURS, later, at)).toBe(100 - 50 * ASLEEP_DECAY);
+    // Fell asleep after 4 hours.
+    expect(decayed(100, at, FULLNESS_HOURS, later, new Date('2026-01-01T04:00:00Z'))).toBe(Math.round(100 - 25 - 25 * ASLEEP_DECAY));
+  });
+
+  it('words are only found at the start of a word', () => {
+    expect(usesWord('zannedersem öyle', 'anne')).toBe(false);
+    expect(usesWord('tamamam', 'mama')).toBe(false);
+    expect(usesWord('Seni çok seviyorum AŞKIMMM', 'aşkım')).toBe(true);
+    expect(usesWord('günaydın, aşkımı özledim', 'aşkım')).toBe(true);
+    expect(wordToLearn('zannedersem', ['anne'], new Set())).toBeNull();
+    expect(favoriteWord(['canım', 'canım benim', 'aşkım', 'zannedersem'], ['anne', 'aşkım', 'canım'])).toBe('canım');
+    expect(favoriteWord(['merhaba'], ['anne'])).toBeNull();
   });
 });

@@ -17,7 +17,7 @@ import {
   MinLength,
 } from 'class-validator';
 import { CursorQueryDto } from '../../common/dto/common.dto.js';
-import { GAME_KINDS, type GameKind } from '../../database/migrations/1760193400000-TalkGames.js';
+import { GAME_KINDS, type GameKind } from '../../database/migrations/1760193700000-EvenMoreGames.js';
 import { CHAT_THEMES, type ChatTheme } from '../../database/migrations/1760192700000-StrictStreaksAndChatThemes.js';
 import { SanitizedText } from '../../common/utils/sanitize.js';
 import { MediaDto } from '../media/dto/media.dto.js';
@@ -325,19 +325,31 @@ export class ChatGameDto {
   @ApiProperty({ type: String, nullable: true, description: 'Q&A: ask | answer | explain. Truth or Dare: pick | prompt | reply' }) phase: string | null;
   @ApiProperty({ type: () => GameTurnDto, isArray: true, description: 'Q&A and Truth or Dare turns so far (the last one is in progress)' }) turns: GameTurnDto[];
   @ApiProperty({ type: Number, isArray: true, description: 'Q&A: "what do you mean?" left; Truth or Dare: passes left (per player)' }) chances: number[];
+  @ApiProperty({
+    type: 'object', additionalProperties: true,
+    description: 'Newer games (from hangman on): '
+      + 'everything the viewer may see of the game, shaped per kind. Empty for the older games',
+  })
+  view: Record<string, unknown>;
   @ApiProperty({ format: 'date-time' }) updatedAt: string;
 }
 export class StartGameDto {
   @ApiProperty({ enum: GAME_KINDS }) @IsIn([...GAME_KINDS]) kind: GameKind;
+  @ApiPropertyOptional({ enum: ['en', 'tr'], description: 'Language for games with words in them (Word Search)' })
+  @IsOptional() @IsIn(['en', 'tr']) lang?: 'en' | 'tr';
 }
+const GAME_ACTIONS = [
+  'ask', 'answer', 'clarify', 'explain', 'pick', 'prompt', 'reply', 'pass', 'guess', 'solve', 'set', 'word', 'roll', 'hold',
+  'judge', 'add', 'toggle', 'close', 'move', 'undo',
+] as const;
 export class GameMoveDto {
-  @ApiPropertyOptional({ description: 'Board cell (XOX, Five in a Row, Memory) or column (Connect Four)' })
-  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(80) cell?: number;
+  @ApiPropertyOptional({ description: 'Board cell (XOX, Five in a Row, Memory, Reversi, Battleship), column (Connect Four), line (Dots), pit (Mangala, 0-5), the lie (0-2) a guess (How well do you know me: 0 = a, 1 = b), a judgement (Love Map: 1 right, 0 wrong), a list item (Bucket List), a card (Pişti), a Sudoku square, a word-search drag (start × 100 + end) or the checker to move (Tavla, 24 = the bar)' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(9999) cell?: number;
   @ApiPropertyOptional({ enum: ['rock', 'paper', 'scissors', 'a', 'b', 'truth', 'dare'], description: 'Rock-paper-scissors pick, This or That answer, or truth/dare' })
   @IsOptional() @IsIn(['rock', 'paper', 'scissors', 'a', 'b', 'truth', 'dare']) choice?: 'rock' | 'paper' | 'scissors' | 'a' | 'b' | 'truth' | 'dare';
-  @ApiPropertyOptional({ enum: ['ask', 'answer', 'clarify', 'explain', 'pick', 'prompt', 'reply', 'pass'], description: 'Q&A and Truth or Dare moves' })
-  @IsOptional() @IsIn(['ask', 'answer', 'clarify', 'explain', 'pick', 'prompt', 'reply', 'pass'])
-  action?: 'ask' | 'answer' | 'clarify' | 'explain' | 'pick' | 'prompt' | 'reply' | 'pass';
+  @ApiPropertyOptional({ enum: GAME_ACTIONS, description: 'Moves of the written and turn-based games (Q&A, Truth or Dare, Hangman, Number Puzzle, Dice…)' })
+  @IsOptional() @IsIn([...GAME_ACTIONS])
+  action?: (typeof GAME_ACTIONS)[number];
   @ApiPropertyOptional({ maxLength: 300, description: 'Written move: a question, answer, dare or explanation' })
   @IsOptional() @IsString() @MaxLength(300) @SanitizedText({ multiline: true }) text?: string;
 }

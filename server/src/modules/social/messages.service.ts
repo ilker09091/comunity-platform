@@ -13,8 +13,10 @@ import { MediaUrlService } from '../media/media-url.service.js';
 import { StickersService } from './stickers.service.js';
 import { GifsService } from '../gifs/gifs.js';
 import type { ChatTheme } from '../../database/migrations/1760192700000-StrictStreaksAndChatThemes.js';
-import type { GameKind } from '../../database/migrations/1760193400000-TalkGames.js';
-import { applyMove, GameRuleError, initialState, THIS_OR_THAT, type BoardState, type GameState, type MemoryState, type RpsState, type TotState, type QaState, type TodState, type GameMove } from './games.js';
+import type { GameKind } from '../../database/migrations/1760193700000-EvenMoreGames.js';
+import { EXTRA_KINDS, extraPicks, extraView, type ExtraKind, type ExtraState } from './games-extra.js';
+import { THIRD_KINDS, thirdPicks, thirdView, type ThirdKind, type ThirdState } from './games-third.js';
+import { applyMove, firstTurn, GameRuleError, initialState, THIS_OR_THAT, type BoardState, type GameState, type MemoryState, type RpsState, type TotState, type QaState, type TodState, type GameMove } from './games.js';
 import { PostsQueryService } from '../posts/posts-query.service.js';
 import {
   USER_AVATAR_JOIN,
@@ -625,14 +627,18 @@ export class MessagesService {
     const tot=kind==='thisorthat'?state as TotState:null;
     const qa=kind==='qa'?state as QaState:null;
     const tod=kind==='tod'?state as TodState:null;
-    const board=!rps&&!memory&&!tot&&!qa&&!tod?state as BoardState:null;
-    const picks=rps?.picks??tot?.picks??null;
+    const extra=(EXTRA_KINDS as readonly string[]).includes(kind)?kind as ExtraKind:null;
+    const third=(THIRD_KINDS as readonly string[]).includes(kind)?kind as ThirdKind:null;
+    const over=g.status!=='active';
+    const view=extra?extraView(extra,state as ExtraState,me,over):third?thirdView(third,state as ThirdState,me,over):{};
+    const board=!rps&&!memory&&!tot&&!qa&&!tod&&!extra&&!third?state as BoardState:null;
+    const picks=rps?.picks??tot?.picks??(extra?extraPicks(extra,state as ExtraState):third?thirdPicks(third,state as ThirdState):null);
     const label=(q:number)=>[...(THIS_OR_THAT[q]??['',''])];
     return {
       id:g.id,kind,players:g.players,
       board:board?.board??[],line:board?.line??[],
       turnId:g.turn_id??null,status:g.status,winnerId:g.winner_id??null,
-      scores:rps?.scores??memory?.scores??[],
+      scores:rps?.scores??memory?.scores??(Array.isArray(view.scores)?view.scores as number[]:[]),
       rounds:rps?rps.rounds.map(r=>({choices:r.choices,winner:r.winner,labels:[]}))
         :tot?tot.rounds.map(r=>({choices:r.answers,winner:null,labels:label(r.q)})):[],
       // Memory faces stay secret until a card is turned up; so do the other player's picks.
@@ -646,14 +652,15 @@ export class MessagesService {
       turns:qa?qa.rounds.map(r=>({who:r.asker,pick:null,question:r.question,clarify:r.clarify,clarification:r.clarification,answer:r.answer,passed:false}))
         :tod?tod.rounds.map(r=>({who:r.player,pick:r.pick,question:r.prompt,clarify:null,clarification:null,answer:r.reply,passed:r.passed})):[],
       chances:qa?.chances??tod?.chances??[],
-      round:tot?.round??(qa?qa.rounds.length-1:tod?tod.rounds.length-1:0),
-      totalRounds:tot?.order.length??qa?.total??tod?.total??0,
+      round:tot?.round??(qa?qa.rounds.length-1:tod?tod.rounds.length-1:typeof view.round==='number'?view.round:0),
+      totalRounds:tot?.order.length??qa?.total??tod?.total??(typeof view.total==='number'?view.total:0),
+      view,
       updatedAt:iso(g.updated_at)!,
     };
   }
 
   /** Starts a mini game: it arrives as a message, and you move first. */
-  async startGame(viewerId:string,peerId:string,kind:GameKind) {
+  async startGame(viewerId:string,peerId:string,kind:GameKind,lang:'en'|'tr'='en') {
     await this.assertPeer(viewerId,peerId,true);
     const row=await this.db.transaction(async m=>{
       await sqlRows(m,'SELECT pg_advisory_xact_lock(hashtext(least($1::text, $2::text) || greatest($1::text, $2::text)))',[viewerId,peerId]);
@@ -661,9 +668,10 @@ export class MessagesService {
         throw AppException.notFound(ErrorCode.USER_NOT_FOUND,'User not found');
       if((await this.requestState(m,peerId,viewerId)).request)
         throw AppException.forbidden(ErrorCode.INVALID_STATE,'Games are available after your message request is accepted');
+      const state=initialState(kind,Math.random,lang), first=firstTurn(kind,state);
       const game=(await sqlOne<{id:string}>(m,`INSERT INTO chat_games(low_id,high_id,kind,players,state,turn_id,created_by)
         VALUES (least($1::uuid,$2::uuid),greatest($1::uuid,$2::uuid),$3,ARRAY[$1::uuid,$2::uuid],$4,$5,$1) RETURNING id`,
-        [viewerId,peerId,kind,JSON.stringify(initialState(kind)),kind==='rps'||kind==='thisorthat'?null:viewerId]))!;
+        [viewerId,peerId,kind,JSON.stringify(state),first===null?null:[viewerId,peerId][first]]))!;
       return (await sqlOne(m,'INSERT INTO direct_messages(sender_id,recipient_id,game_id) VALUES ($1,$2,$3) RETURNING *',[viewerId,peerId,game.id]))!;
     });
     this.push.notifyUser(peerId);

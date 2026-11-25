@@ -5578,7 +5578,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "xox" | "connect4" | "rps" | "memory" | "thisorthat" | "gomoku" | "qa" | "tod";
+            kind: "xox" | "connect4" | "rps" | "memory" | "thisorthat" | "gomoku" | "qa" | "tod" | "hangman" | "bulls" | "dots" | "reversi" | "mangala" | "battleship" | "pig" | "wordchain" | "lies" | "nhie" | "knowme" | "story" | "lovemap" | "daily" | "whomore" | "bucket" | "colorword" | "emoji" | "sudoku" | "wordsearch" | "pisti" | "coin" | "wheel" | "dama" | "tavla" | "chess";
             /** @description players[0] starts; on boards, 1 marks players[0] and 2 players[1] */
             players: string[];
             /** @description Board cells, row by row (XOX, Connect Four, Five in a Row) */
@@ -5620,6 +5620,10 @@ export interface components {
             turns: components["schemas"]["GameTurnDto"][];
             /** @description Q&A: "what do you mean?" left; Truth or Dare: passes left (per player) */
             chances: number[];
+            /** @description Newer games (from hangman on): everything the viewer may see of the game, shaped per kind. Empty for the older games */
+            view: {
+                [key: string]: unknown;
+            };
             /** Format: date-time */
             updatedAt: string;
         };
@@ -5946,7 +5950,7 @@ export interface components {
             outfit: number;
         };
         GameMoveDto: {
-            /** @description Board cell (XOX, Five in a Row, Memory) or column (Connect Four) */
+            /** @description Board cell (XOX, Five in a Row, Memory, Reversi, Battleship), column (Connect Four), line (Dots), pit (Mangala, 0-5), the lie (0-2) a guess (How well do you know me: 0 = a, 1 = b), a judgement (Love Map: 1 right, 0 wrong), a list item (Bucket List), a card (Pişti), a Sudoku square, a word-search drag (start × 100 + end) or the checker to move (Tavla, 24 = the bar) */
             cell?: number;
             /**
              * @description Rock-paper-scissors pick, This or That answer, or truth/dare
@@ -5954,16 +5958,21 @@ export interface components {
              */
             choice?: "rock" | "paper" | "scissors" | "a" | "b" | "truth" | "dare";
             /**
-             * @description Q&A and Truth or Dare moves
+             * @description Moves of the written and turn-based games (Q&A, Truth or Dare, Hangman, Number Puzzle, Dice…)
              * @enum {string}
              */
-            action?: "ask" | "answer" | "clarify" | "explain" | "pick" | "prompt" | "reply" | "pass";
+            action?: "ask" | "answer" | "clarify" | "explain" | "pick" | "prompt" | "reply" | "pass" | "guess" | "solve" | "set" | "word" | "roll" | "hold" | "judge" | "add" | "toggle" | "close" | "move" | "undo";
             /** @description Written move: a question, answer, dare or explanation */
             text?: string;
         };
         StartGameDto: {
             /** @enum {string} */
-            kind: "xox" | "connect4" | "rps" | "memory" | "thisorthat" | "gomoku" | "qa" | "tod";
+            kind: "xox" | "connect4" | "rps" | "memory" | "thisorthat" | "gomoku" | "qa" | "tod" | "hangman" | "bulls" | "dots" | "reversi" | "mangala" | "battleship" | "pig" | "wordchain" | "lies" | "nhie" | "knowme" | "story" | "lovemap" | "daily" | "whomore" | "bucket" | "colorword" | "emoji" | "sudoku" | "wordsearch" | "pisti" | "coin" | "wheel" | "dama" | "tavla" | "chess";
+            /**
+             * @description Language for games with words in them (Word Search)
+             * @enum {string}
+             */
+            lang?: "en" | "tr";
         };
         ChatPrefsDto: {
             /** @description Private nickname for them; null or empty clears it */
